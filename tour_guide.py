@@ -3,9 +3,9 @@ import streamlit as st
 
 # Conteúdo do tour
 TOUR_SECTIONS = {
-    'Início': {
-        'icon': '🎯',
-        'content': '''
+    "Início": {
+        "icon": "🎯",
+        "content": """
 **Bem-vindo ao Guia de Apresentação!**
 
 Este tour vai te guiar em cada seção do dashboard.
@@ -17,11 +17,11 @@ Este tour vai te guiar em cada seção do dashboard.
 
 💡 **Dica:** Mantenha este guia aberto em uma aba 
 separada durante a apresentação!
-'''
+""",
     },
-    'KPIs': {
-        'icon': '📊',
-        'content': '''
+    "KPIs": {
+        "icon": "📊",
+        "content": """
 **Resumo Executivo - O que falar:**
 
 "Aqui temos as 5 métricas principais que vocês vão acompanhar."
@@ -49,11 +49,11 @@ separada durante a apresentação!
 
 💡 **Insight:** Todos indicadores com performance 
 acima do esperado!
-'''
+""",
     },
-    'Funil': {
-        'icon': '🪜',
-        'content': '''
+    "Funil": {
+        "icon": "🪜",
+        "content": """
 **Funil AIDA - O que destacar:**
 
 "Este funil mostra toda a jornada do usuário."
@@ -82,11 +82,11 @@ indica que estamos atraindo o público certo.
 
 🎯 **Oportunidade:** Aumentar impressões 
 mantendo essa qualidade de conversão.
-'''
+""",
     },
-    'Atenção': {
-        'icon': '👀',
-        'content': '''
+    "Atenção": {
+        "icon": "👀",
+        "content": """
 **Etapa 1: Atenção - Criativos**
 
 "Aqui vemos qual mensagem gera mais cliques."
@@ -117,11 +117,11 @@ CTR E o MENOR CPC. Melhor dos dois mundos!
 📊 **Bônus:** Público 40-60 anos responde 
 2.3x melhor. Horário 19h-22h tem 45% mais 
 engajamento.
-'''
+""",
     },
-    'Interesse': {
-        'icon': '🎯',
-        'content': '''
+    "Interesse": {
+        "icon": "🎯",
+        "content": """
 **Etapa 2: Interesse - Landing Page**
 
 "Vamos ver o que acontece na LP."
@@ -150,11 +150,11 @@ conversão é RARO. Significa:
 
 📊 **Detalhe:** Seção "Remédios" teve 78% 
 scroll depth. Valida que é a feature âncora!
-'''
+""",
     },
-    'Desejo': {
-        'icon': '💎',
-        'content': '''
+    "Desejo": {
+        "icon": "💎",
+        "content": """
 **Etapa 3: Desejo - Remarketing**
 
 "Nutrimos quem demonstrou interesse."
@@ -186,11 +186,11 @@ Taxa abertura: 28% (média: 18%)
 
 🎯 **Otimização:** Carrossel de depoimentos 
 aumentou conversão em 35%!
-'''
+""",
     },
-    'Ação': {
-        'icon': '🚀',
-        'content': '''
+    "Ação": {
+        "icon": "🚀",
+        "content": """
 **Etapa 4: Ação - Instalações**
 
 "A etapa final: instalações efetivas."
@@ -224,11 +224,11 @@ aumentou conversão em 35%!
 
 🎯 **Não estamos gerando instalações, 
 estamos gerando USUÁRIOS ATIVOS!**
-'''
+""",
     },
-    'Próximas Ações': {
-        'icon': '⚡',
-        'content': '''
+    "Próximas Ações": {
+        "icon": "⚡",
+        "content": """
 **Próximas Ações - O que falar:**
 
 "Com base nos dados, identificamos as próximas ações."
@@ -265,11 +265,11 @@ dados e impacto esperado mensurável."
 🎯 **Pergunta final:** "Gostariam que eu 
 priorizasse alguma dessas ações, ou seguimos 
 com esse roadmap?"
-'''
+""",
     },
-    'Fechamento': {
-        'icon': '🎉',
-        'content': '''
+    "Fechamento": {
+        "icon": "🎉",
+        "content": """
 **Como Fechar a Apresentação**
 
 "Recapitulando:"
@@ -312,34 +312,26 @@ para finalizar e começar?"
 - PDF resumo
 - Proposta comercial
 - Cronograma detalhado
-'''
-    }
+""",
+    },
 }
+
 
 def render_tour_guide():
     """Renderiza o tour guiado no sidebar"""
-    
+
     with st.sidebar:
         st.markdown("### 📖 Guia de Apresentação")
-        st.markdown("---")
-        
-        # Seleção da seção
+        st.divider()
+
         secao = st.radio(
             "Navegue pelas seções:",
             list(TOUR_SECTIONS.keys()),
-            label_visibility="collapsed"
+            index=0,
         )
-        
-        # Exibir conteúdo da seção selecionada
+
         section_data = TOUR_SECTIONS[secao]
-        
-        st.markdown(f"## {section_data['icon']} {secao}")
-        st.markdown(section_data['content'])
-        
-        st.markdown("---")
-        st.markdown("""
-        <div style='text-align: center; font-size: 0.8rem; color: #94a3b8;'>
-            💡 Use este guia durante a apresentação<br/>
-            📱 Funciona em qualquer dispositivo
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"#### {section_data['icon']} {secao}")
+        st.markdown(section_data["content"])
+
+        st.caption("💡 Use este guia durante a apresentação. 📱 Funciona bem no notebook e no celular.")

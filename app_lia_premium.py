@@ -392,32 +392,33 @@ df_installs = pd.DataFrame({
 })
 
 # ---------------- LAYOUT ----------------
-st.markdown('<div class="lia-container">', unsafe_allow_html=True)
-
-# Header
-st.markdown(
-    """
-    <div class="lia-header">
-        <div class="lia-title">📊 App LIA • Dashboard AIDA</div>
-        <div class="lia-subtitle">
-            Dashboard de validação H1 • Gestão de tráfego Meta Ads<br/>
-            <strong>Nota:</strong> Os dados abaixo são exemplos do briefing. Serão substituídos por dados reais após início das campanhas.
+# Using st.container() instead of HTML div for main container
+with st.container():
+    # Header - using small HTML block only for styling
+    st.markdown(
+        """
+        <div class="lia-header">
+            <div class="lia-title">📊 App LIA • Dashboard AIDA</div>
+            <div class="lia-subtitle">
+                Dashboard de validação H1 • Gestão de tráfego Meta Ads<br/>
+                <strong>Nota:</strong> Os dados abaixo são exemplos do briefing. Serão substituídos por dados reais após início das campanhas.
+            </div>
         </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ---------- RESUMO EXECUTIVO ----------
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">🎯</span>
-        <h2 class="lia-section-title">Resumo Executivo</h2>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">🎯</span>
+            <h2 class="lia-section-title">Resumo Executivo</h2>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 col1, col2, col3, col4, col5 = st.columns(5)
 
@@ -486,22 +487,20 @@ with col5:
         unsafe_allow_html=True,
     )
 
-st.markdown("<br/>", unsafe_allow_html=True)
-
 # ---------- EVOLUÇÃO SEMANAL ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">📈</span>
-        <h2 class="lia-section-title">Evolução Semanal</h2>
-    </div>
-    <div class="lia-section-caption">
-        Acompanhamento do crescimento de instalações ao longo das 5 semanas de campanha.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">📈</span>
+            <h2 class="lia-section-title">Evolução Semanal</h2>
+        </div>
+        <div class="lia-section-caption">
+            Acompanhamento do crescimento de instalações ao longo das 5 semanas de campanha.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 fig_line = go.Figure()
 fig_line.add_trace(go.Scatter(
@@ -526,22 +525,21 @@ fig_line.update_layout(
 )
 
 st.plotly_chart(fig_line, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------- FUNIL AIDA VISUAL ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">🪜</span>
-        <h2 class="lia-section-title">Funil AIDA • Visão Macro</h2>
-    </div>
-    <div class="lia-section-caption">
-        Estrutura completa do funil: Impressões → Cliques → Visitas → CTA → Instalações
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">🪜</span>
+            <h2 class="lia-section-title">Funil AIDA • Visão Macro</h2>
+        </div>
+        <div class="lia-section-caption">
+            Estrutura completa do funil: Impressões → Cliques → Visitas → CTA → Instalações
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 col_f1, col_f2 = st.columns([3, 2])
 
@@ -585,22 +583,20 @@ with col_f2:
             unsafe_allow_html=True,
         )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------- ETAPA 1: ATENÇÃO ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">👀</span>
-        <h2 class="lia-section-title">Etapa 1 • Atenção</h2>
-    </div>
-    <div class="lia-section-caption">
-        <strong>Objetivo:</strong> Gerar o clique. Análise de performance dos criativos e métricas de engajamento.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">👀</span>
+            <h2 class="lia-section-title">Etapa 1 • Atenção</h2>
+        </div>
+        <div class="lia-section-caption">
+            <strong>Objetivo:</strong> Gerar o clique. Análise de performance dos criativos e métricas de engajamento.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 col_a1, col_a2, col_a3 = st.columns(3)
 
@@ -639,8 +635,6 @@ with col_a3:
         """,
         unsafe_allow_html=True,
     )
-
-st.markdown("<br/>", unsafe_allow_html=True)
 
 col_g1, col_g2 = st.columns(2)
 
@@ -716,22 +710,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------- ETAPA 2: INTERESSE ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">🎯</span>
-        <h2 class="lia-section-title">Etapa 2 • Interesse</h2>
-    </div>
-    <div class="lia-section-caption">
-        <strong>Objetivo:</strong> Reter o usuário na Landing Page e gerar engajamento.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">🎯</span>
+            <h2 class="lia-section-title">Etapa 2 • Interesse</h2>
+        </div>
+        <div class="lia-section-caption">
+            <strong>Objetivo:</strong> Reter o usuário na Landing Page e gerar engajamento.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 col_i1, col_i2, col_i3, col_i4 = st.columns(4)
 
@@ -783,7 +775,6 @@ with col_i4:
         unsafe_allow_html=True,
     )
 
-st.markdown("<br/>", unsafe_allow_html=True)
 st.markdown("**📊 Métricas da Landing Page**")
 st.dataframe(df_lp, use_container_width=True, hide_index=True)
 
@@ -799,22 +790,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------- ETAPA 3: DESEJO ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">💎</span>
-        <h2 class="lia-section-title">Etapa 3 • Desejo</h2>
-    </div>
-    <div class="lia-section-caption">
-        <strong>Objetivo:</strong> Converter intenção em ação através de remarketing e nutrição.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">💎</span>
+            <h2 class="lia-section-title">Etapa 3 • Desejo</h2>
+        </div>
+        <div class="lia-section-caption">
+            <strong>Objetivo:</strong> Converter intenção em ação através de remarketing e nutrição.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 col_d1, col_d2, col_d3 = st.columns(3)
 
@@ -853,8 +842,6 @@ with col_d3:
         """,
         unsafe_allow_html=True,
     )
-
-st.markdown("<br/>", unsafe_allow_html=True)
 
 fig_remarketing = px.bar(
     df_remarketing,
@@ -902,22 +889,20 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------- ETAPA 4: AÇÃO ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">🚀</span>
-        <h2 class="lia-section-title">Etapa 4 • Ação</h2>
-    </div>
-    <div class="lia-section-caption">
-        <strong>Objetivo:</strong> Gerar instalações efetivas e ativar usuários no app.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">🚀</span>
+            <h2 class="lia-section-title">Etapa 4 • Ação</h2>
+        </div>
+        <div class="lia-section-caption">
+            <strong>Objetivo:</strong> Gerar instalações efetivas e ativar usuários no app.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 col_ac1, col_ac2, col_ac3, col_ac4 = st.columns(4)
 
@@ -968,8 +953,6 @@ with col_ac4:
         """,
         unsafe_allow_html=True,
     )
-
-st.markdown("<br/>", unsafe_allow_html=True)
 
 col_p1, col_p2 = st.columns(2)
 
@@ -1035,19 +1018,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------- DISTRIBUIÇÃO DE INVESTIMENTO ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">💵</span>
-        <h2 class="lia-section-title">Distribuição de Investimento</h2>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">💵</span>
+            <h2 class="lia-section-title">Distribuição de Investimento</h2>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 df_budget = pd.DataFrame({
     "Categoria": ["Tráfego / Atenção", "Remarketing / Desejo", "App Installs / Ação"],
@@ -1079,19 +1060,17 @@ st.dataframe(
     hide_index=True,
 )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------- PRÓXIMOS PASSOS ----------
-st.markdown('<div class="lia-section">', unsafe_allow_html=True)
-st.markdown(
-    """
-    <div class="lia-section-header">
-        <span class="lia-section-icon">🎯</span>
-        <h2 class="lia-section-title">Próximas Ações & Recomendações</h2>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+with st.container():
+    st.markdown(
+        """
+        <div class="lia-section-header">
+            <span class="lia-section-icon">🎯</span>
+            <h2 class="lia-section-title">Próximas Ações & Recomendações</h2>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 col_r1, col_r2 = st.columns(2)
 
@@ -1121,8 +1100,6 @@ with col_r2:
         """
     )
 
-st.markdown('</div>', unsafe_allow_html=True)
-
 # ---------- FOOTER ----------
 st.markdown(
     """
@@ -1134,5 +1111,3 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
-st.markdown('</div>', unsafe_allow_html=True)

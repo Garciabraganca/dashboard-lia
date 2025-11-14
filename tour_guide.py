@@ -1,93 +1,115 @@
 import streamlit as st
 
-# Definição das seções do tour
 TOUR_SECTIONS = {
     "intro": {
         "titulo": "👋 Bem-vindo ao Dashboard AIDA",
         "conteudo": """
-        Este dashboard apresenta a estrutura completa do **Funil AIDA** aplicada às campanhas de tráfego do Grupo Garcia.
+        Este dashboard apresenta:
         
-        **O que você verá:**
-        - 📊 Resumo executivo do App LIA
-        - 🧹 Case real de recrutamento
-        - 📈 Evolução semanal de métricas
-        - 🪜 Funil AIDA completo
-        - 💡 Insights e próximos passos
+        **1. Case Real de Sucesso (Grupo Garcia):**
+        - Campanha real de recrutamento
+        - Métricas comprovadas
+        - Resultados tangíveis
         
-        Use este menu lateral para navegar pelas explicações de cada seção!
+        **2. Estrutura AIDA (Exemplo App LIA):**
+        - Modelo de funil aplicável
+        - Projeções baseadas em briefing
+        - Framework para outras campanhas
+        
+        Use o menu lateral para navegar!
         """
     },
-    "resumo": {
-        "titulo": "🎯 Resumo Executivo",
+    "case_real": {
+        "titulo": "🧹 Case Real - Profissionais de Limpeza",
         "conteudo": """
-        **North Star Metric:** Instalações do app (120 total)
+        **Campanha de Recrutamento via Meta Ads**
         
-        **Principais KPIs:**
-        - CPI (Custo por Instalação): R$ 15,00
-        - Crescimento: +43% vs período anterior
-        - Investimento total: R$ 1.800
-        - ROI: Aguardando dados de LTV
+        **Período:** Setembro a Novembro 2024
         
-        Estes indicadores mostram a eficiência da campanha em converter investimento em resultados concretos.
-        """
-    },
-    "case": {
-        "titulo": "🧹 Case Real",
-        "conteudo": """
-        **Campanha de Recrutamento - Profissionais de Limpeza**
-        
-        **Resultados:**
-        - Total de leads: 55
-        - CPL médio: R$ 7,01
-        - Redução de CPL: 38,5% (2º ciclo vs 1º ciclo)
-        - Crescimento de leads: +193% entre períodos
+        **Resultados Comprovados:**
+        - 55 leads gerados
+        - R$ 385,58 investidos
+        - CPL de R$ 7,01
+        - Redução de 38,5% no CPL entre períodos
+        - Crescimento de 193% em volume
         
         **Aprendizados:**
-        - Otimização contínua reduz custos
-        - Volume escala sem perder eficiência
-        - Segmentação refinada melhora qualidade
+        - Otimização contínua funciona
+        - Segmentação refinada reduz custos
+        - Volume escala sem perder qualidade
         """
     },
-    "evolucao": {
-        "titulo": "📈 Evolução Semanal",
+    "projecao_lia": {
+        "titulo": "📊 Projeção App LIA",
         "conteudo": """
-        **Crescimento Consistente:**
-        - S1: 10 instalações
-        - S2: 18 instalações (+80%)
-        - S3: 24 instalações (+33%)
-        - S4: 28 instalações (+17%)
-        - S5: 40 instalações (+43%)
+        **Dados de Briefing - Exemplo de Aplicação**
         
-        O gráfico mostra aceleração nas últimas semanas, indicando maturação da campanha e otimização dos criativos.
+        Este funil mostra como a metodologia AIDA seria aplicada ao App LIA:
+        
+        - 100k impressões
+        - 3k cliques (CTR 3%)
+        - 900 visitas à LP
+        - 300 cliques no CTA
+        - 120 instalações finais
+        
+        **Importante:** Estes são dados projetados para demonstrar a estrutura do funil, diferente do case real acima.
         """
     },
-    "funil": {
-        "titulo": "🪜 Funil AIDA",
+    "funil_aida": {
+        "titulo": "🪜 Metodologia AIDA",
         "conteudo": """
-        **Estrutura do Funil:**
+        **As 4 Etapas do Funil:**
         
-        1. **Atenção** (Impressões): 100.000
-        2. **Interesse** (Cliques): 3.000 (3% CTR)
-        3. **Desejo** (Visitas LP): 900 (30% conversão)
-        4. **Ação** (Instalações): 120 (13% conversão final)
+        1. **ATENÇÃO** - Impressões e alcance
+           - Gerar visibilidade máxima
+           - Segmentação precisa
         
-        **Taxa de conversão total:** 0,12% (dentro da média para apps)
+        2. **INTERESSE** - Cliques e engajamento
+           - Criativos que convertem
+           - CTR acima da média
         
-        Cada etapa é otimizada para maximizar o avanço ao próximo nível.
+        3. **DESEJO** - Landing Page
+           - Conteúdo persuasivo
+           - Experiência otimizada
+        
+        4. **AÇÃO** - Conversão final
+           - CTA claro
+           - Processo sem fricção
         """
     },
-    "proximos": {
+    "metricas": {
+        "titulo": "📈 Métricas-Chave",
+        "conteudo": """
+        **Indicadores Essenciais:**
+        
+        - **CPM**: Custo por mil impressões
+        - **CTR**: Taxa de cliques
+        - **CPC**: Custo por clique
+        - **CPL/CPI**: Custo por lead/instalação
+        - **Taxa de Conversão**: % em cada etapa
+        
+        **Benchmarks:**
+        - CTR bom: > 2%
+        - Taxa rejeição: < 50%
+        - Tempo na página: > 2min
+        """
+    },
+    "proximos_passos": {
         "titulo": "🚀 Próximos Passos",
         "conteudo": """
-        **Recomendações Estratégicas:**
+        **Ações Recomendadas:**
         
-        1. **Testar novos criativos** baseados no vencedor
-        2. **Expandir lookalike** do público warm
-        3. **Ativar remarketing** para visitantes
-        4. **A/B test na LP** para aumentar conversão
-        5. **Escalar budget** nos melhores segmentos
+        **Curto Prazo (esta semana):**
+        - Escalar criativos vencedores
+        - Ativar remarketing
         
-        Com estas ações, projetamos 30-50% de melhoria no CPI e volume.
+        **Médio Prazo (2 semanas):**
+        - Expandir lookalikes
+        - Testes A/B em LPs
+        
+        **Longo Prazo (mês):**
+        - Aumentar budget gradualmente
+        - Avaliar novos canais
         """
     }
 }
@@ -95,12 +117,12 @@ TOUR_SECTIONS = {
 def render_tour_guide():
     """Renderiza o tour guiado na sidebar"""
     with st.sidebar:
-        st.markdown("### 📜 Tour Guiado")
+        st.markdown("### 📜 Guia do Dashboard")
         st.markdown("---")
         
         # Seleção da seção
         secao_atual = st.radio(
-            "Escolha uma seção:",
+            "Navegue pelas seções:",
             options=list(TOUR_SECTIONS.keys()),
             format_func=lambda x: TOUR_SECTIONS[x]["titulo"],
             key="tour_section_selector"
@@ -114,4 +136,4 @@ def render_tour_guide():
         st.markdown(secao["conteudo"])
         
         st.markdown("---")
-        st.markdown("💡 **Dica:** Role a página para ver cada seção em detalhes!")
+        st.caption("💡 Role a página para ver cada seção em detalhes!")

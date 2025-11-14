@@ -174,7 +174,7 @@ TOUR_SECTIONS = {
         **Campanha Bradesco - Captação de Profissionais**
 
         **Cliente:** Grupo Garcia Seguradoras
-        **Período:** Setembro a Novembro 2024
+        **Período:** Setembro a Novembro 2025
         **Status:** ✅ Campanha finalizada com sucesso
 
         **Resultados Comprovados:**

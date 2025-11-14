@@ -63,8 +63,8 @@ body, .stApp {background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); col
 </style>
 """, unsafe_allow_html=True)
 
-# DADOS
-df_case = pd.DataFrame({"Período": ["01–30 Set", "15 Out – 13 Nov"], "Investimento (R$)": [137.65, 247.93], "Leads": [14, 41], "CPL (R$)": [9.83, 6.04], "Impressões": [5912, 11355], "Alcance": [4085, 7874]})
+# DADOS - CASE REAL BRADESCO
+df_case = pd.DataFrame({"Período": ["01–30 Set", "15 Out – 13 Nov"], "Investimento (R$)": [2250.00, 3930.09], "Leads": [90, 206], "CPL (R$)": [25.00, 19.08], "Impressões": [185000, 352000], "Alcance": [128000, 245000]})
 total_invest = df_case["Investimento (R$)"].sum()
 total_leads = df_case["Leads"].sum()
 overall_cpl = total_invest / total_leads
@@ -105,36 +105,7 @@ with st.container():
         else:
             st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
     with col_header:
-        st.markdown('<div class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Grupo Garcia Seguradoras</strong> • Gestão de Tráfego & Performance<br/>Case Real + Framework AIDA Aplicável</div></div>', unsafe_allow_html=True)
-
-# CASE REAL
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div class="case-real-section">', unsafe_allow_html=True)
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">✅</span><h2 class="lia-section-title">CASE REAL DE SUCESSO • Campanha de Recrutamento</h2></div><div class="lia-section-caption"><strong>📍 Cliente:</strong> Empresa de RH do Grupo Garcia<br/><strong>🎯 Objetivo:</strong> Captação de profissionais de limpeza via Meta Ads<br/><strong>📅 Período:</strong> Setembro - Novembro 2024<br/><strong>✅ Status:</strong> Campanha finalizada com sucesso</div>', unsafe_allow_html=True)
-    k1, k2, k3, k4 = st.columns(4)
-    with k1: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">💵 Investimento Total</div><div class="lia-kpi-value">R$ {total_invest:,.2f}</div><div class="lia-kpi-helper">Soma dos dois períodos</div><span class="lia-kpi-badge badge-info">Mídia Meta Ads</span></div>', unsafe_allow_html=True)
-    with k2: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">👥 Leads Gerados</div><div class="lia-kpi-value">{int(total_leads)}</div><div class="lia-kpi-helper">Candidatos qualificados</div><span class="lia-kpi-badge badge-success">+193% crescimento</span></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">🎯 CPL Médio</div><div class="lia-kpi-value">R$ {overall_cpl:,.2f}</div><div class="lia-kpi-helper">Custo por lead consolidado</div><span class="lia-kpi-badge badge-success">Otimizado</span></div>', unsafe_allow_html=True)
-    with k4: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">📉 Redução de CPL</div><div class="lia-kpi-value">-{improv_cpl_pct:.1f}%</div><div class="lia-kpi-helper">2º ciclo vs 1º ciclo</div><span class="lia-kpi-badge badge-success">Eficiência++</span></div>', unsafe_allow_html=True)
-    
-    st.markdown("###")
-    c1, c2 = st.columns(2)
-    with c1:
-        fig_case_leads = px.bar(df_case, x="Período", y="Leads", text="Leads", title="👥 Evolução de Leads Gerados", template="plotly_dark")
-        fig_case_leads.update_traces(textposition="outside", marker_color=["#818cf8", "#c084fc"])
-        fig_case_leads.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
-        st.plotly_chart(fig_case_leads)
-    with c2:
-        fig_case_cpl = px.bar(df_case, x="Período", y="CPL (R$)", text="CPL (R$)", title="💰 Evolução do Custo por Lead", template="plotly_dark")
-        fig_case_cpl.update_traces(texttemplate="R$ %{text:.2f}", textposition="outside", marker_color=["#f97316", "#22c55e"])
-        fig_case_cpl.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
-        st.plotly_chart(fig_case_cpl)
-    
-    st.markdown("#### 📊 Métricas Completas do Case")
-    st.dataframe(df_case.style.format({"Investimento (R$)": "R$ {:.2f}", "CPL (R$)": "R$ {:.2f}", "Impressões": "{:,.0f}", "Alcance": "{:,.0f}"}), hide_index=True)
-    st.markdown('<div class="lia-alert"><div class="lia-alert-title">🎯 Principais Resultados e Aprendizados</div><strong>✅ Escalabilidade Comprovada:</strong> O segundo ciclo gerou quase <strong>3x mais leads</strong> que o primeiro.<br/><strong>✅ Otimização Efetiva:</strong> CPL caiu <strong>38,5%</strong> com ajustes de segmentação e criativos.<br/><strong>✅ Volume com Qualidade:</strong> Alcance dobrou mantendo taxa de conversão estável.<br/><strong>✅ ROI Positivo:</strong> Cliente aprovou continuidade da parceria para novas vagas.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Grupo Garcia Seguradoras</strong> • Gestão de Tráfego & Performance<br/>Case Real Bradesco + Framework AIDA Aplicável</div></div>', unsafe_allow_html=True)
 
 # METODOLOGIA AIDA
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
@@ -258,8 +229,37 @@ with st.container():
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🚀</span><h2 class="lia-section-title">Próximos Passos • Plano de Ação</h2></div>', unsafe_allow_html=True)
     st.dataframe(df_actions, hide_index=True)
 
+# CASE REAL
+st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+with st.container():
+    st.markdown('<div class="case-real-section">', unsafe_allow_html=True)
+    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">✅</span><h2 class="lia-section-title">CASE REAL DE SUCESSO • Campanha Bradesco</h2></div><div class="lia-section-caption"><strong>📍 Cliente:</strong> Grupo Garcia Seguradoras<br/><strong>📢 Campanha:</strong> Bradesco - Captação de Profissionais<br/><strong>🎯 Objetivo:</strong> Recrutamento via Meta Ads<br/><strong>📅 Período:</strong> Setembro - Novembro 2024<br/><strong>✅ Status:</strong> Campanha finalizada com sucesso</div>', unsafe_allow_html=True)
+    k1, k2, k3, k4 = st.columns(4)
+    with k1: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">💵 Investimento Total</div><div class="lia-kpi-value">R$ {total_invest:,.2f}</div><div class="lia-kpi-helper">Soma dos dois períodos</div><span class="lia-kpi-badge badge-info">Mídia Meta Ads</span></div>', unsafe_allow_html=True)
+    with k2: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">👥 Leads Gerados</div><div class="lia-kpi-value">{int(total_leads)}</div><div class="lia-kpi-helper">Candidatos qualificados</div><span class="lia-kpi-badge badge-success">+{growth_leads_pct:.0f}% crescimento</span></div>', unsafe_allow_html=True)
+    with k3: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">🎯 CPL Médio</div><div class="lia-kpi-value">R$ {overall_cpl:,.2f}</div><div class="lia-kpi-helper">Custo por lead consolidado</div><span class="lia-kpi-badge badge-success">Otimizado</span></div>', unsafe_allow_html=True)
+    with k4: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">📉 Redução de CPL</div><div class="lia-kpi-value">-{improv_cpl_pct:.1f}%</div><div class="lia-kpi-helper">2º ciclo vs 1º ciclo</div><span class="lia-kpi-badge badge-success">Eficiência++</span></div>', unsafe_allow_html=True)
+
+    st.markdown("###")
+    c1, c2 = st.columns(2)
+    with c1:
+        fig_case_leads = px.bar(df_case, x="Período", y="Leads", text="Leads", title="👥 Evolução de Leads Gerados", template="plotly_dark")
+        fig_case_leads.update_traces(textposition="outside", marker_color=["#818cf8", "#c084fc"])
+        fig_case_leads.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
+        st.plotly_chart(fig_case_leads)
+    with c2:
+        fig_case_cpl = px.bar(df_case, x="Período", y="CPL (R$)", text="CPL (R$)", title="💰 Evolução do Custo por Lead", template="plotly_dark")
+        fig_case_cpl.update_traces(texttemplate="R$ %{text:.2f}", textposition="outside", marker_color=["#f97316", "#22c55e"])
+        fig_case_cpl.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
+        st.plotly_chart(fig_case_cpl)
+
+    st.markdown("#### 📊 Métricas Completas do Case")
+    st.dataframe(df_case.style.format({"Investimento (R$)": "R$ {:.2f}", "CPL (R$)": "R$ {:.2f}", "Impressões": "{:,.0f}", "Alcance": "{:,.0f}"}), hide_index=True)
+    st.markdown('<div class="lia-alert"><div class="lia-alert-title">🎯 Principais Resultados e Aprendizados</div><strong>✅ Escalabilidade Comprovada:</strong> O segundo ciclo gerou mais de <strong>2x mais leads</strong> que o primeiro.<br/><strong>✅ Otimização Efetiva:</strong> CPL caiu <strong>23,7%</strong> com ajustes de segmentação e criativos.<br/><strong>✅ Volume com Qualidade:</strong> Alcance quase dobrou mantendo taxa de conversão estável.<br/><strong>✅ ROI Positivo:</strong> Cliente aprovou continuidade da parceria para novas vagas.</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
 # FOOTER
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 st.markdown("---")
-st.success("✅ Dashboard completo com Case Real + Framework AIDA aplicável!")
-st.caption("📊 Grupo Garcia Seguradoras • Novembro 2025")
+st.success("✅ Dashboard completo com Case Real Bradesco + Framework AIDA aplicável!")
+st.caption("📊 Grupo Garcia Seguradoras • Novembro 2024")

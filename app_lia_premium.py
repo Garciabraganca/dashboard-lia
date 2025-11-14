@@ -69,6 +69,21 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, input, textarea, select {color: #ff
 /* Success/Info messages */
 .stSuccess, .stInfo, .stWarning {background: rgba(255, 255, 255, 0.05) !important;}
 .stSuccess *, .stInfo *, .stWarning * {color: #ffffff !important;}
+/* Botão hamburguer - preto para aparecer no fundo claro */
+[data-testid="collapsedControl"] {
+    background-color: #ffffff !important;
+    border: 2px solid #000000 !important;
+    border-radius: 8px !important;
+    padding: 0.5rem !important;
+}
+[data-testid="collapsedControl"]:hover {
+    background-color: #f0f0f0 !important;
+}
+[data-testid="collapsedControl"] svg {
+    color: #000000 !important;
+    fill: #000000 !important;
+    stroke: #000000 !important;
+}
 @media (max-width: 768px) {
     .lia-title {font-size: 1.8rem;}
     .lia-kpi-value {font-size: 1.5rem;}
@@ -232,7 +247,7 @@ with st.container():
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
     st.markdown('<div id="case_real" class="case-real-section">', unsafe_allow_html=True)
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">✅</span><h2 class="lia-section-title">CASE REAL DE SUCESSO • Campanha Bradesco</h2></div><div class="lia-section-caption"><strong>📍 Cliente:</strong> Grupo Garcia Seguradoras<br/><strong>📢 Campanha:</strong> Bradesco - Captação de Profissionais<br/><strong>🎯 Objetivo:</strong> Recrutamento via Meta Ads<br/><strong>📅 Período:</strong> Setembro - Novembro 2024<br/><strong>✅ Status:</strong> Campanha finalizada com sucesso</div>', unsafe_allow_html=True)
+    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">✅</span><h2 class="lia-section-title">CASE REAL DE SUCESSO • Campanha Bradesco</h2></div><div class="lia-section-caption"><strong>📍 Cliente:</strong> Grupo Garcia Seguradoras<br/><strong>📢 Campanha:</strong> Bradesco - Captação de Profissionais<br/><strong>🎯 Objetivo:</strong> Recrutamento via Meta Ads<br/><strong>📅 Período:</strong> Setembro - Novembro 2025<br/><strong>✅ Status:</strong> Campanha finalizada com sucesso</div>', unsafe_allow_html=True)
 
     st.markdown("###")
     k1, k2, k3, k4 = st.columns(4)

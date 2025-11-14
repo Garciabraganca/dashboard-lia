@@ -338,4 +338,3 @@ with st.container():
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 st.markdown("---")
 st.success("✅ Dashboard completo com Case Real Bradesco + Framework AIDA aplicável!")
-st.caption("📊 Grupo Garcia Seguradoras • Novembro 2024")

@@ -20,23 +20,25 @@ TOUR_SECTIONS = {
         """
     },
     "case_real": {
-        "titulo": "🧹 Case Real - Profissionais de Limpeza",
+        "titulo": "✅ Case Real Bradesco - Grupo Garcia",
         "conteudo": """
-        **Campanha de Recrutamento via Meta Ads**
-        
+        **Campanha Bradesco - Captação de Profissionais**
+
+        **Cliente:** Grupo Garcia Seguradoras
         **Período:** Setembro a Novembro 2024
-        
+
         **Resultados Comprovados:**
-        - 55 leads gerados
-        - R$ 385,58 investidos
-        - CPL de R$ 7,01
-        - Redução de 38,5% no CPL entre períodos
-        - Crescimento de 193% em volume
-        
+        - 296 leads gerados
+        - R$ 6.180,09 investidos
+        - CPL médio de R$ 20,88
+        - Redução de 23,7% no CPL entre períodos
+        - Crescimento de 129% em volume de leads
+
         **Aprendizados:**
-        - Otimização contínua funciona
+        - Otimização contínua funciona em escala
         - Segmentação refinada reduz custos
-        - Volume escala sem perder qualidade
+        - Volume escala mantendo qualidade
+        - ROI positivo comprovado
         """
     },
     "projecao_lia": {

@@ -69,58 +69,9 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, input, textarea, select {color: #ff
 /* Success/Info messages */
 .stSuccess, .stInfo, .stWarning {background: rgba(255, 255, 255, 0.05) !important;}
 .stSuccess *, .stInfo *, .stWarning * {color: #ffffff !important;}
-/* Menu hamburguer mobile - FORÇAR VISIBILIDADE */
-button[kind="header"] {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    border-radius: 8px !important;
-    padding: 0.5rem !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-button[kind="header"]:hover {
-    background-color: rgba(255, 255, 255, 0.2) !important;
-    border-color: rgba(255, 255, 255, 0.5) !important;
-}
-button[kind="header"] svg {
-    fill: #ffffff !important;
-    stroke: #ffffff !important;
-    color: #ffffff !important;
-}
-/* Garantir visibilidade do ícone do menu */
-[data-testid="collapsedControl"] {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    background: rgba(255, 255, 255, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    border-radius: 8px !important;
-    padding: 0.5rem !important;
-}
-[data-testid="collapsedControl"]:hover {
-    background: rgba(255, 255, 255, 0.2) !important;
-}
-[data-testid="collapsedControl"] svg {
-    fill: #ffffff !important;
-    color: #ffffff !important;
-    stroke: #ffffff !important;
-}
 @media (max-width: 768px) {
     .lia-title {font-size: 1.8rem;}
     .lia-kpi-value {font-size: 1.5rem;}
-    /* Forçar menu hamburguer visível no mobile */
-    button[kind="header"], [data-testid="collapsedControl"] {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        z-index: 999999 !important;
-    }
-    /* Sidebar mobile */
-    [data-testid="stSidebar"] {
-        z-index: 999998 !important;
-    }
 }
 </style>
 """, unsafe_allow_html=True)

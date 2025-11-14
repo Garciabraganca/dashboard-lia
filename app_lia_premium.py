@@ -82,11 +82,11 @@ df_installs = pd.DataFrame({"Plataforma": ["Google Play", "App Store"], "Instala
 df_lookalike = pd.DataFrame({"Lookalike": ["Warm (Engajou)", "Cold (Lançamento)", "Retargeting (Abandonou)"], "Instalações": [45, 52, 23], "CPI (R$)": [12.50, 18.00, 10.20]})
 df_actions = pd.DataFrame({"Ação": ["📊 Criar variações do criativo vencedor", "🎯 Expandir lookalike 3% do público warm", "🔄 Ativar retargeting visitantes LP", "🧪 A/B test na headline da LP", "💰 Escalar budget em +30%"], "Impacto Esperado": ["Alto", "Médio", "Médio", "Médio", "Alto"], "Prazo": ["Imediato", "1 semana", "Imediato", "2 semanas", "Gradual"]})
 
-# HEADER COM LOGOS
+# HEADER COM LOGO LIA
 with st.container():
     st.markdown("### ")
-    col_logo1, col_logo2, col_header = st.columns([1, 1, 3])
-    with col_logo1:
+    col_logo, col_header = st.columns([1, 4])
+    with col_logo:
         lia_logo = load_image("lia-logo.png")
         if lia_logo:
             try:
@@ -95,17 +95,8 @@ with st.container():
                 st.markdown('<div class="logo-placeholder">🏢<br/>LIA</div>', unsafe_allow_html=True)
         else:
             st.markdown('<div class="logo-placeholder">🏢<br/>LIA</div>', unsafe_allow_html=True)
-    with col_logo2:
-        garcia_logo = load_image("logotipo-gb.png")
-        if garcia_logo:
-            try:
-                st.image(garcia_logo, width=200)
-            except:
-                st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
     with col_header:
-        st.markdown('<div class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Grupo Garcia Seguradoras</strong> • Gestão de Tráfego & Performance<br/>Case Real Bradesco + Framework AIDA Aplicável</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Gestão de Tráfego & Performance</strong><br/>Metodologia AIDA + Cases Reais Comprovados</div></div>', unsafe_allow_html=True)
 
 # METODOLOGIA AIDA
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
@@ -234,6 +225,20 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
     st.markdown('<div class="case-real-section">', unsafe_allow_html=True)
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">✅</span><h2 class="lia-section-title">CASE REAL DE SUCESSO • Campanha Bradesco</h2></div><div class="lia-section-caption"><strong>📍 Cliente:</strong> Grupo Garcia Seguradoras<br/><strong>📢 Campanha:</strong> Bradesco - Captação de Profissionais<br/><strong>🎯 Objetivo:</strong> Recrutamento via Meta Ads<br/><strong>📅 Período:</strong> Setembro - Novembro 2024<br/><strong>✅ Status:</strong> Campanha finalizada com sucesso</div>', unsafe_allow_html=True)
+
+    # Logo Grupo Garcia
+    col_logo_case, col_spacer = st.columns([1, 3])
+    with col_logo_case:
+        garcia_logo = load_image("logotipo-gb.png")
+        if garcia_logo:
+            try:
+                st.image(garcia_logo, width=250)
+            except:
+                st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
+
+    st.markdown("###")
     k1, k2, k3, k4 = st.columns(4)
     with k1: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">💵 Investimento Total</div><div class="lia-kpi-value">R$ {total_invest:,.2f}</div><div class="lia-kpi-helper">Soma dos dois períodos</div><span class="lia-kpi-badge badge-info">Mídia Meta Ads</span></div>', unsafe_allow_html=True)
     with k2: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">👥 Leads Gerados</div><div class="lia-kpi-value">{int(total_leads)}</div><div class="lia-kpi-helper">Candidatos qualificados</div><span class="lia-kpi-badge badge-success">+{growth_leads_pct:.0f}% crescimento</span></div>', unsafe_allow_html=True)
@@ -256,6 +261,32 @@ with st.container():
     st.markdown("#### 📊 Métricas Completas do Case")
     st.dataframe(df_case.style.format({"Investimento (R$)": "R$ {:.2f}", "CPL (R$)": "R$ {:.2f}", "Impressões": "{:,.0f}", "Alcance": "{:,.0f}"}), hide_index=True)
     st.markdown('<div class="lia-alert"><div class="lia-alert-title">🎯 Principais Resultados e Aprendizados</div><strong>✅ Escalabilidade Comprovada:</strong> O segundo ciclo gerou mais de <strong>2x mais leads</strong> que o primeiro.<br/><strong>✅ Otimização Efetiva:</strong> CPL caiu <strong>23,7%</strong> com ajustes de segmentação e criativos.<br/><strong>✅ Volume com Qualidade:</strong> Alcance quase dobrou mantendo taxa de conversão estável.<br/><strong>✅ ROI Positivo:</strong> Cliente aprovou continuidade da parceria para novas vagas.</div>', unsafe_allow_html=True)
+
+    # Botão para baixar mais cases
+    st.markdown("###")
+    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+    with col_btn2:
+        st.markdown("""
+        <a href="https://drive.google.com/file/d/1ulmViwENe9wvzXgAxDgMLMomlN5yhIxn/view?usp=sharing" target="_blank">
+            <button style="
+                width: 100%;
+                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                color: white;
+                padding: 1rem 2rem;
+                font-size: 1.1rem;
+                font-weight: 600;
+                border: none;
+                border-radius: 12px;
+                cursor: pointer;
+                box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
+                transition: all 0.3s ease;
+            " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 12px 32px rgba(34, 197, 94, 0.5)';" onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 8px 24px rgba(34, 197, 94, 0.4)';">
+                📥 Baixar Mais Cases de Sucesso
+            </button>
+        </a>
+        """, unsafe_allow_html=True)
+        st.caption("Acesse nossa biblioteca completa de casos reais comprovados")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # FOOTER

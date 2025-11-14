@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 
 TOUR_SECTIONS = {
     "intro": {
@@ -219,4 +220,23 @@ def render_tour_guide():
             st.warning("⚠️ Seção não encontrada. Recarregue a página.")
 
         st.markdown("---")
-        st.caption("💡 Role a página para ver cada seção em detalhes!")
+        st.caption("💡 Clique em qualquer seção acima para navegar!")
+
+    # JavaScript para scroll automático até a seção
+    scroll_script = f"""
+    <script>
+        // Função para fazer scroll até a seção
+        function scrollToSection(sectionId) {{
+            const element = window.parent.document.getElementById(sectionId);
+            if (element) {{
+                element.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+            }}
+        }}
+
+        // Scroll para a seção atual
+        setTimeout(() => {{
+            scrollToSection('{secao_atual}');
+        }}, 100);
+    </script>
+    """
+    components.html(scroll_script, height=0)

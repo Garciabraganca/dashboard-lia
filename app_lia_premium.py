@@ -97,12 +97,12 @@ df_actions = pd.DataFrame({"Ação": ["📊 Criar variações do criativo venced
 
 # HEADER
 with st.container():
-    st.markdown('<div class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Gestão de Tráfego & Performance</strong><br/>Metodologia AIDA + Cases Reais Comprovados</div></div>', unsafe_allow_html=True)
+    st.markdown('<div id="intro" class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Gestão de Tráfego & Performance</strong><br/>Metodologia AIDA + Cases Reais Comprovados</div></div>', unsafe_allow_html=True)
 
 # METODOLOGIA AIDA
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">💡</span><h2 class="lia-section-title">Como Aplicamos a Metodologia AIDA</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="metodologia_aida" class="lia-section-header"><span class="lia-section-icon">💡</span><h2 class="lia-section-title">Como Aplicamos a Metodologia AIDA</h2></div>', unsafe_allow_html=True)
     st.markdown("""
     <div style="text-align: center; padding: 2rem;">
         <div style="font-size: 2.5rem; margin-bottom: 1.5rem;">📊</div>
@@ -126,7 +126,7 @@ with st.container():
 # PROJEÇÃO APP LIA
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
-    st.markdown('<div class="projecao-section">', unsafe_allow_html=True)
+    st.markdown('<div id="projecao_lia" class="projecao-section">', unsafe_allow_html=True)
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">📱</span><h2 class="lia-section-title">EXEMPLO DE APLICAÇÃO • Projeção App LIA</h2></div><div class="lia-section-caption"><strong>⚠️ IMPORTANTE:</strong> Os dados abaixo são projeções baseadas no <strong>briefing do App LIA</strong>.<br/>Esta seção demonstra <strong>como o framework AIDA seria aplicado</strong> em uma campanha de app mobile.</div>', unsafe_allow_html=True)
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1: st.markdown('<div class="lia-kpi-card"><div class="lia-kpi-label">⭐ North Star</div><div class="lia-kpi-value">120</div><div class="lia-kpi-helper">Instalações projetadas</div><span class="lia-kpi-badge badge-info">Meta inicial</span></div>', unsafe_allow_html=True)
@@ -145,7 +145,7 @@ with st.container():
 # FUNIL AIDA
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🪜</span><h2 class="lia-section-title">Estrutura Completa do Funil AIDA</h2></div><div class="lia-section-caption">Visão macro das 4 etapas: <strong>Atenção</strong> → <strong>Interesse</strong> → <strong>Desejo</strong> → <strong>Ação</strong></div>', unsafe_allow_html=True)
+    st.markdown('<div id="funil_aida" class="lia-section-header"><span class="lia-section-icon">🪜</span><h2 class="lia-section-title">Estrutura Completa do Funil AIDA</h2></div><div class="lia-section-caption">Visão macro das 4 etapas: <strong>Atenção</strong> → <strong>Interesse</strong> → <strong>Desejo</strong> → <strong>Ação</strong></div>', unsafe_allow_html=True)
     col_f1, col_f2 = st.columns([3, 2])
     with col_f1:
         df_funnel = pd.DataFrame({"Etapa": stages, "Quantidade": values})
@@ -161,7 +161,7 @@ with st.container():
 # 4 ETAPAS DETALHADAS
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">👁️</span><h2 class="lia-section-title">1. ATENÇÃO • Impressões & Alcance</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="etapa_atencao" class="lia-section-header"><span class="lia-section-icon">👁️</span><h2 class="lia-section-title">1. ATENÇÃO • Impressões & Alcance</h2></div>', unsafe_allow_html=True)
     col_a1, col_a2 = st.columns(2)
     with col_a1:
         st.metric("📊 Impressões", "100.000", "+23%")
@@ -175,7 +175,7 @@ with st.container():
         st.caption("Vezes que cada pessoa viu")
 
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🖱️</span><h2 class="lia-section-title">2. INTERESSE • Cliques & Engajamento</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="etapa_interesse" class="lia-section-header"><span class="lia-section-icon">🖱️</span><h2 class="lia-section-title">2. INTERESSE • Cliques & Engajamento</h2></div>', unsafe_allow_html=True)
     col_i1, col_i2 = st.columns([2, 3])
     with col_i1:
         st.metric("🖱️ Cliques", "3.000", "+15%")
@@ -189,7 +189,7 @@ with st.container():
     st.dataframe(df_creatives.style.format({"CPM (R$)": "R$ {:.2f}", "CPC (R$)": "R$ {:.2f}", "CTR (%)": "{:.1f}%"}), hide_index=True)
 
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">3. DESEJO • Landing Page</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="etapa_desejo" class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">3. DESEJO • Landing Page</h2></div>', unsafe_allow_html=True)
     col_d1, col_d2 = st.columns(2)
     with col_d1:
         st.metric("🌐 Visitas LP", "900", "+12%")
@@ -200,7 +200,7 @@ with st.container():
     st.dataframe(df_lp, hide_index=True)
 
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">📲</span><h2 class="lia-section-title">4. AÇÃO • Instalações</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="etapa_acao" class="lia-section-header"><span class="lia-section-icon">📲</span><h2 class="lia-section-title">4. AÇÃO • Instalações</h2></div>', unsafe_allow_html=True)
     col_ac1, col_ac2 = st.columns([2, 3])
     with col_ac1:
         st.metric("📲 Instalações", "120", "+40%")
@@ -215,23 +215,23 @@ with st.container():
 # REMARKETING E LOOKALIKE
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🔄</span><h2 class="lia-section-title">Remarketing • Reengajamento</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="remarketing" class="lia-section-header"><span class="lia-section-icon">🔄</span><h2 class="lia-section-title">Remarketing • Reengajamento</h2></div>', unsafe_allow_html=True)
     st.dataframe(df_remarketing.style.format({"CTR (%)": "{:.1f}%"}), hide_index=True)
 
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">Lookalike • Expansão</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="lookalike" class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">Lookalike • Expansão</h2></div>', unsafe_allow_html=True)
     st.dataframe(df_lookalike.style.format({"CPI (R$)": "R$ {:.2f}"}), hide_index=True)
 
 # PRÓXIMOS PASSOS
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🚀</span><h2 class="lia-section-title">Próximos Passos • Plano de Ação</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div id="proximos_passos" class="lia-section-header"><span class="lia-section-icon">🚀</span><h2 class="lia-section-title">Próximos Passos • Plano de Ação</h2></div>', unsafe_allow_html=True)
     st.dataframe(df_actions, hide_index=True)
 
 # CASE REAL
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
-    st.markdown('<div class="case-real-section">', unsafe_allow_html=True)
+    st.markdown('<div id="case_real" class="case-real-section">', unsafe_allow_html=True)
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">✅</span><h2 class="lia-section-title">CASE REAL DE SUCESSO • Campanha Bradesco</h2></div><div class="lia-section-caption"><strong>📍 Cliente:</strong> Grupo Garcia Seguradoras<br/><strong>📢 Campanha:</strong> Bradesco - Captação de Profissionais<br/><strong>🎯 Objetivo:</strong> Recrutamento via Meta Ads<br/><strong>📅 Período:</strong> Setembro - Novembro 2024<br/><strong>✅ Status:</strong> Campanha finalizada com sucesso</div>', unsafe_allow_html=True)
 
     st.markdown("###")

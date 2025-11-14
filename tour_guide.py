@@ -121,21 +121,26 @@ def render_tour_guide():
     with st.sidebar:
         st.markdown("### 📜 Guia do Dashboard")
         st.markdown("---")
-        
+
         # Seleção da seção
         secao_atual = st.radio(
             "Navegue pelas seções:",
             options=list(TOUR_SECTIONS.keys()),
-            format_func=lambda x: TOUR_SECTIONS[x]["titulo"],
-            key="tour_section_selector"
+            format_func=lambda x: TOUR_SECTIONS.get(x, {}).get("titulo", x),
+            key="tour_section_selector",
+            index=0  # Sempre começa na primeira opção
         )
-        
+
         st.markdown("---")
-        
+
         # Exibir conteúdo da seção selecionada
-        secao = TOUR_SECTIONS[secao_atual]
-        st.markdown(f"## {secao['titulo']}")
-        st.markdown(secao["conteudo"])
-        
+        if secao_atual in TOUR_SECTIONS:
+            secao = TOUR_SECTIONS[secao_atual]
+            st.markdown(f"## {secao['titulo']}")
+            st.markdown(secao["conteudo"])
+        else:
+            # Fallback se a seção não existir
+            st.warning("⚠️ Seção não encontrada. Recarregue a página.")
+
         st.markdown("---")
         st.caption("💡 Role a página para ver cada seção em detalhes!")

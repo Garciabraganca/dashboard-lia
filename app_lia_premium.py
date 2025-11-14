@@ -88,12 +88,22 @@ with st.container():
     col_logo1, col_logo2, col_header = st.columns([1, 1, 3])
     with col_logo1:
         lia_logo = load_image("lia-logo.png")
-        if lia_logo: st.image(lia_logo, use_container_width=True)
-        else: st.markdown('<div class="logo-placeholder">🏢<br/>LIA</div>', unsafe_allow_html=True)
+        if lia_logo:
+            try:
+                st.image(lia_logo, width=200)
+            except:
+                st.markdown('<div class="logo-placeholder">🏢<br/>LIA</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="logo-placeholder">🏢<br/>LIA</div>', unsafe_allow_html=True)
     with col_logo2:
         garcia_logo = load_image("logotipo-gb.png")
-        if garcia_logo: st.image(garcia_logo, use_container_width=True)
-        else: st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
+        if garcia_logo:
+            try:
+                st.image(garcia_logo, width=200)
+            except:
+                st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="logo-placeholder">🏢<br/>Grupo<br/>Garcia</div>', unsafe_allow_html=True)
     with col_header:
         st.markdown('<div class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Grupo Garcia Seguradoras</strong> • Gestão de Tráfego & Performance<br/>Case Real + Framework AIDA Aplicável</div></div>', unsafe_allow_html=True)
 
@@ -133,8 +143,13 @@ with st.container():
     col_img, col_text = st.columns([2, 1])
     with col_img:
         lia_imagem = load_image("lia-imagem.jpg")
-        if lia_imagem: st.image(lia_imagem, use_container_width=True, caption="Framework AIDA em Ação")
-        else: st.markdown('<div class="logo-placeholder" style="padding: 4rem;"><div style="font-size: 3rem;">📊</div><div style="font-size: 1.2rem; margin-top: 1rem;">Framework AIDA</div><div style="font-size: 0.9rem; color: #94a3b8; margin-top: 0.5rem;">Atenção → Interesse → Desejo → Ação</div></div>', unsafe_allow_html=True)
+        if lia_imagem:
+            try:
+                st.image(lia_imagem, caption="Framework AIDA em Ação", width=600)
+            except:
+                st.markdown('<div class="logo-placeholder" style="padding: 4rem;"><div style="font-size: 3rem;">📊</div><div style="font-size: 1.2rem; margin-top: 1rem;">Framework AIDA</div><div style="font-size: 0.9rem; color: #94a3b8; margin-top: 0.5rem;">Atenção → Interesse → Desejo → Ação</div></div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="logo-placeholder" style="padding: 4rem;"><div style="font-size: 3rem;">📊</div><div style="font-size: 1.2rem; margin-top: 1rem;">Framework AIDA</div><div style="font-size: 0.9rem; color: #94a3b8; margin-top: 0.5rem;">Atenção → Interesse → Desejo → Ação</div></div>', unsafe_allow_html=True)
     with col_text:
         st.markdown("### O Framework AIDA\n\n**A**tenção → **I**nteresse → **D**esejo → **A**ção\n\nEsta é a estrutura que usamos em TODAS as nossas campanhas:\n\n- ✅ Segmentação precisa\n- ✅ Criativos testados\n- ✅ LPs otimizadas\n- ✅ Conversão maximizada\n\n**Resultado:** Campanhas previsíveis e escaláveis.")
 

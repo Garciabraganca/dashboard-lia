@@ -124,15 +124,15 @@ with st.container():
         fig_case_leads = px.bar(df_case, x="Período", y="Leads", text="Leads", title="👥 Evolução de Leads Gerados", template="plotly_dark")
         fig_case_leads.update_traces(textposition="outside", marker_color=["#818cf8", "#c084fc"])
         fig_case_leads.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
-        st.plotly_chart(fig_case_leads, use_container_width=True)
+        st.plotly_chart(fig_case_leads)
     with c2:
         fig_case_cpl = px.bar(df_case, x="Período", y="CPL (R$)", text="CPL (R$)", title="💰 Evolução do Custo por Lead", template="plotly_dark")
         fig_case_cpl.update_traces(texttemplate="R$ %{text:.2f}", textposition="outside", marker_color=["#f97316", "#22c55e"])
         fig_case_cpl.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
-        st.plotly_chart(fig_case_cpl, use_container_width=True)
+        st.plotly_chart(fig_case_cpl)
     
     st.markdown("#### 📊 Métricas Completas do Case")
-    st.dataframe(df_case.style.format({"Investimento (R$)": "R$ {:.2f}", "CPL (R$)": "R$ {:.2f}", "Impressões": "{:,.0f}", "Alcance": "{:,.0f}"}), use_container_width=True, hide_index=True)
+    st.dataframe(df_case.style.format({"Investimento (R$)": "R$ {:.2f}", "CPL (R$)": "R$ {:.2f}", "Impressões": "{:,.0f}", "Alcance": "{:,.0f}"}), hide_index=True)
     st.markdown('<div class="lia-alert"><div class="lia-alert-title">🎯 Principais Resultados e Aprendizados</div><strong>✅ Escalabilidade Comprovada:</strong> O segundo ciclo gerou quase <strong>3x mais leads</strong> que o primeiro.<br/><strong>✅ Otimização Efetiva:</strong> CPL caiu <strong>38,5%</strong> com ajustes de segmentação e criativos.<br/><strong>✅ Volume com Qualidade:</strong> Alcance dobrou mantendo taxa de conversão estável.<br/><strong>✅ ROI Positivo:</strong> Cliente aprovou continuidade da parceria para novas vagas.</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -169,7 +169,7 @@ with st.container():
     fig_line = go.Figure()
     fig_line.add_trace(go.Scatter(x=df_week["Semana"], y=df_week["Instalações"], mode="lines+markers", line=dict(color="#818cf8", width=3), marker=dict(size=12, color="#c084fc"), fill="tozeroy", fillcolor="rgba(129, 140, 248, 0.2)", name="Instalações"))
     fig_line.update_layout(template="plotly_dark", height=350, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(showgrid=False, title="Semana"), yaxis=dict(showgrid=True, gridcolor="rgba(148, 163, 184, 0.1)", title="Instalações"), font=dict(size=12, color="#cbd5e1"))
-    st.plotly_chart(fig_line, use_container_width=True)
+    st.plotly_chart(fig_line)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # FUNIL AIDA
@@ -181,7 +181,7 @@ with st.container():
         df_funnel = pd.DataFrame({"Etapa": stages, "Quantidade": values})
         fig_funnel = go.Figure(go.Funnel(y=df_funnel["Etapa"], x=df_funnel["Quantidade"], textinfo="value+percent initial", marker=dict(color=["#818cf8", "#a78bfa", "#c084fc", "#e879f9", "#f0abfc"])))
         fig_funnel.update_layout(template="plotly_dark", height=450, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(size=13, color="#cbd5e1"))
-        st.plotly_chart(fig_funnel, use_container_width=True)
+        st.plotly_chart(fig_funnel)
     with col_f2:
         st.markdown("#### 📊 Taxa de Conversão")
         for i in range(1, len(stages)):
@@ -215,8 +215,8 @@ with st.container():
         fig_creative = px.bar(df_creatives, x="Criativo", y="Cliques", text="Cliques", title="Performance por Criativo", template="plotly_dark", color="CTR (%)", color_continuous_scale="Purples")
         fig_creative.update_traces(textposition="outside")
         fig_creative.update_layout(height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", showlegend=False)
-        st.plotly_chart(fig_creative, use_container_width=True)
-    st.dataframe(df_creatives.style.format({"CPM (R$)": "R$ {:.2f}", "CPC (R$)": "R$ {:.2f}", "CTR (%)": "{:.1f}%"}), use_container_width=True, hide_index=True)
+        st.plotly_chart(fig_creative)
+    st.dataframe(df_creatives.style.format({"CPM (R$)": "R$ {:.2f}", "CPC (R$)": "R$ {:.2f}", "CTR (%)": "{:.1f}%"}), hide_index=True)
 
 with st.container():
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">3. DESEJO • Landing Page</h2></div>', unsafe_allow_html=True)
@@ -227,7 +227,7 @@ with st.container():
     with col_d2:
         st.metric("🚪 Taxa Rejeição", "45%", "-5%")
         st.metric("🖱️ Cliques CTA", "300", "+18%")
-    st.dataframe(df_lp, use_container_width=True, hide_index=True)
+    st.dataframe(df_lp, hide_index=True)
 
 with st.container():
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">📲</span><h2 class="lia-section-title">4. AÇÃO • Instalações</h2></div>', unsafe_allow_html=True)
@@ -239,24 +239,24 @@ with st.container():
     with col_ac2:
         fig_install = px.pie(df_installs, names="Plataforma", values="Instalações", title="Distribuição de Instalações", template="plotly_dark", color_discrete_sequence=["#818cf8", "#c084fc"])
         fig_install.update_layout(height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_install, use_container_width=True)
-    st.dataframe(df_installs.style.format({"CPI (R$)": "R$ {:.2f}"}), use_container_width=True, hide_index=True)
+        st.plotly_chart(fig_install)
+    st.dataframe(df_installs.style.format({"CPI (R$)": "R$ {:.2f}"}), hide_index=True)
 
 # REMARKETING E LOOKALIKE
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🔄</span><h2 class="lia-section-title">Remarketing • Reengajamento</h2></div>', unsafe_allow_html=True)
-    st.dataframe(df_remarketing.style.format({"CTR (%)": "{:.1f}%"}), use_container_width=True, hide_index=True)
+    st.dataframe(df_remarketing.style.format({"CTR (%)": "{:.1f}%"}), hide_index=True)
 
 with st.container():
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">Lookalike • Expansão</h2></div>', unsafe_allow_html=True)
-    st.dataframe(df_lookalike.style.format({"CPI (R$)": "R$ {:.2f}"}), use_container_width=True, hide_index=True)
+    st.dataframe(df_lookalike.style.format({"CPI (R$)": "R$ {:.2f}"}), hide_index=True)
 
 # PRÓXIMOS PASSOS
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 with st.container():
     st.markdown('<div class="lia-section-header"><span class="lia-section-icon">🚀</span><h2 class="lia-section-title">Próximos Passos • Plano de Ação</h2></div>', unsafe_allow_html=True)
-    st.dataframe(df_actions, use_container_width=True, hide_index=True)
+    st.dataframe(df_actions, hide_index=True)
 
 # FOOTER
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import base64
 import os
 import logging
+import textwrap
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -720,16 +721,16 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
         is_positive = delta < 0 if invert else delta >= 0
         delta_class = "positive" if is_positive else "negative"
         delta_text = f"{delta:+.{precision}f}{suffix}"
-    return f"""
-    <div class=\"kpi-card\">
-        <div class=\"kpi-top\">
-            <div class=\"kpi-icon\">{icon}</div>
-            <div class=\"kpi-label\">{label}</div>
+    return textwrap.dedent(f"""
+    <div class="kpi-card">
+        <div class="kpi-top">
+            <div class="kpi-icon">{icon}</div>
+            <div class="kpi-label">{label}</div>
         </div>
-        <div class=\"kpi-value\">{value}</div>
-        <div class=\"kpi-delta {delta_class}\">{delta_text}</div>
+        <div class="kpi-value">{value}</div>
+        <div class="kpi-delta {delta_class}">{delta_text}</div>
     </div>
-    """
+    """).strip()
 
 kpi_cards = [
     {"icon": "💰", "label": "Investimento", "value": f"R$ {meta_data['investimento']:,.2f}", "delta": meta_data['delta_investimento'], "suffix": "%"},
@@ -742,7 +743,7 @@ kpi_cards = [
     {"icon": "📊", "label": "CPM", "value": f"R$ {meta_data['cpm']:.2f}", "delta": meta_data['delta_cpm'], "suffix": "%", "invert": True},
 ]
 
-kpi_cards_html = "".join(
+kpi_cards_html = "\n".join(
     build_kpi_card(
         card["icon"],
         card["label"],
@@ -755,14 +756,16 @@ kpi_cards_html = "".join(
     for card in kpi_cards
 )
 
-st.markdown(f'''
+kpi_section = textwrap.dedent(f"""
 <div class="glass-card">
-    <div class="section-title"><div class="section-icon">$</div> KPIs Principais</div>
-    <div class="kpi-grid">
-        {kpi_cards_html}
-    </div>
+  <div class="section-title"><div class="section-icon">$</div> KPIs Principais</div>
+  <div class="kpi-grid">
+{kpi_cards_html}
+  </div>
 </div>
-''', unsafe_allow_html=True)
+""")
+
+st.markdown(kpi_section, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # PERFORMANCE POR CRIATIVO
@@ -908,7 +911,7 @@ ga4_cards = [
     {"icon": "⏱️", "label": "Tempo Medio", "value": ga4_data['tempo_medio'], "delta": None, "suffix": ""},
 ]
 
-ga4_cards_html = "".join(
+ga4_cards_html = "\n".join(
     build_kpi_card(
         card["icon"],
         card["label"],
@@ -921,11 +924,13 @@ ga4_cards_html = "".join(
     for card in ga4_cards
 )
 
-st.markdown(f'''
+ga4_section = textwrap.dedent(f"""
 <div class="kpi-grid ga4-grid">
-    {ga4_cards_html}
+{ga4_cards_html}
 </div>
-''', unsafe_allow_html=True)
+""")
+
+st.markdown(ga4_section, unsafe_allow_html=True)
 
 # Tabela Origem/Midia
 try:

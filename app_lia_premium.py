@@ -2,305 +2,1100 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from tour_guide import render_tour_guide
+from datetime import datetime, timedelta
+import json
 
+# =============================================================================
+# CONFIGURAÇÃO DA PÁGINA
+# =============================================================================
 st.set_page_config(
-    page_title="App LIA • Dashboard AIDA",
+    page_title="LIA • Ciclo 1 Dashboard",
     page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
-render_tour_guide()
+# =============================================================================
+# DATA PROVIDER - Camada de abstração para dados
+# =============================================================================
+class DataProvider:
+    """Camada de abstração para integração com Meta Ads e GA4"""
 
+    def __init__(self, mode="mock"):
+        self.mode = mode
+
+    def get_meta_metrics(self, period="7d", level="campaign", filters=None):
+        """
+        Retorna métricas do Meta Ads
+        Args:
+            period: "today", "yesterday", "7d", "14d", "custom"
+            level: "campaign", "adset", "creative"
+            filters: dict com filtros adicionais
+        """
+        if self.mode == "mock":
+            return self._get_mock_meta_metrics(period, level)
+        # TODO: Implementar integração real com Meta Ads API
+        return self._get_mock_meta_metrics(period, level)
+
+    def get_ga4_metrics(self, period="7d", filters=None):
+        """
+        Retorna métricas do GA4
+        Args:
+            period: "today", "yesterday", "7d", "14d", "custom"
+            filters: dict com filtros adicionais
+        """
+        if self.mode == "mock":
+            return self._get_mock_ga4_metrics(period)
+        # TODO: Implementar integração real com GA4 API
+        return self._get_mock_ga4_metrics(period)
+
+    def get_creative_performance(self, period="7d"):
+        """Retorna performance por criativo"""
+        if self.mode == "mock":
+            return self._get_mock_creative_data()
+        return self._get_mock_creative_data()
+
+    def get_daily_trends(self, period="7d"):
+        """Retorna tendências diárias para gráficos"""
+        if self.mode == "mock":
+            return self._get_mock_daily_trends(period)
+        return self._get_mock_daily_trends(period)
+
+    def _get_mock_meta_metrics(self, period, level):
+        """Dados mock para Meta Ads"""
+        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2}.get(period, 1)
+
+        base_metrics = {
+            "investimento": 850.00,
+            "impressoes": 125000,
+            "alcance": 89000,
+            "frequencia": 1.40,
+            "cliques_link": 3200,
+            "ctr_link": 2.56,
+            "cpc_link": 0.27,
+            "cpm": 6.80,
+            # Variações vs período anterior
+            "delta_investimento": 12.5,
+            "delta_impressoes": 18.3,
+            "delta_alcance": 15.2,
+            "delta_frequencia": 0.05,
+            "delta_cliques": 22.1,
+            "delta_ctr": 0.3,
+            "delta_cpc": -8.5,
+            "delta_cpm": -5.2,
+        }
+
+        return {k: v * multiplier if isinstance(v, (int, float)) and not k.startswith("delta") else v
+                for k, v in base_metrics.items()}
+
+    def _get_mock_ga4_metrics(self, period):
+        """Dados mock para GA4"""
+        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2}.get(period, 1)
+
+        return {
+            "sessoes": int(2850 * multiplier),
+            "usuarios": int(2340 * multiplier),
+            "pageviews": int(4200 * multiplier),
+            "taxa_engajamento": 68.5,
+            "tempo_medio": "1m 42s",
+            "delta_sessoes": 15.8,
+            "delta_usuarios": 12.3,
+            "delta_pageviews": 18.9,
+            "delta_engajamento": 3.2,
+        }
+
+    def _get_mock_creative_data(self):
+        """Dados mock de performance por criativo"""
+        return pd.DataFrame({
+            "Criativo": [
+                "Video_LIA_Problema_WhatsApp_v2",
+                "Static_Beneficios_App_v1",
+                "Carousel_Features_3slides",
+                "Video_Depoimento_Usuario",
+                "Static_Promo_Download_v3"
+            ],
+            "Formato": ["Vídeo 15s", "Imagem", "Carrossel", "Vídeo 30s", "Imagem"],
+            "Investimento": [285.00, 195.00, 165.00, 125.00, 80.00],
+            "Impressões": [42000, 31000, 26000, 18000, 8000],
+            "Cliques Link": [1280, 890, 620, 320, 90],
+            "CTR Link": [3.05, 2.87, 2.38, 1.78, 1.12],
+            "CPC Link": [0.22, 0.22, 0.27, 0.39, 0.89],
+            "CPM": [6.79, 6.29, 6.35, 6.94, 10.00],
+        })
+
+    def _get_mock_daily_trends(self, period):
+        """Dados mock para tendências diárias"""
+        days = {"today": 1, "yesterday": 1, "7d": 7, "14d": 14}.get(period, 7)
+        dates = [(datetime.now() - timedelta(days=i)).strftime("%d/%m") for i in range(days-1, -1, -1)]
+
+        import random
+        random.seed(42)
+
+        base_clicks = [380, 420, 395, 450, 480, 510, 565][:days]
+        base_ctr = [2.3, 2.4, 2.35, 2.5, 2.55, 2.6, 2.75][:days]
+        base_cpc = [0.30, 0.28, 0.29, 0.27, 0.26, 0.25, 0.24][:days]
+
+        return pd.DataFrame({
+            "Data": dates,
+            "Cliques": base_clicks + [random.randint(400, 550) for _ in range(max(0, days-7))],
+            "CTR": base_ctr + [round(random.uniform(2.3, 2.8), 2) for _ in range(max(0, days-7))],
+            "CPC": base_cpc + [round(random.uniform(0.22, 0.32), 2) for _ in range(max(0, days-7))],
+        })
+
+    def get_source_medium(self):
+        """Retorna dados de origem/mídia do GA4"""
+        return pd.DataFrame({
+            "Origem/Mídia": [
+                "facebook / paid",
+                "instagram / paid",
+                "google / cpc",
+                "(direct) / (none)",
+                "google / organic"
+            ],
+            "Sessões": [1450, 890, 285, 145, 80],
+            "Usuários": [1200, 750, 240, 95, 55],
+            "Taxa Engaj.": ["72.3%", "68.9%", "58.2%", "45.1%", "62.8%"],
+            "Tempo Médio": ["1m 58s", "1m 42s", "1m 15s", "0m 48s", "2m 05s"],
+        })
+
+
+# Inicializar provider
+data_provider = DataProvider(mode="mock")
+
+# =============================================================================
+# CSS CUSTOMIZADO - Tema Dark com Inter
+# =============================================================================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-/* Forçar background preto e texto branco em tudo */
-[data-testid="stSidebar"] {background: #000000 !important; border-right: 2px solid rgba(255, 255, 255, 0.2);}
-[data-testid="stSidebar"] * {color: #ffffff !important;}
-[data-testid="stSidebar"] h3 {font-size: 1.3rem; font-weight: 600;}
-[data-testid="stSidebar"] h2 {font-size: 1.1rem;}
-[data-testid="stSidebar"] p, [data-testid="stSidebar"] li {line-height: 1.6;}
-body, .stApp {background: #000000 !important; color: #ffffff !important; font-family: 'Inter', sans-serif;}
-/* Forçar todos os textos para branco */
-* {color: #ffffff !important;}
-h1, h2, h3, h4, h5, h6, p, span, div, label, input, textarea, select {color: #ffffff !important;}
-.lia-header {background: rgba(255, 255, 255, 0.05); border-radius: 20px; padding: 2rem; margin-bottom: 2rem; border: 1px solid rgba(255, 255, 255, 0.2);}
-.lia-title {font-size: 2.5rem; font-weight: 700; color: #ffffff !important; margin-bottom: 0.5rem;}
-.lia-subtitle {font-size: 1rem; color: #ffffff !important; line-height: 1.6;}
-.lia-subtitle strong {color: #ffffff !important;}
-.lia-kpi-card {background: rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.2); transition: all 0.3s ease; position: relative; overflow: hidden;}
-.lia-kpi-card::before {content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #ffffff;}
-.lia-kpi-card:hover {transform: translateY(-5px); border-color: rgba(255, 255, 255, 0.4);}
-.lia-kpi-label {font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #ffffff !important; margin-bottom: 0.5rem; font-weight: 600;}
-.lia-kpi-value {font-size: 2rem; font-weight: 700; color: #ffffff !important; margin-bottom: 0.3rem;}
-.lia-kpi-helper {font-size: 0.8rem; color: #ffffff !important;}
-.lia-kpi-badge {display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-top: 0.5rem;}
-.badge-success {background: rgba(255, 255, 255, 0.1); color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.3);}
-.badge-warning {background: rgba(255, 255, 255, 0.1); color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.3);}
-.badge-info {background: rgba(255, 255, 255, 0.1); color: #ffffff !important; border: 1px solid rgba(255, 255, 255, 0.3);}
-.lia-section-header {display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid rgba(255, 255, 255, 0.2);}
-.lia-section-icon {font-size: 1.8rem; color: #ffffff !important;}
-.lia-section-title {font-size: 1.5rem; font-weight: 700; color: #ffffff !important; margin: 0;}
-.lia-section-caption {font-size: 0.95rem; color: #ffffff !important; line-height: 1.6; margin-bottom: 1.5rem; padding: 1rem; background: rgba(255, 255, 255, 0.05); border-left: 3px solid #ffffff; border-radius: 4px;}
-.lia-section-caption strong {color: #ffffff !important;}
-.section-divider {height: 3px; background: #ffffff; margin: 3rem 0; border-radius: 2px;}
-.funnel-stage {background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 12px; padding: 1rem; margin: 0.5rem 0; text-align: center; transition: all 0.3s ease;}
-.funnel-stage:hover {background: rgba(255, 255, 255, 0.1); transform: scale(1.02);}
-.funnel-value {font-size: 1.5rem; font-weight: 700; color: #ffffff !important;}
-.funnel-label {font-size: 0.9rem; color: #ffffff !important; margin-top: 0.25rem;}
-.funnel-conversion {font-size: 0.75rem; color: #ffffff !important; font-weight: 600; margin-top: 0.5rem;}
-.lia-alert {background: rgba(255, 255, 255, 0.05); border-left: 4px solid #ffffff; border-radius: 8px; padding: 1rem 1.5rem; margin: 1.5rem 0; color: #ffffff !important;}
-.lia-alert-title {font-weight: 600; color: #ffffff !important; margin-bottom: 0.5rem; font-size: 1.1rem;}
-.lia-alert strong {color: #ffffff !important;}
-.case-real-section {background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 2rem; margin: 2rem 0;}
-.projecao-section {background: rgba(255, 255, 255, 0.05); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 20px; padding: 2rem; margin: 2rem 0;}
-/* Streamlit components específicos */
-[data-testid="stMetricValue"] {color: #ffffff !important;}
-[data-testid="stMetricLabel"] {color: #ffffff !important;}
-[data-testid="stMetricDelta"] {color: #ffffff !important;}
-[data-testid="stMarkdownContainer"] {color: #ffffff !important;}
-[data-testid="stMarkdownContainer"] * {color: #ffffff !important;}
-/* Tabelas */
-.dataframe {color: #ffffff !important; background: rgba(255, 255, 255, 0.05) !important;}
-.dataframe th {color: #ffffff !important; background: rgba(255, 255, 255, 0.1) !important;}
-.dataframe td {color: #ffffff !important;}
-/* Success/Info messages */
-.stSuccess, .stInfo, .stWarning {background: rgba(255, 255, 255, 0.05) !important;}
-.stSuccess *, .stInfo *, .stWarning * {color: #ffffff !important;}
-/* Botão hamburguer - preto para aparecer no fundo claro */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Reset e Base */
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    background: #000 !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+/* Esconder sidebar completamente */
+[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+section[data-testid="stSidebar"] {
+    display: none !important;
+}
+
+button[kind="header"] {
+    display: none !important;
+}
+
 [data-testid="collapsedControl"] {
-    background-color: #ffffff !important;
-    border: 2px solid #000000 !important;
-    border-radius: 8px !important;
-    padding: 0.5rem !important;
+    display: none !important;
 }
-[data-testid="collapsedControl"]:hover {
-    background-color: #f0f0f0 !important;
+
+/* Container principal */
+.main .block-container {
+    padding: 0 !important;
+    max-width: 100% !important;
 }
-[data-testid="collapsedControl"] svg {
-    color: #000000 !important;
-    fill: #000000 !important;
-    stroke: #000000 !important;
+
+/* Tipografia global */
+h1, h2, h3, h4, h5, h6, p, span, div, label {
+    font-family: 'Inter', sans-serif !important;
 }
+
+/* ========================================
+   BRANDING PANEL (Coluna Esquerda)
+   ======================================== */
+.branding-panel {
+    background: linear-gradient(180deg, #7c3aed 0%, #4c1d95 40%, #000000 100%);
+    min-height: 100vh;
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.logo-circle {
+    width: 48px;
+    height: 48px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logo-circle svg {
+    width: 28px;
+    height: 28px;
+}
+
+.logo-text {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+}
+
+.branding-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+    margin-bottom: 12px;
+}
+
+.branding-subtitle {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.5;
+    margin-bottom: 40px;
+}
+
+/* Steps/Pills do Ciclo */
+.steps-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 48px;
+}
+
+.step-pill {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.step-pill.active {
+    background: #fff;
+}
+
+.step-pill.inactive {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.step-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.step-pill.active .step-number {
+    background: #000;
+    color: #fff;
+}
+
+.step-pill.inactive .step-number {
+    background: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.step-text {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.step-pill.active .step-text {
+    color: #000;
+}
+
+.step-pill.inactive .step-text {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.branding-footer {
+    position: absolute;
+    bottom: 32px;
+    left: 32px;
+    right: 32px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.branding-footer-text {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.5;
+}
+
+/* ========================================
+   DASHBOARD PANEL (Coluna Direita)
+   ======================================== */
+.dashboard-panel {
+    background: #000;
+    padding: 32px;
+    min-height: 100vh;
+}
+
+.dashboard-header {
+    margin-bottom: 24px;
+}
+
+.dashboard-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.dashboard-subtitle {
+    font-size: 14px;
+    color: #a3a3a3;
+}
+
+/* Barra de Filtros */
+.filter-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: #0f0f10;
+    border: 1px solid #232323;
+    border-radius: 12px;
+}
+
+/* Cards de KPI */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+@media (max-width: 1200px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
-    .lia-title {font-size: 1.8rem;}
-    .lia-kpi-value {font-size: 1.5rem;}
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.kpi-card {
+    background: #0f0f10;
+    border: 1px solid #232323;
+    border-radius: 16px;
+    padding: 20px;
+    transition: all 0.2s ease;
+}
+
+.kpi-card:hover {
+    border-color: #3f3f46;
+    transform: translateY(-2px);
+}
+
+.kpi-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #a3a3a3;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.kpi-delta {
+    font-size: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.kpi-delta.positive {
+    color: #22c55e;
+}
+
+.kpi-delta.negative {
+    color: #ef4444;
+}
+
+/* Seções */
+.section-container {
+    background: #0f0f10;
+    border: 1px solid #232323;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.section-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-success {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.badge-info {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.badge-warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Alert/Aviso */
+.scope-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    margin-bottom: 24px;
+}
+
+.scope-alert-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.scope-alert-text {
+    font-size: 13px;
+    color: #a3a3a3;
+    line-height: 1.5;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.empty-state-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.empty-state-text {
+    font-size: 14px;
+    color: #a3a3a3;
+}
+
+/* Tabelas */
+.styled-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.styled-table th {
+    background: rgba(255, 255, 255, 0.05);
+    color: #a3a3a3;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #232323;
+}
+
+.styled-table td {
+    color: #fff;
+    font-size: 14px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #232323;
+}
+
+.styled-table tr:last-child td {
+    border-bottom: none;
+}
+
+.styled-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Botões */
+.btn-primary {
+    background: #fff;
+    color: #000;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    background: #e5e5e5;
+}
+
+.btn-outline {
+    background: transparent;
+    color: #a3a3a3;
+    border: 1px solid #3f3f46;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-outline:hover {
+    border-color: #fff;
+    color: #fff;
+}
+
+/* Streamlit overrides */
+.stSelectbox > div > div {
+    background: #0f0f10 !important;
+    border: 1px solid #232323 !important;
+    border-radius: 8px !important;
+}
+
+.stSelectbox label {
+    color: #a3a3a3 !important;
+    font-size: 12px !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: #fff !important;
+    font-size: 28px !important;
+    font-weight: 700 !important;
+}
+
+[data-testid="stMetricLabel"] {
+    color: #a3a3a3 !important;
+}
+
+[data-testid="stMetricDelta"] svg {
+    display: none;
+}
+
+[data-testid="stMetricDelta"] {
+    font-size: 12px !important;
+}
+
+.stDataFrame {
+    background: transparent !important;
+}
+
+[data-testid="stDataFrame"] > div {
+    background: transparent !important;
+}
+
+/* Gráficos Plotly */
+.js-plotly-plot .plotly .modebar {
+    display: none !important;
+}
+
+/* Responsivo - empilhar no mobile */
+@media (max-width: 992px) {
+    .branding-panel {
+        min-height: auto;
+        padding: 32px 24px;
+    }
+
+    .branding-footer {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        right: auto;
+        margin-top: 32px;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# DADOS - CASE REAL BRADESCO
-df_case = pd.DataFrame({"Período": ["01–30 Set", "15 Out – 13 Nov"], "Investimento (R$)": [2250.00, 3930.09], "Leads": [90, 206], "CPL (R$)": [25.00, 19.08], "Impressões": [185000, 352000], "Alcance": [128000, 245000]})
-total_invest = df_case["Investimento (R$)"].sum()
-total_leads = df_case["Leads"].sum()
-overall_cpl = total_invest / total_leads
-growth_leads_pct = (df_case.loc[1, "Leads"] - df_case.loc[0, "Leads"]) / df_case.loc[0, "Leads"] * 100
-improv_cpl_pct = (df_case.loc[0, "CPL (R$)"] - df_case.loc[1, "CPL (R$)"]) / df_case.loc[0, "CPL (R$)"] * 100
+# =============================================================================
+# LAYOUT PRINCIPAL - DUAS COLUNAS
+# =============================================================================
 
-stages = ["Impressões", "Cliques", "Visitas LP", "Cliques CTA", "Instalações"]
-values = [100_000, 3_000, 900, 300, 120]
-conversions = [(values[i] / values[i-1] * 100) if values[i-1] else 0 for i in range(1, len(values))]
-df_week = pd.DataFrame({"Semana": ["S1", "S2", "S3", "S4", "S5"], "Instalações": [10, 18, 24, 28, 40]})
-df_creatives = pd.DataFrame({"Criativo": ["🚨 Dor do WhatsApp", "💊 Feature Remédios", "💰 Feature Despesas"], "CPM (R$)": [8.50, 7.90, 9.20], "CPC (R$)": [0.85, 0.73, 0.92], "CTR (%)": [1.3, 1.5, 1.1], "Cliques": [1200, 1450, 980]})
-df_lp = pd.DataFrame({"Métrica": ["Visitas", "Duração Média", "Taxa de Rejeição", "Cliques no CTA"], "Valor": ["900", "2m 34s", "45%", "300"], "Status": ["✅ Bom", "✅ Ótimo", "⚠️ Médio", "✅ Bom"]})
-df_remarketing = pd.DataFrame({"Público": ["Visitantes LP", "Clicaram CTA", "E-mails Coletados"], "Tamanho": [900, 300, 245], "CTR (%)": [3.2, 4.5, 2.8], "Conversão": [15, 22, 12]})
-df_installs = pd.DataFrame({"Plataforma": ["Google Play", "App Store"], "Instalações": [75, 45], "CPI (R$)": [12.50, 18.30]})
-df_lookalike = pd.DataFrame({"Lookalike": ["Warm (Engajou)", "Cold (Lançamento)", "Retargeting (Abandonou)"], "Instalações": [45, 52, 23], "CPI (R$)": [12.50, 18.00, 10.20]})
-df_actions = pd.DataFrame({"Ação": ["📊 Criar variações do criativo vencedor", "🎯 Expandir lookalike 3% do público warm", "🔄 Ativar retargeting visitantes LP", "🧪 A/B test na headline da LP", "💰 Escalar budget em +30%"], "Impacto Esperado": ["Alto", "Médio", "Médio", "Médio", "Alto"], "Prazo": ["Imediato", "1 semana", "Imediato", "2 semanas", "Gradual"]})
+# Criar layout split
+col_brand, col_dash = st.columns([0.38, 0.62], gap="small")
 
-# HEADER
-with st.container():
-    st.markdown('<div id="intro" class="lia-header"><div class="lia-title">📊 Dashboard AIDA Completo</div><div class="lia-subtitle"><strong>Gestão de Tráfego & Performance</strong><br/>Metodologia AIDA + Cases Reais Comprovados</div></div>', unsafe_allow_html=True)
-
-# METODOLOGIA AIDA
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div id="metodologia_aida" class="lia-section-header"><span class="lia-section-icon">💡</span><h2 class="lia-section-title">Como Aplicamos a Metodologia AIDA</h2></div>', unsafe_allow_html=True)
+# =============================================================================
+# COLUNA ESQUERDA - BRANDING PANEL
+# =============================================================================
+with col_brand:
     st.markdown("""
-    <div style="text-align: center; padding: 2rem;">
-        <div style="font-size: 2.5rem; margin-bottom: 1.5rem;">📊</div>
-        <h3 style="color: #f1f5f9; margin-bottom: 1rem;">O Framework AIDA</h3>
-        <div style="font-size: 1.3rem; color: #818cf8; margin-bottom: 2rem;">
-            <strong>A</strong>tenção → <strong>I</strong>nteresse → <strong>D</strong>esejo → <strong>A</strong>ção
+    <div class="branding-panel">
+        <!-- Logo -->
+        <div class="logo-container">
+            <div class="logo-circle">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 17L12 22L22 17" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M2 12L12 17L22 12" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <span class="logo-text">LIA</span>
         </div>
-        <p style="color: #cbd5e1; font-size: 1.1rem; line-height: 1.8; max-width: 800px; margin: 0 auto;">
-            Esta é a estrutura que usamos em <strong>TODAS</strong> as nossas campanhas:
-        </p>
-        <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 1.5rem; flex-wrap: wrap;">
-            <div style="color: #cbd5e1;">✅ Segmentação precisa</div>
-            <div style="color: #cbd5e1;">✅ Criativos testados</div>
-            <div style="color: #cbd5e1;">✅ LPs otimizadas</div>
-            <div style="color: #cbd5e1;">✅ Conversão maximizada</div>
+
+        <!-- Título -->
+        <h1 class="branding-title">Ciclo 1 — Tráfego para Landing</h1>
+        <p class="branding-subtitle">Medição até clique. Sem conversão final nesta fase.</p>
+
+        <!-- Steps AIDA -->
+        <div class="steps-container">
+            <div class="step-pill active">
+                <div class="step-number">1</div>
+                <span class="step-text">Alcance</span>
+            </div>
+            <div class="step-pill active">
+                <div class="step-number">2</div>
+                <span class="step-text">Interesse</span>
+            </div>
+            <div class="step-pill active">
+                <div class="step-number">3</div>
+                <span class="step-text">Landing</span>
+            </div>
+            <div class="step-pill inactive">
+                <div class="step-number">4</div>
+                <span class="step-text">Próximos passos</span>
+            </div>
         </div>
-        <p style="color: #4ade80; font-size: 1.1rem; margin-top: 1.5rem;"><strong>Resultado:</strong> Campanhas previsíveis e escaláveis.</p>
+
+        <!-- Footer -->
+        <div class="branding-footer">
+            <p class="branding-footer-text">
+                ⏱️ Primeiras 48h = fase de aprendizado.<br/>
+                Evitar decisões precipitadas sobre criativos.
+            </p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-# PROJEÇÃO APP LIA
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div id="projecao_lia" class="projecao-section">', unsafe_allow_html=True)
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">📱</span><h2 class="lia-section-title">EXEMPLO DE APLICAÇÃO • Projeção App LIA</h2></div><div class="lia-section-caption"><strong>⚠️ IMPORTANTE:</strong> Os dados abaixo são projeções baseadas no <strong>briefing do App LIA</strong>.<br/>Esta seção demonstra <strong>como o framework AIDA seria aplicado</strong> em uma campanha de app mobile.</div>', unsafe_allow_html=True)
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1: st.markdown('<div class="lia-kpi-card"><div class="lia-kpi-label">⭐ North Star</div><div class="lia-kpi-value">120</div><div class="lia-kpi-helper">Instalações projetadas</div><span class="lia-kpi-badge badge-info">Meta inicial</span></div>', unsafe_allow_html=True)
-    with col2: st.markdown('<div class="lia-kpi-card"><div class="lia-kpi-label">💰 CPI Projetado</div><div class="lia-kpi-value">R$ 15,00</div><div class="lia-kpi-helper">Custo por instalação</div><span class="lia-kpi-badge badge-warning">Estimativa</span></div>', unsafe_allow_html=True)
-    with col3: st.markdown('<div class="lia-kpi-card"><div class="lia-kpi-label">📈 Crescimento</div><div class="lia-kpi-value">+43%</div><div class="lia-kpi-helper">Semana a semana</div><span class="lia-kpi-badge badge-info">Projeção</span></div>', unsafe_allow_html=True)
-    with col4: st.markdown('<div class="lia-kpi-card"><div class="lia-kpi-label">💵 Budget</div><div class="lia-kpi-value">R$ 1.800</div><div class="lia-kpi-helper">Investimento inicial</div><span class="lia-kpi-badge badge-info">5 semanas</span></div>', unsafe_allow_html=True)
-    with col5: st.markdown('<div class="lia-kpi-card"><div class="lia-kpi-label">📊 ROI</div><div class="lia-kpi-value">A definir</div><div class="lia-kpi-helper">Após LTV conhecido</div><span class="lia-kpi-badge badge-warning">Análise futura</span></div>', unsafe_allow_html=True)
-    
-    st.markdown("#### 📈 Projeção de Crescimento Semanal")
-    fig_line = go.Figure()
-    fig_line.add_trace(go.Scatter(x=df_week["Semana"], y=df_week["Instalações"], mode="lines+markers", line=dict(color="#818cf8", width=3), marker=dict(size=12, color="#c084fc"), fill="tozeroy", fillcolor="rgba(129, 140, 248, 0.2)", name="Instalações"))
-    fig_line.update_layout(template="plotly_dark", height=350, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", xaxis=dict(showgrid=False, title="Semana"), yaxis=dict(showgrid=True, gridcolor="rgba(148, 163, 184, 0.1)", title="Instalações"), font=dict(size=12, color="#cbd5e1"))
-    st.plotly_chart(fig_line)
+# =============================================================================
+# COLUNA DIREITA - DASHBOARD OPERACIONAL
+# =============================================================================
+with col_dash:
+    # Header do Dashboard
+    st.markdown("""
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">Dashboard Ciclo 1</h1>
+        <p class="dashboard-subtitle">Performance de mídia até o clique na landing (applia.ai)</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Barra de Filtros
+    st.markdown('<div style="margin-bottom: 8px;">', unsafe_allow_html=True)
+    filter_cols = st.columns([1.5, 1, 1, 1.5])
+
+    with filter_cols[0]:
+        periodo = st.selectbox(
+            "Período",
+            ["Hoje", "Ontem", "Últimos 7 dias", "Últimos 14 dias", "Personalizado"],
+            index=2,
+            key="filter_periodo"
+        )
+
+    with filter_cols[1]:
+        fonte = st.selectbox(
+            "Fonte",
+            ["Meta", "GA4", "Ambos"],
+            index=0,
+            key="filter_fonte"
+        )
+
+    with filter_cols[2]:
+        nivel = st.selectbox(
+            "Nível",
+            ["Campanha", "Conjunto", "Criativo"],
+            index=0,
+            key="filter_nivel"
+        )
+
+    with filter_cols[3]:
+        campanha = st.selectbox(
+            "Campanha",
+            ["Todas", "LIA_Awareness_BR", "LIA_Trafego_BR"],
+            index=0,
+            key="filter_campanha"
+        )
+
     st.markdown('</div>', unsafe_allow_html=True)
 
-# FUNIL AIDA
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div id="funil_aida" class="lia-section-header"><span class="lia-section-icon">🪜</span><h2 class="lia-section-title">Estrutura Completa do Funil AIDA</h2></div><div class="lia-section-caption">Visão macro das 4 etapas: <strong>Atenção</strong> → <strong>Interesse</strong> → <strong>Desejo</strong> → <strong>Ação</strong></div>', unsafe_allow_html=True)
-    col_f1, col_f2 = st.columns([3, 2])
-    with col_f1:
-        df_funnel = pd.DataFrame({"Etapa": stages, "Quantidade": values})
-        fig_funnel = go.Figure(go.Funnel(y=df_funnel["Etapa"], x=df_funnel["Quantidade"], textinfo="value+percent initial", marker=dict(color=["#818cf8", "#a78bfa", "#c084fc", "#e879f9", "#f0abfc"])))
-        fig_funnel.update_layout(template="plotly_dark", height=450, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(size=13, color="#cbd5e1"))
-        st.plotly_chart(fig_funnel)
-    with col_f2:
-        st.markdown("#### 📊 Taxa de Conversão")
-        for i in range(1, len(stages)):
-            conv = conversions[i-1]
-            st.markdown(f'<div class="funnel-stage"><div class="funnel-label">{stages[i-1]} → {stages[i]}</div><div class="funnel-value">{conv:.1f}%</div><div class="funnel-conversion">✓ Taxa de conversão</div></div>', unsafe_allow_html=True)
+    # Mapear período para o provider
+    period_map = {
+        "Hoje": "today",
+        "Ontem": "yesterday",
+        "Últimos 7 dias": "7d",
+        "Últimos 14 dias": "14d",
+        "Personalizado": "7d"
+    }
+    selected_period = period_map.get(periodo, "7d")
 
-# 4 ETAPAS DETALHADAS
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div id="etapa_atencao" class="lia-section-header"><span class="lia-section-icon">👁️</span><h2 class="lia-section-title">1. ATENÇÃO • Impressões & Alcance</h2></div>', unsafe_allow_html=True)
-    col_a1, col_a2 = st.columns(2)
-    with col_a1:
-        st.metric("📊 Impressões", "100.000", "+23%")
-        st.caption("Total de exibições do anúncio")
-        st.metric("👥 Alcance", "75.000", "+18%")
-        st.caption("Pessoas únicas alcançadas")
-    with col_a2:
-        st.metric("💰 CPM", "R$ 8,20", "-12%")
-        st.caption("Custo por mil impressões")
-        st.metric("📈 Frequência", "1,33", "")
-        st.caption("Vezes que cada pessoa viu")
+    # Obter dados
+    meta_data = data_provider.get_meta_metrics(period=selected_period)
+    ga4_data = data_provider.get_ga4_metrics(period=selected_period)
+    creative_data = data_provider.get_creative_performance()
+    trends_data = data_provider.get_daily_trends(period=selected_period)
 
-with st.container():
-    st.markdown('<div id="etapa_interesse" class="lia-section-header"><span class="lia-section-icon">🖱️</span><h2 class="lia-section-title">2. INTERESSE • Cliques & Engajamento</h2></div>', unsafe_allow_html=True)
-    col_i1, col_i2 = st.columns([2, 3])
-    with col_i1:
-        st.metric("🖱️ Cliques", "3.000", "+15%")
-        st.metric("📊 CTR", "3,0%", "+8%")
-        st.metric("💵 CPC", "R$ 0,80", "-18%")
-    with col_i2:
-        fig_creative = px.bar(df_creatives, x="Criativo", y="Cliques", text="Cliques", title="Performance por Criativo", template="plotly_dark", color="CTR (%)", color_continuous_scale="Purples")
-        fig_creative.update_traces(textposition="outside")
-        fig_creative.update_layout(height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", showlegend=False)
-        st.plotly_chart(fig_creative)
-    st.dataframe(df_creatives.style.format({"CPM (R$)": "R$ {:.2f}", "CPC (R$)": "R$ {:.2f}", "CTR (%)": "{:.1f}%"}), hide_index=True)
+    # =============================================================================
+    # KPIs PRINCIPAIS - Grid 4x2
+    # =============================================================================
+    st.markdown("### 📊 KPIs Principais", unsafe_allow_html=True)
 
-with st.container():
-    st.markdown('<div id="etapa_desejo" class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">3. DESEJO • Landing Page</h2></div>', unsafe_allow_html=True)
-    col_d1, col_d2 = st.columns(2)
-    with col_d1:
-        st.metric("🌐 Visitas LP", "900", "+12%")
-        st.metric("⏱️ Tempo Médio", "2m 34s", "+20%")
-    with col_d2:
-        st.metric("🚪 Taxa Rejeição", "45%", "-5%")
-        st.metric("🖱️ Cliques CTA", "300", "+18%")
-    st.dataframe(df_lp, hide_index=True)
+    # Linha 1 de KPIs
+    kpi_row1 = st.columns(4)
 
-with st.container():
-    st.markdown('<div id="etapa_acao" class="lia-section-header"><span class="lia-section-icon">📲</span><h2 class="lia-section-title">4. AÇÃO • Instalações</h2></div>', unsafe_allow_html=True)
-    col_ac1, col_ac2 = st.columns([2, 3])
-    with col_ac1:
-        st.metric("📲 Instalações", "120", "+40%")
-        st.metric("💰 CPI", "R$ 15,00", "-25%")
-        st.metric("📊 Taxa Conversão", "40%", "+12%")
-    with col_ac2:
-        fig_install = px.pie(df_installs, names="Plataforma", values="Instalações", title="Distribuição de Instalações", template="plotly_dark", color_discrete_sequence=["#818cf8", "#c084fc"])
-        fig_install.update_layout(height=320, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_install)
-    st.dataframe(df_installs.style.format({"CPI (R$)": "R$ {:.2f}"}), hide_index=True)
+    with kpi_row1[0]:
+        investimento = meta_data["investimento"]
+        delta_inv = meta_data["delta_investimento"]
+        st.metric(
+            label="Investimento",
+            value=f"${investimento:,.2f}",
+            delta=f"{delta_inv:+.1f}%"
+        )
 
-# REMARKETING E LOOKALIKE
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div id="remarketing" class="lia-section-header"><span class="lia-section-icon">🔄</span><h2 class="lia-section-title">Remarketing • Reengajamento</h2></div>', unsafe_allow_html=True)
-    st.dataframe(df_remarketing.style.format({"CTR (%)": "{:.1f}%"}), hide_index=True)
+    with kpi_row1[1]:
+        impressoes = meta_data["impressoes"]
+        delta_imp = meta_data["delta_impressoes"]
+        st.metric(
+            label="Impressões",
+            value=f"{impressoes:,.0f}",
+            delta=f"{delta_imp:+.1f}%"
+        )
 
-with st.container():
-    st.markdown('<div id="lookalike" class="lia-section-header"><span class="lia-section-icon">🎯</span><h2 class="lia-section-title">Lookalike • Expansão</h2></div>', unsafe_allow_html=True)
-    st.dataframe(df_lookalike.style.format({"CPI (R$)": "R$ {:.2f}"}), hide_index=True)
+    with kpi_row1[2]:
+        alcance = meta_data["alcance"]
+        delta_alc = meta_data["delta_alcance"]
+        st.metric(
+            label="Alcance",
+            value=f"{alcance:,.0f}",
+            delta=f"{delta_alc:+.1f}%"
+        )
 
-# PRÓXIMOS PASSOS
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div id="proximos_passos" class="lia-section-header"><span class="lia-section-icon">🚀</span><h2 class="lia-section-title">Próximos Passos • Plano de Ação</h2></div>', unsafe_allow_html=True)
-    st.dataframe(df_actions, hide_index=True)
+    with kpi_row1[3]:
+        frequencia = meta_data["frequencia"]
+        delta_freq = meta_data["delta_frequencia"]
+        st.metric(
+            label="Frequência",
+            value=f"{frequencia:.2f}",
+            delta=f"{delta_freq:+.2f}"
+        )
 
-# CASE REAL
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-with st.container():
-    st.markdown('<div id="case_real" class="case-real-section">', unsafe_allow_html=True)
-    st.markdown('<div class="lia-section-header"><span class="lia-section-icon">✅</span><h2 class="lia-section-title">CASE REAL DE SUCESSO • Campanha Bradesco</h2></div><div class="lia-section-caption"><strong>📍 Cliente:</strong> Grupo Garcia Seguradoras<br/><strong>📢 Campanha:</strong> Bradesco - Captação de Profissionais<br/><strong>🎯 Objetivo:</strong> Recrutamento via Meta Ads<br/><strong>📅 Período:</strong> Setembro - Novembro 2025<br/><strong>✅ Status:</strong> Campanha finalizada com sucesso</div>', unsafe_allow_html=True)
+    # Linha 2 de KPIs
+    kpi_row2 = st.columns(4)
 
-    st.markdown("###")
-    k1, k2, k3, k4 = st.columns(4)
-    with k1: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">💵 Investimento Total</div><div class="lia-kpi-value">R$ {total_invest:,.2f}</div><div class="lia-kpi-helper">Soma dos dois períodos</div><span class="lia-kpi-badge badge-info">Mídia Meta Ads</span></div>', unsafe_allow_html=True)
-    with k2: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">👥 Leads Gerados</div><div class="lia-kpi-value">{int(total_leads)}</div><div class="lia-kpi-helper">Candidatos qualificados</div><span class="lia-kpi-badge badge-success">+{growth_leads_pct:.0f}% crescimento</span></div>', unsafe_allow_html=True)
-    with k3: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">🎯 CPL Médio</div><div class="lia-kpi-value">R$ {overall_cpl:,.2f}</div><div class="lia-kpi-helper">Custo por lead consolidado</div><span class="lia-kpi-badge badge-success">Otimizado</span></div>', unsafe_allow_html=True)
-    with k4: st.markdown(f'<div class="lia-kpi-card"><div class="lia-kpi-label">📉 Redução de CPL</div><div class="lia-kpi-value">-{improv_cpl_pct:.1f}%</div><div class="lia-kpi-helper">2º ciclo vs 1º ciclo</div><span class="lia-kpi-badge badge-success">Eficiência++</span></div>', unsafe_allow_html=True)
+    with kpi_row2[0]:
+        cliques = meta_data["cliques_link"]
+        delta_clq = meta_data["delta_cliques"]
+        st.metric(
+            label="Cliques no Link",
+            value=f"{cliques:,.0f}",
+            delta=f"{delta_clq:+.1f}%"
+        )
 
-    st.markdown("###")
-    c1, c2 = st.columns(2)
-    with c1:
-        fig_case_leads = px.bar(df_case, x="Período", y="Leads", text="Leads", title="👥 Evolução de Leads Gerados", template="plotly_dark")
-        fig_case_leads.update_traces(textposition="outside", marker_color=["#818cf8", "#c084fc"])
-        fig_case_leads.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
-        st.plotly_chart(fig_case_leads)
-    with c2:
-        fig_case_cpl = px.bar(df_case, x="Período", y="CPL (R$)", text="CPL (R$)", title="💰 Evolução do Custo por Lead", template="plotly_dark")
-        fig_case_cpl.update_traces(texttemplate="R$ %{text:.2f}", textposition="outside", marker_color=["#f97316", "#22c55e"])
-        fig_case_cpl.update_layout(height=350, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font=dict(color="#cbd5e1"))
-        st.plotly_chart(fig_case_cpl)
+    with kpi_row2[1]:
+        ctr = meta_data["ctr_link"]
+        delta_ctr = meta_data["delta_ctr"]
+        st.metric(
+            label="CTR (Link)",
+            value=f"{ctr:.2f}%",
+            delta=f"{delta_ctr:+.2f}pp"
+        )
 
-    st.markdown("#### 📊 Métricas Completas do Case")
-    st.dataframe(df_case.style.format({"Investimento (R$)": "R$ {:.2f}", "CPL (R$)": "R$ {:.2f}", "Impressões": "{:,.0f}", "Alcance": "{:,.0f}"}), hide_index=True)
-    st.markdown('<div class="lia-alert"><div class="lia-alert-title">🎯 Principais Resultados e Aprendizados</div><strong>✅ Escalabilidade Comprovada:</strong> O segundo ciclo gerou mais de <strong>2x mais leads</strong> que o primeiro.<br/><strong>✅ Otimização Efetiva:</strong> CPL caiu <strong>23,7%</strong> com ajustes de segmentação e criativos.<br/><strong>✅ Volume com Qualidade:</strong> Alcance quase dobrou mantendo taxa de conversão estável.<br/><strong>✅ ROI Positivo:</strong> Cliente aprovou continuidade da parceria para novas vagas.</div>', unsafe_allow_html=True)
+    with kpi_row2[2]:
+        cpc = meta_data["cpc_link"]
+        delta_cpc = meta_data["delta_cpc"]
+        st.metric(
+            label="CPC (Link)",
+            value=f"${cpc:.2f}",
+            delta=f"{delta_cpc:+.1f}%",
+            delta_color="inverse"
+        )
 
-    # Botão para baixar mais cases
-    st.markdown("###")
-    col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-    with col_btn2:
+    with kpi_row2[3]:
+        cpm = meta_data["cpm"]
+        delta_cpm = meta_data["delta_cpm"]
+        st.metric(
+            label="CPM",
+            value=f"${cpm:.2f}",
+            delta=f"{delta_cpm:+.1f}%",
+            delta_color="inverse"
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # =============================================================================
+    # PERFORMANCE POR CRIATIVO
+    # =============================================================================
+    st.markdown("""
+    <div class="section-container">
+        <div class="section-header">
+            <span class="section-title">🎨 Performance por Criativo</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Identificar melhor CTR e menor CPC
+    if len(creative_data) > 0:
+        best_ctr_idx = creative_data["CTR Link"].idxmax()
+        best_cpc_idx = creative_data["CPC Link"].idxmin()
+
+        badge_cols = st.columns(2)
+        with badge_cols[0]:
+            st.markdown(f"""
+            <div class="section-badge badge-success">
+                🏆 Melhor CTR: <strong>{creative_data.loc[best_ctr_idx, 'Criativo'][:25]}...</strong> ({creative_data.loc[best_ctr_idx, 'CTR Link']:.2f}%)
+            </div>
+            """, unsafe_allow_html=True)
+
+        with badge_cols[1]:
+            st.markdown(f"""
+            <div class="section-badge badge-info">
+                💰 Menor CPC: <strong>{creative_data.loc[best_cpc_idx, 'Criativo'][:25]}...</strong> (${creative_data.loc[best_cpc_idx, 'CPC Link']:.2f})
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Tabela de criativos
+        st.dataframe(
+            creative_data.style.format({
+                "Investimento": "${:.2f}",
+                "Impressões": "{:,.0f}",
+                "Cliques Link": "{:,.0f}",
+                "CTR Link": "{:.2f}%",
+                "CPC Link": "${:.2f}",
+                "CPM": "${:.2f}"
+            }).background_gradient(subset=["CTR Link"], cmap="Greens")
+            .background_gradient(subset=["CPC Link"], cmap="Reds_r"),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
         st.markdown("""
-        <a href="https://drive.google.com/file/d/1ulmViwENe9wvzXgAxDgMLMomlN5yhIxn/view?usp=sharing" target="_blank">
-            <button style="
-                width: 100%;
-                background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-                color: white;
-                padding: 1rem 2rem;
-                font-size: 1.1rem;
-                font-weight: 600;
-                border: none;
-                border-radius: 12px;
-                cursor: pointer;
-                box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
-                transition: all 0.3s ease;
-            " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 12px 32px rgba(34, 197, 94, 0.5)';" onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 8px 24px rgba(34, 197, 94, 0.4)';">
-                📥 Baixar Mais Cases de Sucesso
-            </button>
-        </a>
+        <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <div class="empty-state-title">Ainda em aprendizado</div>
+            <div class="empty-state-text">Aguarde acumular entregas para visualizar performance por criativo.</div>
+        </div>
         """, unsafe_allow_html=True)
-        st.caption("Acesse nossa biblioteca completa de casos reais comprovados")
 
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-# FOOTER
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-st.markdown("---")
-st.success("✅ Dashboard completo com Case Real Bradesco + Framework AIDA aplicável!")
+    # =============================================================================
+    # TENDÊNCIA TEMPORAL
+    # =============================================================================
+    st.markdown("### 📈 Tendência Temporal", unsafe_allow_html=True)
+
+    chart_cols = st.columns(3)
+
+    # Gráfico de Cliques por Dia
+    with chart_cols[0]:
+        fig_clicks = go.Figure()
+        fig_clicks.add_trace(go.Scatter(
+            x=trends_data["Data"],
+            y=trends_data["Cliques"],
+            mode="lines+markers",
+            line=dict(color="#7c3aed", width=2),
+            marker=dict(size=6, color="#7c3aed"),
+            fill="tozeroy",
+            fillcolor="rgba(124, 58, 237, 0.1)",
+            name="Cliques"
+        ))
+        fig_clicks.update_layout(
+            title="Cliques por Dia",
+            template="plotly_dark",
+            height=220,
+            margin=dict(l=0, r=0, t=40, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, tickfont=dict(size=10)),
+            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=10)),
+            font=dict(size=12, color="#a3a3a3"),
+            showlegend=False
+        )
+        st.plotly_chart(fig_clicks, use_container_width=True)
+
+    # Gráfico de CTR por Dia
+    with chart_cols[1]:
+        fig_ctr = go.Figure()
+        fig_ctr.add_trace(go.Scatter(
+            x=trends_data["Data"],
+            y=trends_data["CTR"],
+            mode="lines+markers",
+            line=dict(color="#22c55e", width=2),
+            marker=dict(size=6, color="#22c55e"),
+            fill="tozeroy",
+            fillcolor="rgba(34, 197, 94, 0.1)",
+            name="CTR"
+        ))
+        fig_ctr.update_layout(
+            title="CTR por Dia (%)",
+            template="plotly_dark",
+            height=220,
+            margin=dict(l=0, r=0, t=40, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, tickfont=dict(size=10)),
+            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=10)),
+            font=dict(size=12, color="#a3a3a3"),
+            showlegend=False
+        )
+        st.plotly_chart(fig_ctr, use_container_width=True)
+
+    # Gráfico de CPC por Dia
+    with chart_cols[2]:
+        fig_cpc = go.Figure()
+        fig_cpc.add_trace(go.Scatter(
+            x=trends_data["Data"],
+            y=trends_data["CPC"],
+            mode="lines+markers",
+            line=dict(color="#f59e0b", width=2),
+            marker=dict(size=6, color="#f59e0b"),
+            fill="tozeroy",
+            fillcolor="rgba(245, 158, 11, 0.1)",
+            name="CPC"
+        ))
+        fig_cpc.update_layout(
+            title="CPC por Dia ($)",
+            template="plotly_dark",
+            height=220,
+            margin=dict(l=0, r=0, t=40, b=0),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, tickfont=dict(size=10)),
+            yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=10)),
+            font=dict(size=12, color="#a3a3a3"),
+            showlegend=False
+        )
+        st.plotly_chart(fig_cpc, use_container_width=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # =============================================================================
+    # LANDING PAGE (GA4)
+    # =============================================================================
+    st.markdown("### 🌐 Landing Page (GA4)", unsafe_allow_html=True)
+
+    # Alerta de escopo
+    st.markdown("""
+    <div class="scope-alert">
+        <span class="scope-alert-icon">ℹ️</span>
+        <span class="scope-alert-text">
+            <strong>Ciclo 1 mede até clique/sessão.</strong>
+            Instalações e conversões serão avaliadas nos próximos ciclos.
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # KPIs do GA4
+    ga4_cols = st.columns(5)
+
+    with ga4_cols[0]:
+        st.metric(
+            label="Sessões",
+            value=f"{ga4_data['sessoes']:,.0f}",
+            delta=f"{ga4_data['delta_sessoes']:+.1f}%"
+        )
+
+    with ga4_cols[1]:
+        st.metric(
+            label="Usuários",
+            value=f"{ga4_data['usuarios']:,.0f}",
+            delta=f"{ga4_data['delta_usuarios']:+.1f}%"
+        )
+
+    with ga4_cols[2]:
+        st.metric(
+            label="Pageviews",
+            value=f"{ga4_data['pageviews']:,.0f}",
+            delta=f"{ga4_data['delta_pageviews']:+.1f}%"
+        )
+
+    with ga4_cols[3]:
+        st.metric(
+            label="Taxa Engajamento",
+            value=f"{ga4_data['taxa_engajamento']:.1f}%",
+            delta=f"{ga4_data['delta_engajamento']:+.1f}%"
+        )
+
+    with ga4_cols[4]:
+        st.metric(
+            label="Tempo Médio",
+            value=ga4_data['tempo_medio']
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Tabela de Origem/Mídia
+    st.markdown("#### Origem/Mídia (foco em paid social)")
+    source_data = data_provider.get_source_medium()
+    st.dataframe(
+        source_data,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # Footer
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; padding: 24px; color: #525252; font-size: 12px;">
+        Dashboard Ciclo 1 • LIA App • Atualizado em tempo real
+    </div>
+    """, unsafe_allow_html=True)

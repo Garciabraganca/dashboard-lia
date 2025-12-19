@@ -7,31 +7,34 @@ import base64
 import os
 
 # =============================================================================
-# CONFIGURAÇÃO DA PÁGINA
+# CONFIGURACAO DA PAGINA
 # =============================================================================
 st.set_page_config(
-    page_title="LIA • Dashboard Ciclo 1",
+    page_title="LIA Dashboard - Ciclo 1",
     page_icon="logo_lia.png",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
 # =============================================================================
-# PALETA OFICIAL LIA - Cores da Marca
+# PALETA OFICIAL LIA - Visual Caloroso (Laranja Dominante)
 # =============================================================================
-# Extraídas do logo oficial da coruja LIA
 LIA_COLORS = {
-    "primary": "#F97316",       # Laranja principal (topo da coruja)
-    "secondary": "#FB7185",     # Rosa/coral (base da coruja)
-    "primary_dark": "#EA580C",  # Laranja escuro para hover/accent
-    "secondary_dark": "#F43F5E", # Rosa escuro para variação
-    "bg_dark": "#0A0A0A",       # Fundo principal escuro
-    "bg_panel": "#111111",      # Fundo do painel
-    "surface": "#171717",       # Superfície de cards
-    "border": "#262626",        # Bordas sutis
-    "text_primary": "#FFFFFF",  # Texto principal
-    "text_secondary": "#A3A3A3", # Texto secundário
-    "text_muted": "#525252",    # Texto discreto
+    "primary": "#F47C3C",           # Laranja principal LIA
+    "primary_light": "#F89B5C",     # Laranja claro
+    "secondary": "#FB7185",         # Rosa/coral
+    "coral": "#FECACA",             # Coral claro para backgrounds
+    "gradient_start": "#F97316",    # Inicio gradiente
+    "gradient_mid": "#FB7185",      # Meio gradiente
+    "gradient_end": "#FECDD3",      # Fim gradiente (rosa suave)
+    "bg_card": "#FFFFFF",           # Cards brancos
+    "bg_card_alt": "#F8F8F8",       # Cards cinza claro
+    "bg_dark": "#0E0E0E",           # Preto base (apenas contraste)
+    "text_primary": "#1A1A1A",      # Texto principal escuro
+    "text_secondary": "#555555",    # Texto secundario
+    "text_muted": "#888888",        # Texto discreto
+    "success": "#16A34A",           # Verde para variacao positiva
+    "border": "#E5E5E5",            # Bordas suaves
 }
 
 # =============================================================================
@@ -48,10 +51,10 @@ def get_logo_base64():
 logo_base64 = get_logo_base64()
 
 # =============================================================================
-# DATA PROVIDER - Camada de abstração para dados
+# DATA PROVIDER - Camada de abstracao para dados
 # =============================================================================
 class DataProvider:
-    """Camada de abstração para integração com Meta Ads e GA4"""
+    """Camada de abstracao para integracao com Meta Ads e GA4"""
 
     def __init__(self, mode="mock"):
         self.mode = mode
@@ -155,17 +158,11 @@ class DataProvider:
             "Tempo Medio": ["1m 58s", "1m 42s", "1m 15s", "0m 48s", "2m 05s"],
         })
 
-    def get_executive_summary(self, period, meta_data, creative_data):
-        """Gera resumo executivo dinâmico baseado nos dados"""
+    def get_cycle_status(self, period, meta_data, creative_data):
+        """Gera status do ciclo com insights"""
         insights = []
 
-        # Verificar fase de aprendizado
-        is_learning = period in ["today", "yesterday"] or meta_data["investimento"] < 20
-        if is_learning:
-            insights.append("Em aprendizado")
-
-        # Analisar CTR
-        ctr = meta_data["ctr_link"]
+        # CTR
         delta_ctr = meta_data["delta_ctr"]
         if abs(delta_ctr) < 0.5:
             insights.append("CTR estavel")
@@ -174,31 +171,33 @@ class DataProvider:
         else:
             insights.append("CTR em queda")
 
-        # Analisar CPC
+        # CPC
         delta_cpc = meta_data["delta_cpc"]
         if delta_cpc < 0:
             insights.append("CPC controlado")
-        elif delta_cpc > 10:
-            insights.append("CPC subindo")
         else:
-            insights.append("CPC estavel")
+            insights.append("CPC em observacao")
 
         # Criativo lider
         if len(creative_data) > 0:
-            best_ctr_idx = creative_data["CTR"].idxmax()
-            best_creative = creative_data.loc[best_ctr_idx, "Criativo"]
-            # Abreviar nome
-            short_name = best_creative.split("_")[0] + "_" + best_creative.split("_")[1] if "_" in best_creative else best_creative[:15]
-            insights.append(f"Lider: {short_name}")
+            insights.append("Criativo lider ja identificado")
 
-        return " | ".join(insights)
+        # Fase
+        is_learning = period in ["today", "yesterday"]
+        phase = "Fase de Aprendizado (ate 48h)" if is_learning else "Otimizacao ativa"
+
+        return {
+            "insights": insights,
+            "phase": phase,
+            "is_learning": is_learning
+        }
 
 
 # Inicializar provider
 data_provider = DataProvider(mode="mock")
 
 # =============================================================================
-# CSS CUSTOMIZADO - Tema LIA (Cores Oficiais: Laranja/Rosa)
+# CSS - VISUAL CALOROSO LIA (LARANJA DOMINANTE, CARDS CLAROS)
 # =============================================================================
 st.markdown(f"""
 <style>
@@ -206,8 +205,10 @@ st.markdown(f"""
 
 *, *::before, *::after {{ box-sizing: border-box; }}
 
+/* Fundo principal: Gradiente LIA (igual landing) */
 html, body, [data-testid="stAppViewContainer"], .stApp {{
-    background: {LIA_COLORS["bg_dark"]} !important;
+    background: linear-gradient(135deg, {LIA_COLORS["gradient_start"]} 0%, {LIA_COLORS["gradient_mid"]} 50%, {LIA_COLORS["gradient_end"]} 100%) !important;
+    min-height: 100vh;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
 }}
 
@@ -218,8 +219,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 }}
 
 .main .block-container {{
-    padding: 24px 40px !important;
-    max-width: 1400px !important;
+    padding: 20px 32px !important;
+    max-width: 1300px !important;
     margin: 0 auto;
 }}
 
@@ -227,14 +228,16 @@ h1, h2, h3, h4, h5, h6, p, span, div, label {{
     font-family: 'Inter', sans-serif !important;
 }}
 
-/* Header com Logo LIA */
+/* ============ HEADER COM GRADIENTE ============ */
 .lia-header {{
+    background: linear-gradient(135deg, {LIA_COLORS["primary"]} 0%, {LIA_COLORS["secondary"]} 100%);
+    border-radius: 16px;
+    padding: 24px 32px;
+    margin-bottom: 24px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 0 24px 0;
-    border-bottom: 1px solid {LIA_COLORS["border"]};
-    margin-bottom: 24px;
+    box-shadow: 0 8px 32px rgba(244, 124, 60, 0.3);
 }}
 
 .lia-header-left {{
@@ -244,9 +247,11 @@ h1, h2, h3, h4, h5, h6, p, span, div, label {{
 }}
 
 .lia-logo {{
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    background: white;
+    padding: 4px;
 }}
 
 .lia-brand {{
@@ -255,62 +260,174 @@ h1, h2, h3, h4, h5, h6, p, span, div, label {{
 }}
 
 .lia-brand-name {{
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 700;
-    color: {LIA_COLORS["text_primary"]};
+    color: white;
     letter-spacing: -0.5px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }}
 
 .lia-brand-tagline {{
-    font-size: 13px;
-    color: {LIA_COLORS["text_secondary"]};
-}}
-
-.lia-header-right {{
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    font-size: 14px;
+    color: rgba(255,255,255,0.9);
+    margin-top: 2px;
 }}
 
 .lia-cycle-badge {{
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: linear-gradient(135deg, {LIA_COLORS["primary"]}22, {LIA_COLORS["secondary"]}22);
-    border: 1px solid {LIA_COLORS["primary"]}44;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: {LIA_COLORS["primary"]};
-}}
-
-/* Executive Summary - Cor da marca */
-.exec-summary {{
-    background: {LIA_COLORS["surface"]};
-    border: 1px solid {LIA_COLORS["border"]};
-    border-left: 3px solid {LIA_COLORS["primary"]};
+    gap: 8px;
+    padding: 10px 18px;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.3);
     border-radius: 10px;
-    padding: 16px 20px;
-    margin-bottom: 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
 }}
 
-.exec-label {{
-    font-size: 11px;
+/* ============ CARDS CLAROS ============ */
+.card {{
+    background: {LIA_COLORS["bg_card"]};
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    border: 1px solid {LIA_COLORS["border"]};
+}}
+
+.card-alt {{
+    background: {LIA_COLORS["bg_card_alt"]};
+}}
+
+/* ============ STATUS DO CICLO (COM CORUJA) ============ */
+.status-card {{
+    background: {LIA_COLORS["bg_card"]};
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    border-left: 4px solid {LIA_COLORS["primary"]};
+}}
+
+.status-owl {{
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+}}
+
+.status-content {{
+    flex: 1;
+}}
+
+.status-title {{
+    font-size: 13px;
     font-weight: 600;
     color: {LIA_COLORS["text_muted"]};
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }}
 
-.exec-text {{
-    font-size: 14px;
+.status-text {{
+    font-size: 15px;
     color: {LIA_COLORS["text_primary"]};
+    line-height: 1.6;
+    margin-bottom: 12px;
+}}
+
+.status-badge {{
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: {LIA_COLORS["primary"]};
+    color: white;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}}
+
+/* ============ SECTION TITLES ============ */
+.section-title {{
+    font-size: 17px;
+    font-weight: 700;
+    color: {LIA_COLORS["text_primary"]};
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}}
+
+.section-title-icon {{
+    width: 24px;
+    height: 24px;
+    background: {LIA_COLORS["primary"]};
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+}}
+
+/* ============ KPIs EM CARDS CLAROS ============ */
+.kpi-grid {{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}}
+
+.kpi-card {{
+    background: {LIA_COLORS["bg_card"]};
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid {LIA_COLORS["border"]};
+}}
+
+.kpi-label {{
+    font-size: 11px;
+    font-weight: 600;
+    color: {LIA_COLORS["text_muted"]};
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}}
+
+.kpi-icon {{
+    color: {LIA_COLORS["primary"]};
+}}
+
+.kpi-value {{
+    font-size: 26px;
+    font-weight: 700;
+    color: {LIA_COLORS["text_primary"]};
+    margin-bottom: 4px;
+}}
+
+.kpi-delta {{
+    font-size: 12px;
     font-weight: 500;
 }}
 
-/* KPIs */
+.kpi-delta.positive {{
+    color: {LIA_COLORS["success"]};
+}}
+
+.kpi-delta.negative {{
+    color: #DC2626;
+}}
+
+/* Override Streamlit metrics */
 [data-testid="stMetricValue"] {{
     color: {LIA_COLORS["text_primary"]} !important;
     font-size: 26px !important;
@@ -318,44 +435,23 @@ h1, h2, h3, h4, h5, h6, p, span, div, label {{
 }}
 
 [data-testid="stMetricLabel"] {{
-    color: {LIA_COLORS["text_secondary"]} !important;
+    color: {LIA_COLORS["text_muted"]} !important;
     font-size: 11px !important;
     text-transform: uppercase !important;
-    letter-spacing: 0.3px !important;
 }}
 
 [data-testid="stMetricDelta"] {{
-    font-size: 11px !important;
-    opacity: 0.8 !important;
+    font-size: 12px !important;
 }}
 
 [data-testid="stMetricDelta"] svg {{
     display: none !important;
 }}
 
-/* Seções */
-.section-title {{
-    font-size: 16px;
-    font-weight: 600;
-    color: {LIA_COLORS["text_primary"]};
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}}
-
-.section-title::before {{
-    content: "";
-    width: 4px;
-    height: 16px;
-    background: {LIA_COLORS["primary"]};
-    border-radius: 2px;
-}}
-
-/* Badges - Cores da marca LIA */
+/* ============ BADGES ============ */
 .badge-row {{
     display: flex;
-    gap: 10px;
+    gap: 12px;
     flex-wrap: wrap;
     margin-bottom: 16px;
 }}
@@ -366,147 +462,166 @@ h1, h2, h3, h4, h5, h6, p, span, div, label {{
     gap: 6px;
     padding: 8px 14px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
 }}
 
-.badge-primary {{
-    background: {LIA_COLORS["primary"]}18;
+.badge-orange {{
+    background: {LIA_COLORS["primary"]}15;
     color: {LIA_COLORS["primary"]};
-    border: 1px solid {LIA_COLORS["primary"]}33;
+    border: 1px solid {LIA_COLORS["primary"]}30;
 }}
 
-.badge-secondary {{
-    background: {LIA_COLORS["secondary"]}18;
-    color: {LIA_COLORS["secondary"]};
-    border: 1px solid {LIA_COLORS["secondary"]}33;
+.badge-green {{
+    background: {LIA_COLORS["success"]}15;
+    color: {LIA_COLORS["success"]};
+    border: 1px solid {LIA_COLORS["success"]}30;
 }}
 
-/* Alerta de escopo - Cores da marca */
-.scope-note {{
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 16px;
-    background: {LIA_COLORS["primary"]}0A;
-    border: 1px solid {LIA_COLORS["primary"]}22;
-    border-radius: 10px;
-    margin-bottom: 16px;
+/* ============ TABELA COM HEADER LARANJA ============ */
+.table-card {{
+    background: {LIA_COLORS["bg_card"]};
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 24px;
 }}
 
-.scope-note-icon {{
-    color: {LIA_COLORS["primary"]};
-    font-size: 16px;
+.table-header {{
+    background: linear-gradient(90deg, {LIA_COLORS["primary"]}20, {LIA_COLORS["secondary"]}10);
+    padding: 14px 20px;
+    border-bottom: 1px solid {LIA_COLORS["border"]};
 }}
 
-.scope-note-text {{
-    font-size: 12px;
-    color: {LIA_COLORS["text_secondary"]};
-}}
-
-.scope-note-text strong {{
+.table-header-title {{
+    font-size: 15px;
+    font-weight: 600;
     color: {LIA_COLORS["text_primary"]};
 }}
 
-/* Empty State com Coruja */
-.empty-box {{
-    text-align: center;
-    padding: 48px 24px;
-    background: {LIA_COLORS["surface"]};
-    border: 1px dashed {LIA_COLORS["border"]};
+.stDataFrame {{
+    background: transparent !important;
+}}
+
+[data-testid="stDataFrame"] > div {{
+    background: {LIA_COLORS["bg_card"]} !important;
+    border-radius: 0 0 14px 14px !important;
+}}
+
+/* ============ ESCOPO DO CICLO (CORAL CLARO) ============ */
+.scope-card {{
+    background: {LIA_COLORS["coral"]};
     border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid {LIA_COLORS["secondary"]}30;
 }}
 
-.empty-box-owl {{
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 16px;
-    opacity: 0.6;
+.scope-icon {{
+    font-size: 20px;
 }}
 
-.empty-box-title {{
-    font-size: 15px;
-    font-weight: 600;
-    color: {LIA_COLORS["text_secondary"]};
-    margin-bottom: 6px;
-}}
-
-.empty-box-text {{
+.scope-text {{
     font-size: 13px;
-    color: {LIA_COLORS["text_muted"]};
+    color: {LIA_COLORS["text_primary"]};
+    line-height: 1.5;
 }}
 
-/* Tabelas */
-.stDataFrame {{ background: transparent !important; }}
-[data-testid="stDataFrame"] > div {{ background: transparent !important; }}
+.scope-text strong {{
+    font-weight: 600;
+}}
 
-/* Gráficos */
-.js-plotly-plot .plotly .modebar {{ display: none !important; }}
-
-/* Streamlit overrides */
+/* ============ FILTROS ============ */
 .stSelectbox > div > div {{
-    background: {LIA_COLORS["surface"]} !important;
+    background: {LIA_COLORS["bg_card"]} !important;
     border: 1px solid {LIA_COLORS["border"]} !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
 }}
 
 .stSelectbox label {{
     color: {LIA_COLORS["text_secondary"]} !important;
-    font-size: 11px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
 }}
 
-/* Footer */
+/* ============ GRAFICOS ============ */
+.chart-card {{
+    background: {LIA_COLORS["bg_card"]};
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+}}
+
+.js-plotly-plot .plotly .modebar {{ display: none !important; }}
+
+/* ============ FOOTER ============ */
 .dash-footer {{
     text-align: center;
-    padding: 32px 0;
-    color: {LIA_COLORS["text_muted"]};
-    font-size: 12px;
-    border-top: 1px solid {LIA_COLORS["border"]};
-    margin-top: 32px;
+    padding: 24px 0;
+    color: white;
+    font-size: 13px;
+    margin-top: 20px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }}
 
 .dash-footer a {{
-    color: {LIA_COLORS["primary"]};
-    text-decoration: none;
+    color: white;
+    text-decoration: underline;
+}}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 768px) {{
+    .kpi-grid {{
+        grid-template-columns: repeat(2, 1fr);
+    }}
+    .lia-header {{
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }}
 }}
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# HEADER COM LOGO LIA
+# HEADER COM GRADIENTE LARANJA
 # =============================================================================
-logo_img = f'<img src="data:image/png;base64,{logo_base64}" class="lia-logo" alt="LIA">' if logo_base64 else '<div class="lia-logo" style="background: linear-gradient(135deg, #F97316, #FB7185); border-radius: 12px;"></div>'
+logo_img = f'<img src="data:image/png;base64,{logo_base64}" class="lia-logo" alt="LIA">' if logo_base64 else '<div class="lia-logo" style="background: white; border-radius: 14px;"></div>'
 
 st.markdown(f'''
 <div class="lia-header">
     <div class="lia-header-left">
         {logo_img}
         <div class="lia-brand">
-            <span class="lia-brand-name">LIA Dashboard</span>
-            <span class="lia-brand-tagline">Performance de midia • applia.ai</span>
+            <span class="lia-brand-name">LIA Dashboard - Ciclo 1</span>
+            <span class="lia-brand-tagline">Performance de midia ate clique na landing</span>
         </div>
     </div>
-    <div class="lia-header-right">
-        <div class="lia-cycle-badge">Ciclo 1 • Trafego</div>
-    </div>
+    <div class="lia-cycle-badge">Ciclo 1 - Trafego</div>
 </div>
 ''', unsafe_allow_html=True)
 
 # =============================================================================
-# FILTROS
+# FILTROS (em card claro)
 # =============================================================================
+st.markdown('<div class="card">', unsafe_allow_html=True)
 filter_cols = st.columns([1.5, 1, 1, 1.5])
 with filter_cols[0]:
-    periodo = st.selectbox("Periodo", ["Hoje", "Ontem", "Ultimos 7 dias", "Ultimos 14 dias", "Personalizado"], index=2, key="filter_periodo")
+    periodo = st.selectbox("Periodo", ["Hoje", "Ontem", "Ultimos 7 dias", "Ultimos 14 dias"], index=2, key="filter_periodo")
 with filter_cols[1]:
     fonte = st.selectbox("Fonte", ["Meta", "GA4", "Ambos"], index=0, key="filter_fonte")
 with filter_cols[2]:
     nivel = st.selectbox("Nivel", ["Campanha", "Conjunto", "Criativo"], index=0, key="filter_nivel")
 with filter_cols[3]:
     campanha = st.selectbox("Campanha", ["Todas", "LIA_Awareness_BR", "LIA_Trafego_BR"], index=0, key="filter_campanha")
+st.markdown('</div>', unsafe_allow_html=True)
 
-# Mapear período
-period_map = {"Hoje": "today", "Ontem": "yesterday", "Ultimos 7 dias": "7d", "Ultimos 14 dias": "14d", "Personalizado": "7d"}
+# Mapear periodo
+period_map = {"Hoje": "today", "Ontem": "yesterday", "Ultimos 7 dias": "7d", "Ultimos 14 dias": "14d"}
 selected_period = period_map.get(periodo, "7d")
 
 # Obter dados
@@ -514,25 +629,34 @@ meta_data = data_provider.get_meta_metrics(period=selected_period)
 ga4_data = data_provider.get_ga4_metrics(period=selected_period)
 creative_data = data_provider.get_creative_performance()
 trends_data = data_provider.get_daily_trends(period=selected_period)
-
-st.markdown("<br>", unsafe_allow_html=True)
+cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
 
 # =============================================================================
-# RESUMO EXECUTIVO
+# BLOCO 1 - STATUS DO CICLO (COM CORUJA)
 # =============================================================================
-exec_summary = data_provider.get_executive_summary(selected_period, meta_data, creative_data)
+owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl" alt="LIA">' if logo_base64 else ''
+insights_text = ".<br>".join(cycle_status["insights"]) + "."
+
 st.markdown(f'''
-<div class="exec-summary">
-    <div class="exec-label">Status do Ciclo 1</div>
-    <div class="exec-text">{exec_summary}</div>
+<div class="status-card">
+    {owl_img}
+    <div class="status-content">
+        <div class="status-title">Status do Ciclo 1</div>
+        <div class="status-text">
+            {insights_text}<br>
+            Campanha em fase de aprendizado.
+        </div>
+        <div class="status-badge">{cycle_status["phase"]}</div>
+    </div>
 </div>
 ''', unsafe_allow_html=True)
 
 # =============================================================================
-# KPIs PRINCIPAIS
+# BLOCO 2 - KPIs PRINCIPAIS (Cards Claros)
 # =============================================================================
-st.markdown('<div class="section-title">KPIs Principais</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-title-icon">$</div> KPIs Principais</div>', unsafe_allow_html=True)
 
+st.markdown('<div class="card">', unsafe_allow_html=True)
 kpi_row1 = st.columns(4)
 with kpi_row1[0]:
     st.metric("Investimento", f"R$ {meta_data['investimento']:,.2f}", f"{meta_data['delta_investimento']:+.1f}%")
@@ -552,13 +676,12 @@ with kpi_row2[2]:
     st.metric("CPC Link", f"R$ {meta_data['cpc_link']:.2f}", f"{meta_data['delta_cpc']:+.1f}%", delta_color="inverse")
 with kpi_row2[3]:
     st.metric("CPM", f"R$ {meta_data['cpm']:.2f}", f"{meta_data['delta_cpm']:+.1f}%", delta_color="inverse")
-
-st.markdown("<br>", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # =============================================================================
-# PERFORMANCE POR CRIATIVO
+# BLOCO 3 - PERFORMANCE POR CRIATIVO
 # =============================================================================
-st.markdown('<div class="section-title">Performance por Criativo</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-title-icon">*</div> Performance por Criativo</div>', unsafe_allow_html=True)
 
 if len(creative_data) > 0:
     best_ctr_idx = creative_data["CTR"].idxmax()
@@ -568,14 +691,20 @@ if len(creative_data) > 0:
 
     st.markdown(f'''
     <div class="badge-row">
-        <div class="badge badge-primary">Melhor CTR: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}%)</div>
-        <div class="badge badge-secondary">Menor CPC: {best_cpc_name}... (R$ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
+        <div class="badge badge-orange">Melhor CTR: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}%)</div>
+        <div class="badge badge-green">Menor CPC: {best_cpc_name}... (R$ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
     </div>
     ''', unsafe_allow_html=True)
 
-    # Tabela
+    # Tabela com header laranja
+    st.markdown('<div class="table-card">', unsafe_allow_html=True)
+    st.markdown('<div class="table-header"><span class="table-header-title">Criativos Ativos</span></div>', unsafe_allow_html=True)
+
+    # Ordenar por Cliques (padrao)
+    creative_sorted = creative_data.sort_values("Cliques", ascending=False)
+
     st.dataframe(
-        creative_data.style.format({
+        creative_sorted.style.format({
             "Investimento": "R$ {:.2f}",
             "Impressoes": "{:,.0f}",
             "Cliques": "{:,.0f}",
@@ -586,98 +715,94 @@ if len(creative_data) > 0:
         use_container_width=True,
         hide_index=True
     )
-else:
-    owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="empty-box-owl" alt="LIA">' if logo_base64 else ''
-    st.markdown(f'''
-    <div class="empty-box">
-        {owl_img}
-        <div class="empty-box-title">Ainda em aprendizado</div>
-        <div class="empty-box-text">A LIA esta coletando dados. Volte apos acumular entrega (impressoes/cliques).</div>
-    </div>
-    ''', unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =============================================================================
-# TENDÊNCIA TEMPORAL
+# BLOCO 4 - ESCOPO DO CICLO (Coral Claro)
 # =============================================================================
-st.markdown('<div class="section-title">Tendencia Temporal</div>', unsafe_allow_html=True)
+st.markdown(f'''
+<div class="scope-card">
+    <span class="scope-icon">i</span>
+    <span class="scope-text"><strong>Ciclo 1 analisa midia ate clique/sessao.</strong> Conversoes finais entram em ciclos posteriores.</span>
+</div>
+''', unsafe_allow_html=True)
+
+# =============================================================================
+# TENDENCIA TEMPORAL (em cards claros)
+# =============================================================================
+st.markdown('<div class="section-title"><div class="section-title-icon">~</div> Tendencia Temporal</div>', unsafe_allow_html=True)
 
 chart_cols = st.columns(3)
 
-# Cores da marca para gráficos
-PRIMARY_COLOR = LIA_COLORS["primary"]
-SECONDARY_COLOR = LIA_COLORS["secondary"]
-PRIMARY_DARK = LIA_COLORS["primary_dark"]
-
 with chart_cols[0]:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     fig_clicks = go.Figure()
     fig_clicks.add_trace(go.Scatter(
         x=trends_data["Data"], y=trends_data["Cliques"],
-        mode="lines+markers", line=dict(color=PRIMARY_COLOR, width=2),
-        marker=dict(size=6, color=PRIMARY_COLOR),
-        fill="tozeroy", fillcolor=f"rgba(249,115,22,0.1)"
+        mode="lines+markers",
+        line=dict(color=LIA_COLORS["primary"], width=3),
+        marker=dict(size=8, color=LIA_COLORS["primary"]),
+        fill="tozeroy", fillcolor="rgba(244,124,60,0.15)"
     ))
     fig_clicks.update_layout(
-        title="Cliques/Dia", template="plotly_dark", height=220,
-        margin=dict(l=0, r=0, t=40, b=0),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        title=dict(text="Cliques/Dia", font=dict(size=14, color=LIA_COLORS["text_primary"])),
+        height=200, margin=dict(l=0, r=0, t=40, b=0),
+        paper_bgcolor="transparent", plot_bgcolor="transparent",
         xaxis=dict(showgrid=False, tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
-        font=dict(size=12, color=LIA_COLORS["text_secondary"]), showlegend=False
+        yaxis=dict(showgrid=True, gridcolor="#E5E5E5", tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
+        showlegend=False
     )
     st.plotly_chart(fig_clicks, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with chart_cols[1]:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     fig_ctr = go.Figure()
     fig_ctr.add_trace(go.Scatter(
         x=trends_data["Data"], y=trends_data["CTR"],
-        mode="lines+markers", line=dict(color=SECONDARY_COLOR, width=2),
-        marker=dict(size=6, color=SECONDARY_COLOR),
-        fill="tozeroy", fillcolor=f"rgba(251,113,133,0.1)"
+        mode="lines+markers",
+        line=dict(color=LIA_COLORS["secondary"], width=3),
+        marker=dict(size=8, color=LIA_COLORS["secondary"]),
+        fill="tozeroy", fillcolor="rgba(251,113,133,0.15)"
     ))
     fig_ctr.update_layout(
-        title="CTR/Dia (%)", template="plotly_dark", height=220,
-        margin=dict(l=0, r=0, t=40, b=0),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        title=dict(text="CTR/Dia (%)", font=dict(size=14, color=LIA_COLORS["text_primary"])),
+        height=200, margin=dict(l=0, r=0, t=40, b=0),
+        paper_bgcolor="transparent", plot_bgcolor="transparent",
         xaxis=dict(showgrid=False, tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
-        font=dict(size=12, color=LIA_COLORS["text_secondary"]), showlegend=False
+        yaxis=dict(showgrid=True, gridcolor="#E5E5E5", tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
+        showlegend=False
     )
     st.plotly_chart(fig_ctr, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with chart_cols[2]:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     fig_cpc = go.Figure()
     fig_cpc.add_trace(go.Scatter(
         x=trends_data["Data"], y=trends_data["CPC"],
-        mode="lines+markers", line=dict(color=PRIMARY_DARK, width=2),
-        marker=dict(size=6, color=PRIMARY_DARK),
-        fill="tozeroy", fillcolor=f"rgba(234,88,12,0.1)"
+        mode="lines+markers",
+        line=dict(color=LIA_COLORS["success"], width=3),
+        marker=dict(size=8, color=LIA_COLORS["success"]),
+        fill="tozeroy", fillcolor="rgba(22,163,74,0.15)"
     ))
     fig_cpc.update_layout(
-        title="CPC/Dia (R$)", template="plotly_dark", height=220,
-        margin=dict(l=0, r=0, t=40, b=0),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        title=dict(text="CPC/Dia (R$)", font=dict(size=14, color=LIA_COLORS["text_primary"])),
+        height=200, margin=dict(l=0, r=0, t=40, b=0),
+        paper_bgcolor="transparent", plot_bgcolor="transparent",
         xaxis=dict(showgrid=False, tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
-        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
-        font=dict(size=12, color=LIA_COLORS["text_secondary"]), showlegend=False
+        yaxis=dict(showgrid=True, gridcolor="#E5E5E5", tickfont=dict(size=10, color=LIA_COLORS["text_muted"])),
+        showlegend=False
     )
     st.plotly_chart(fig_cpc, use_container_width=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =============================================================================
 # LANDING PAGE (GA4)
 # =============================================================================
-st.markdown('<div class="section-title">Landing Page (GA4)</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-title-icon">@</div> Landing Page (GA4)</div>', unsafe_allow_html=True)
 
-st.markdown(f'''
-<div class="scope-note">
-    <span class="scope-note-icon">i</span>
-    <span class="scope-note-text"><strong>Ciclo 1 mede ate clique/sessao.</strong> Instalacoes e conversoes serao avaliadas nos proximos ciclos.</span>
-</div>
-''', unsafe_allow_html=True)
-
+st.markdown('<div class="card">', unsafe_allow_html=True)
 ga4_cols = st.columns(5)
 with ga4_cols[0]:
     st.metric("Sessoes", f"{ga4_data['sessoes']:,.0f}", f"{ga4_data['delta_sessoes']:+.1f}%")
@@ -689,17 +814,18 @@ with ga4_cols[3]:
     st.metric("Engajamento", f"{ga4_data['taxa_engajamento']:.1f}%", f"{ga4_data['delta_engajamento']:+.1f}%")
 with ga4_cols[4]:
     st.metric("Tempo Medio", ga4_data['tempo_medio'])
+st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# Tabela Origem/Mídia
-st.markdown("**Origem/Midia (foco em paid social)**")
+# Tabela Origem/Midia
+st.markdown('<div class="table-card">', unsafe_allow_html=True)
+st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
 source_data = data_provider.get_source_medium()
 st.dataframe(source_data, use_container_width=True, hide_index=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
 st.markdown(f'''
 <div class="dash-footer">
-    Dashboard Ciclo 1 • <a href="https://applia.ai" target="_blank">LIA App</a> • Atualizado em tempo real
+    Dashboard Ciclo 1 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real
 </div>
 ''', unsafe_allow_html=True)

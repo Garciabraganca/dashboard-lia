@@ -223,7 +223,7 @@ data_provider = DataProvider(mode="mock")
 def render_error_card(title="Estamos ajustando os dados", message="Algumas metricas estao temporariamente indisponiveis. Nossa equipe ja esta verificando."):
     owl_img = f'<img src="data:image/png;base64,{logo_base64}" style="width:48px;height:48px;margin-bottom:12px;">' if logo_base64 else ''
     st.markdown(f'''
-    <div style="background:{LIA["white"]};border-radius:16px;padding:32px;text-align:center;border:1px solid {LIA["border"]};margin:16px 0;">
+    <div style="background:rgba(255,255,255,0.65);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:20px;padding:32px;text-align:center;border:1px solid rgba(255,255,255,0.35);margin:16px 0;box-shadow:0 20px 40px rgba(0,0,0,0.12);">
         {owl_img}
         <h3 style="color:{LIA["text_dark"]};font-size:18px;margin:0 0 8px 0;">{title}</h3>
         <p style="color:{LIA["text_secondary"]};font-size:14px;margin:0 0 16px 0;">{message}</p>
@@ -260,24 +260,36 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     margin: 0 auto;
 }}
 
-/* ========== CAMADA DE CONTEUDO CENTRAL (BRANCA) ========== */
-.content-layer {{
-    background: {LIA["white"]};
+/* ========== CARTOES GLASSMORPHISM ========== */
+.glass-card {{
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
     border-radius: 20px;
-    padding: 28px 32px;
-    box-shadow: 0 8px 40px {LIA["shadow"]};
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    padding: 24px;
+}}
+
+.content-layer {{
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
     margin-top: 16px;
 }}
 
-/* ========== HEADER (sobre gradiente, texto branco OK) ========== */
+/* ========== HEADER (em glass) ========== */
 .lia-header {{
-    background: linear-gradient(135deg, {LIA["primary"]} 0%, {LIA["secondary"]} 100%);
-    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 20px;
     padding: 20px 28px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    box-shadow: 0 4px 20px rgba(244,124,60,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
     margin-bottom: 0;
 }}
 
@@ -291,29 +303,33 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     width: 50px;
     height: 50px;
     border-radius: 12px;
-    background: white;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     padding: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.12);
 }}
 
 .lia-brand-name {{
     font-size: 22px;
     font-weight: 700;
-    color: white;
+    color: {LIA["text_dark"]};
 }}
 
 .lia-brand-tagline {{
     font-size: 13px;
-    color: rgba(255,255,255,0.9);
+    color: {LIA["text_secondary"]};
 }}
 
 .lia-cycle-badge {{
     padding: 8px 16px;
-    background: rgba(255,255,255,0.2);
-    border: 1px solid rgba(255,255,255,0.3);
-    border-radius: 8px;
+    background: rgba(255,255,255,0.75);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 12px;
     font-size: 13px;
     font-weight: 600;
-    color: white;
+    color: {LIA["text_dark"]};
 }}
 
 /* ========== TITULOS DE SECAO ========== */
@@ -321,7 +337,7 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     font-size: 16px;
     font-weight: 700;
     color: {LIA["text_dark"]};
-    margin: 24px 0 16px 0;
+    margin: 0 0 14px 0;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -342,15 +358,17 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== STATUS DO CICLO (COM CORUJA) ========== */
 .status-card {{
-    background: {LIA["white"]};
-    border-radius: 14px;
-    padding: 20px;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 20px;
+    padding: 24px;
     display: flex;
     align-items: flex-start;
     gap: 16px;
-    border-left: 4px solid {LIA["primary"]};
-    border: 1px solid {LIA["border"]};
-    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    margin-bottom: 4px;
 }}
 
 .status-owl {{
@@ -385,43 +403,71 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     font-weight: 600;
 }}
 
-/* ========== KPIs EM CARDS BRANCOS INDIVIDUAIS ========== */
+/* ========== KPIs EM CARDS GLASS ========== */
 .kpi-grid {{
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 14px;
-    margin-bottom: 20px;
+    margin-bottom: 8px;
+}}
+
+.ga4-grid {{
+    grid-template-columns: repeat(5, 1fr);
 }}
 
 .kpi-card {{
-    background: {LIA["white"]};
-    border-radius: 12px;
-    padding: 16px 18px;
-    border: 1px solid {LIA["border"]};
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    padding: 20px 22px;
+}}
+
+.kpi-top {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}}
+
+.kpi-icon {{
+    width: 28px;
+    height: 28px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, {LIA["primary"]}, {LIA["secondary"]});
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.12);
 }}
 
 .kpi-label {{
     font-size: 11px;
     font-weight: 600;
-    color: {LIA["text_muted"]};
+    color: {LIA["text_secondary"]};
     text-transform: uppercase;
-    margin-bottom: 6px;
+    letter-spacing: 0.3px;
 }}
 
 .kpi-value {{
-    font-size: 24px;
-    font-weight: 700;
-    color: {LIA["text_dark"]};
-    margin-bottom: 4px;
+    font-size: 26px;
+    font-weight: 800;
+    color: #000000;
+    margin-bottom: 6px;
 }}
 
 .kpi-delta {{
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 700;
 }}
 
 .kpi-delta.positive {{ color: {LIA["success"]}; }}
 .kpi-delta.negative {{ color: {LIA["error"]}; }}
+.kpi-delta.neutral {{ color: {LIA["text_secondary"]}; }}
 
 /* Override Streamlit metrics para funcionar em cards brancos */
 [data-testid="stMetricValue"] {{
@@ -469,19 +515,22 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border: 1px solid {LIA["success"]}40;
 }}
 
-/* ========== TABELA COM HEADER LARANJA CLARO ========== */
+/* ========== TABELA COM HEADER GLASS ========== */
 .table-container {{
-    background: {LIA["white"]};
-    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 20px;
     overflow: hidden;
-    border: 1px solid {LIA["border"]};
-    margin-bottom: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    margin-bottom: 12px;
 }}
 
 .table-header {{
-    background: {LIA["primary_light"]};
-    padding: 12px 18px;
-    border-bottom: 1px solid {LIA["border"]};
+    background: rgba(255,255,255,0.75);
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
 }}
 
 .table-header-title {{
@@ -495,18 +544,22 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 }}
 
 [data-testid="stDataFrame"] > div {{
-    background: {LIA["white"]} !important;
+    background: transparent !important;
 }}
 
-/* ========== CARD DE ESCOPO (CORAL CLARO) ========== */
+/* ========== CARD DE ESCOPO ========== */
 .scope-card {{
-    background: {LIA["coral"]};
-    border-radius: 10px;
-    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 20px;
+    padding: 16px 20px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 20px;
+    gap: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    margin-bottom: 12px;
 }}
 
 .scope-text {{
@@ -516,20 +569,34 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== GRAFICOS EM CARDS ========== */
 .chart-card {{
-    background: {LIA["white"]};
-    border-radius: 12px;
-    padding: 16px;
-    border: 1px solid {LIA["border"]};
-    margin-bottom: 16px;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 20px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    margin-bottom: 12px;
 }}
 
 .js-plotly-plot .plotly .modebar {{ display: none !important; }}
 
 /* ========== FILTROS ========== */
+.filter-card {{
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    padding: 18px 18px 10px 18px;
+}}
+
 .stSelectbox > div > div {{
-    background: {LIA["white"]} !important;
-    border: 1px solid {LIA["border"]} !important;
-    border-radius: 8px !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
 }}
 
 .stSelectbox label {{
@@ -540,11 +607,11 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 /* ========== FOOTER ========== */
 .footer {{
     text-align: center;
-    padding: 20px 0 0 0;
+    padding: 8px 0 0 0;
     color: {LIA["text_muted"]};
     font-size: 12px;
-    border-top: 1px solid {LIA["border"]};
-    margin-top: 24px;
+    border-top: none;
+    margin-top: 8px;
 }}
 
 .footer a {{
@@ -579,13 +646,14 @@ st.markdown(f'''
 ''', unsafe_allow_html=True)
 
 # =============================================================================
-# CAMADA DE CONTEUDO CENTRAL (FUNDO BRANCO)
+# CAMADA DE CONTEUDO CENTRAL
 # =============================================================================
 st.markdown('<div class="content-layer">', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # FILTROS
 # -----------------------------------------------------------------------------
+st.markdown('<div class="filter-card">', unsafe_allow_html=True)
 filter_cols = st.columns([1.5, 1, 1, 1.5])
 with filter_cols[0]:
     periodo = st.selectbox("Periodo", ["Hoje", "Ontem", "Ultimos 7 dias", "Ultimos 14 dias"], index=2, key="periodo")
@@ -595,6 +663,7 @@ with filter_cols[2]:
     nivel = st.selectbox("Nivel", ["Campanha", "Conjunto", "Criativo"], index=0, key="nivel")
 with filter_cols[3]:
     campanha = st.selectbox("Campanha", ["Todas", "LIA_Awareness_BR", "LIA_Trafego_BR"], index=0, key="campanha")
+st.markdown('</div>', unsafe_allow_html=True)
 
 period_map = {"Hoje": "today", "Ontem": "yesterday", "Ultimos 7 dias": "7d", "Ultimos 14 dias": "14d"}
 selected_period = period_map.get(periodo, "7d")
@@ -627,13 +696,14 @@ if has_error:
 # -----------------------------------------------------------------------------
 owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
 insights_text = ". ".join(cycle_status["insights"]) + "."
+status_line = f"{insights_text} {cycle_status['phase']}."
 
 st.markdown(f'''
 <div class="status-card">
     {owl_img}
     <div style="flex:1;">
         <div class="status-title">Status do Ciclo 1</div>
-        <div class="status-text">{insights_text} Campanha em fase de aprendizado.</div>
+        <div class="status-text">{status_line}</div>
         <div class="status-badge">{cycle_status["phase"]}</div>
     </div>
 </div>
@@ -642,31 +712,62 @@ st.markdown(f'''
 # -----------------------------------------------------------------------------
 # KPIs PRINCIPAIS (em cards brancos)
 # -----------------------------------------------------------------------------
-st.markdown('<div class="section-title"><div class="section-icon">$</div> KPIs Principais</div>', unsafe_allow_html=True)
+def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precision=1):
+    if delta is None:
+        delta_class = "neutral"
+        delta_text = "—"
+    else:
+        is_positive = delta < 0 if invert else delta >= 0
+        delta_class = "positive" if is_positive else "negative"
+        delta_text = f"{delta:+.{precision}f}{suffix}"
+    return f"""
+    <div class=\"kpi-card\">
+        <div class=\"kpi-top\">
+            <div class=\"kpi-icon\">{icon}</div>
+            <div class=\"kpi-label\">{label}</div>
+        </div>
+        <div class=\"kpi-value\">{value}</div>
+        <div class=\"kpi-delta {delta_class}\">{delta_text}</div>
+    </div>
+    """
 
-kpi_row1 = st.columns(4)
-with kpi_row1[0]:
-    st.metric("Investimento", f"R$ {meta_data['investimento']:,.2f}", f"{meta_data['delta_investimento']:+.1f}%")
-with kpi_row1[1]:
-    st.metric("Impressoes", f"{meta_data['impressoes']:,.0f}", f"{meta_data['delta_impressoes']:+.1f}%")
-with kpi_row1[2]:
-    st.metric("Alcance", f"{meta_data['alcance']:,.0f}", f"{meta_data['delta_alcance']:+.1f}%")
-with kpi_row1[3]:
-    st.metric("Frequencia", f"{meta_data['frequencia']:.2f}", f"{meta_data['delta_frequencia']:+.2f}")
+kpi_cards = [
+    {"icon": "💰", "label": "Investimento", "value": f"R$ {meta_data['investimento']:,.2f}", "delta": meta_data['delta_investimento'], "suffix": "%"},
+    {"icon": "👀", "label": "Impressoes", "value": f"{meta_data['impressoes']:,.0f}", "delta": meta_data['delta_impressoes'], "suffix": "%"},
+    {"icon": "📡", "label": "Alcance", "value": f"{meta_data['alcance']:,.0f}", "delta": meta_data['delta_alcance'], "suffix": "%"},
+    {"icon": "🔁", "label": "Frequencia", "value": f"{meta_data['frequencia']:.2f}", "delta": meta_data['delta_frequencia'], "suffix": "", "precision": 2},
+    {"icon": "🖱️", "label": "Cliques Link", "value": f"{meta_data['cliques_link']:,.0f}", "delta": meta_data['delta_cliques'], "suffix": "%"},
+    {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data['ctr_link']:.2f}%", "delta": meta_data['delta_ctr'], "suffix": "pp", "precision": 2},
+    {"icon": "💡", "label": "CPC Link", "value": f"R$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
+    {"icon": "📊", "label": "CPM", "value": f"R$ {meta_data['cpm']:.2f}", "delta": meta_data['delta_cpm'], "suffix": "%", "invert": True},
+]
 
-kpi_row2 = st.columns(4)
-with kpi_row2[0]:
-    st.metric("Cliques Link", f"{meta_data['cliques_link']:,.0f}", f"{meta_data['delta_cliques']:+.1f}%")
-with kpi_row2[1]:
-    st.metric("CTR Link", f"{meta_data['ctr_link']:.2f}%", f"{meta_data['delta_ctr']:+.2f}pp")
-with kpi_row2[2]:
-    st.metric("CPC Link", f"R$ {meta_data['cpc_link']:.2f}", f"{meta_data['delta_cpc']:+.1f}%", delta_color="inverse")
-with kpi_row2[3]:
-    st.metric("CPM", f"R$ {meta_data['cpm']:.2f}", f"{meta_data['delta_cpm']:+.1f}%", delta_color="inverse")
+kpi_cards_html = "".join(
+    build_kpi_card(
+        card["icon"],
+        card["label"],
+        card["value"],
+        card["delta"],
+        suffix=card.get("suffix", "%"),
+        invert=card.get("invert", False),
+        precision=card.get("precision", 1),
+    )
+    for card in kpi_cards
+)
+
+st.markdown(f'''
+<div class="glass-card">
+    <div class="section-title"><div class="section-icon">$</div> KPIs Principais</div>
+    <div class="kpi-grid">
+        {kpi_cards_html}
+    </div>
+</div>
+''', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # PERFORMANCE POR CRIATIVO
 # -----------------------------------------------------------------------------
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title"><div class="section-icon">*</div> Performance por Criativo</div>', unsafe_allow_html=True)
 
 if len(creative_data) > 0:
@@ -701,10 +802,12 @@ if len(creative_data) > 0:
         render_error_card("Dados de criativos indisponiveis", "Estamos processando as informacoes de criativos.")
 else:
     st.markdown(f'''
-    <div style="background:{LIA["bg_zebra"]};border-radius:12px;padding:32px;text-align:center;border:1px dashed {LIA["border"]};">
+    <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:32px;text-align:center;border:1px dashed rgba(255,255,255,0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
         <p style="color:{LIA["text_muted"]};margin:0;">Nenhum criativo ativo no periodo selecionado.</p>
     </div>
     ''', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # ESCOPO DO CICLO
@@ -719,6 +822,7 @@ st.markdown(f'''
 # -----------------------------------------------------------------------------
 # TENDENCIA TEMPORAL
 # -----------------------------------------------------------------------------
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendencia Temporal</div>', unsafe_allow_html=True)
 
 if len(trends_data) > 0:
@@ -788,22 +892,40 @@ if len(trends_data) > 0:
         logger.error(f"Erro ao renderizar graficos: {e}")
         render_error_card("Graficos indisponiveis", "Estamos processando os dados de tendencia.")
 
+st.markdown('</div>', unsafe_allow_html=True)
+
 # -----------------------------------------------------------------------------
 # LANDING PAGE (GA4)
 # -----------------------------------------------------------------------------
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title"><div class="section-icon">@</div> Landing Page (GA4)</div>', unsafe_allow_html=True)
 
-ga4_cols = st.columns(5)
-with ga4_cols[0]:
-    st.metric("Sessoes", f"{ga4_data['sessoes']:,.0f}", f"{ga4_data['delta_sessoes']:+.1f}%")
-with ga4_cols[1]:
-    st.metric("Usuarios", f"{ga4_data['usuarios']:,.0f}", f"{ga4_data['delta_usuarios']:+.1f}%")
-with ga4_cols[2]:
-    st.metric("Pageviews", f"{ga4_data['pageviews']:,.0f}", f"{ga4_data['delta_pageviews']:+.1f}%")
-with ga4_cols[3]:
-    st.metric("Engajamento", f"{ga4_data['taxa_engajamento']:.1f}%", f"{ga4_data['delta_engajamento']:+.1f}%")
-with ga4_cols[4]:
-    st.metric("Tempo Medio", ga4_data['tempo_medio'])
+ga4_cards = [
+    {"icon": "🌐", "label": "Sessoes", "value": f"{ga4_data['sessoes']:,.0f}", "delta": ga4_data['delta_sessoes']},
+    {"icon": "👥", "label": "Usuarios", "value": f"{ga4_data['usuarios']:,.0f}", "delta": ga4_data['delta_usuarios']},
+    {"icon": "📄", "label": "Pageviews", "value": f"{ga4_data['pageviews']:,.0f}", "delta": ga4_data['delta_pageviews']},
+    {"icon": "⚡", "label": "Engajamento", "value": f"{ga4_data['taxa_engajamento']:.1f}%", "delta": ga4_data['delta_engajamento']},
+    {"icon": "⏱️", "label": "Tempo Medio", "value": ga4_data['tempo_medio'], "delta": None, "suffix": ""},
+]
+
+ga4_cards_html = "".join(
+    build_kpi_card(
+        card["icon"],
+        card["label"],
+        card["value"],
+        card.get("delta"),
+        suffix=card.get("suffix", "%"),
+        invert=card.get("invert", False),
+        precision=card.get("precision", 1),
+    )
+    for card in ga4_cards
+)
+
+st.markdown(f'''
+<div class="kpi-grid ga4-grid">
+    {ga4_cards_html}
+</div>
+''', unsafe_allow_html=True)
 
 # Tabela Origem/Midia
 try:
@@ -816,9 +938,11 @@ try:
 except Exception as e:
     logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")
 
+st.markdown('</div>', unsafe_allow_html=True)
+
 # Footer
 st.markdown(f'''
-<div class="footer">
+<div class="footer glass-card">
     Dashboard Ciclo 1 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real
 </div>
 ''', unsafe_allow_html=True)

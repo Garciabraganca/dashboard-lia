@@ -190,7 +190,29 @@ class DataProvider:
             default=self._empty_ga4_metrics()
         )
 
-    def get_creative_performance(self, period="7d"):
+    def get_creative_performance(self, period="7d", campaign_filter=None):
+        # Tentar dados reais primeiro
+        if self.meta_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=campaign_filter)
+                if not df.empty:
+                    # Formatar para o dashboard
+                    result = pd.DataFrame({
+                        "Criativo": df['ad_name'] if 'ad_name' in df.columns else [],
+                        "Formato": "Anúncio",  # API não retorna formato diretamente
+                        "Investimento": df['spend'] if 'spend' in df.columns else 0,
+                        "Impressoes": df['impressions'].astype(int) if 'impressions' in df.columns else 0,
+                        "Cliques": df['clicks'].astype(int) if 'clicks' in df.columns else 0,
+                        "CTR": df['ctr'] if 'ctr' in df.columns else 0,
+                        "CPC": df['cpc'] if 'cpc' in df.columns else 0,
+                        "CPM": df['cpm'] if 'cpm' in df.columns else 0,
+                    })
+                    return result
+            except Exception as e:
+                logger.error(f"Erro ao obter criativos reais: {e}")
+
+        # Fallback para mock
         return self._safe_execute(
             lambda: self._get_mock_creative_data(),
             default=pd.DataFrame()
@@ -789,7 +811,7 @@ campaign_filter = campanha if campanha != "Todas" else None
 try:
     meta_data = data_provider.get_meta_metrics(period=selected_period, campaign_filter=campaign_filter)
     ga4_data = data_provider.get_ga4_metrics(period=selected_period)
-    creative_data = data_provider.get_creative_performance()
+    creative_data = data_provider.get_creative_performance(period=selected_period, campaign_filter=campaign_filter)
     trends_data = data_provider.get_daily_trends(period=selected_period)
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
     has_error = data_provider.error_state

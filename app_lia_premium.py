@@ -7,6 +7,11 @@ import os
 import logging
 import textwrap
 
+# Importar integrações
+from config import Config
+from ga_integration import GA4Integration
+from meta_integration import MetaAdsIntegration
+
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -63,10 +68,39 @@ logo_base64 = get_logo_base64()
 # DATA PROVIDER COM TRATAMENTO DE ERROS
 # =============================================================================
 class DataProvider:
-    def __init__(self, mode="mock"):
+    def __init__(self, mode="auto"):
         self.mode = mode
         self.error_state = False
         self.error_message = ""
+        self.meta_client = None
+        self.ga4_client = None
+        self._init_clients()
+
+    def _init_clients(self):
+        """Inicializa clientes das APIs se credenciais estiverem disponíveis"""
+        try:
+            # Inicializar Meta Ads
+            if Config.validate_meta_credentials():
+                self.meta_client = MetaAdsIntegration(
+                    access_token=Config.get_meta_access_token(),
+                    ad_account_id=Config.get_meta_ad_account_id()
+                )
+                logger.info("Meta Ads client initialized")
+        except Exception as e:
+            logger.error(f"Erro ao inicializar Meta client: {e}")
+            self.meta_client = None
+
+        try:
+            # Inicializar GA4
+            if Config.validate_ga4_credentials():
+                self.ga4_client = GA4Integration(
+                    credentials_json=Config.get_ga4_credentials(),
+                    property_id=Config.get_ga4_property_id()
+                )
+                logger.info("GA4 client initialized")
+        except Exception as e:
+            logger.error(f"Erro ao inicializar GA4 client: {e}")
+            self.ga4_client = None
 
     def _safe_execute(self, func, default=None):
         """Executa funcao com tratamento de erro"""
@@ -78,13 +112,75 @@ class DataProvider:
             self.error_message = str(e)
             return default
 
+    def _period_to_api_format(self, period):
+        """Converte período do dashboard para formato da API"""
+        mapping = {
+            "today": "today",
+            "yesterday": "yesterday",
+            "7d": "last_7d",
+            "14d": "last_14d"
+        }
+        return mapping.get(period, "last_7d")
+
     def get_meta_metrics(self, period="7d", level="campaign", filters=None):
+        # Tentar dados reais primeiro
+        if self.meta_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                insights = self.meta_client.get_ad_insights(date_range=api_period)
+                if not insights.empty:
+                    return self._process_meta_insights(insights)
+            except Exception as e:
+                logger.error(f"Erro ao obter dados reais do Meta: {e}")
+
+        # Fallback para mock
         return self._safe_execute(
             lambda: self._get_mock_meta_metrics(period, level),
             default=self._empty_meta_metrics()
         )
 
+    def _process_meta_insights(self, df):
+        """Processa insights do Meta para formato do dashboard"""
+        try:
+            return {
+                "investimento": df['spend'].sum() if 'spend' in df.columns else 0,
+                "impressoes": int(df['impressions'].sum()) if 'impressions' in df.columns else 0,
+                "alcance": int(df['reach'].sum()) if 'reach' in df.columns else 0,
+                "frequencia": df['frequency'].mean() if 'frequency' in df.columns else 0,
+                "cliques_link": int(df['clicks'].sum()) if 'clicks' in df.columns else 0,
+                "ctr_link": df['ctr'].mean() if 'ctr' in df.columns else 0,
+                "cpc_link": df['cpc'].mean() if 'cpc' in df.columns else 0,
+                "cpm": df['cpm'].mean() if 'cpm' in df.columns else 0,
+                "delta_investimento": 0,
+                "delta_impressoes": 0,
+                "delta_alcance": 0,
+                "delta_frequencia": 0,
+                "delta_cliques": 0,
+                "delta_ctr": 0,
+                "delta_cpc": 0,
+                "delta_cpm": 0,
+            }
+        except Exception as e:
+            logger.error(f"Erro ao processar insights Meta: {e}")
+            return self._empty_meta_metrics()
+
     def get_ga4_metrics(self, period="7d", filters=None):
+        # Tentar dados reais primeiro
+        if self.ga4_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                metrics = self.ga4_client.get_aggregated_metrics(date_range=api_period)
+                if metrics and metrics.get('sessoes', 0) > 0:
+                    # Adicionar deltas (por enquanto zerados)
+                    metrics['delta_sessoes'] = 0
+                    metrics['delta_usuarios'] = 0
+                    metrics['delta_pageviews'] = 0
+                    metrics['delta_engajamento'] = 0
+                    return metrics
+            except Exception as e:
+                logger.error(f"Erro ao obter dados reais do GA4: {e}")
+
+        # Fallback para mock
         return self._safe_execute(
             lambda: self._get_mock_ga4_metrics(period),
             default=self._empty_ga4_metrics()
@@ -102,7 +198,18 @@ class DataProvider:
             default=pd.DataFrame({"Data": [], "Cliques": [], "CTR": [], "CPC": []})
         )
 
-    def get_source_medium(self):
+    def get_source_medium(self, period="7d"):
+        # Tentar dados reais primeiro
+        if self.ga4_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                source_data = self.ga4_client.get_source_medium_data(date_range=api_period)
+                if not source_data.empty:
+                    return source_data
+            except Exception as e:
+                logger.error(f"Erro ao obter source/medium do GA4: {e}")
+
+        # Fallback para mock
         return self._safe_execute(
             lambda: self._get_mock_source_medium(),
             default=pd.DataFrame()
@@ -216,7 +323,7 @@ class DataProvider:
 
 
 # Inicializar provider
-data_provider = DataProvider(mode="mock")
+data_provider = DataProvider(mode="auto")
 
 # =============================================================================
 # COMPONENTE: CARD DE ERRO AMIGAVEL
@@ -934,7 +1041,7 @@ st.markdown(ga4_section, unsafe_allow_html=True)
 
 # Tabela Origem/Midia
 try:
-    source_data = data_provider.get_source_medium()
+    source_data = data_provider.get_source_medium(period=selected_period)
     if len(source_data) > 0:
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
         st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)

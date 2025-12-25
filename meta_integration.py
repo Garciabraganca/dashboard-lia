@@ -19,10 +19,7 @@ class MetaAdsIntegration:
         """
         self.access_token = access_token
         self.ad_account_id = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
-        self.base_url = "https://graph.facebook.com/v19.0"
-        self.headers = {
-            "Authorization": f"Bearer {self.access_token}"
-        }
+        self.base_url = "https://graph.facebook.com/v21.0"
 
     def get_campaigns(self, date_range: str = "last_7d") -> pd.DataFrame:
         """
@@ -61,7 +58,7 @@ class MetaAdsIntegration:
                 "access_token": self.access_token
             }
 
-            response = requests.get(url, params=params, headers=self.headers)
+            response = requests.get(url, params=params)
             response.raise_for_status()
 
             data = response.json()
@@ -138,7 +135,17 @@ class MetaAdsIntegration:
                 "access_token": self.access_token
             }
 
-            response = requests.get(url, params=params, headers=self.headers)
+            response = requests.get(url, params=params)
+
+            # Log detalhado para debug
+            if response.status_code != 200:
+                error_data = response.json() if response.text else {}
+                error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+                error_code = error_data.get('error', {}).get('code', 'N/A')
+                print(f"Meta API Error {response.status_code}: Code={error_code}, Message={error_msg}")
+                print(f"URL: {url}")
+                print(f"Ad Account: {self.ad_account_id}")
+
             response.raise_for_status()
 
             data = response.json()

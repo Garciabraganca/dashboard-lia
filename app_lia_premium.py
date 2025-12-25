@@ -980,16 +980,16 @@ if len(trends_data) > 0:
             fig1 = go.Figure()
             fig1.add_trace(go.Scatter(
                 x=trends_data["Data"], y=trends_data["Cliques"],
-                mode="lines+markers", line=dict(color=LIA["primary"], width=2),
-                marker=dict(size=6, color=LIA["primary"]),
-                fill="tozeroy", fillcolor="rgba(244,124,60,0.1)"
+                mode="lines+markers", line=dict(color=LIA["primary"], width=3),
+                marker=dict(size=10, color=LIA["primary"], line=dict(width=2, color="white")),
+                fill="tozeroy", fillcolor="rgba(244,124,60,0.25)"
             ))
             fig1.update_layout(
-                title=dict(text="Cliques/Dia", font=dict(size=13, color=LIA["text_dark"])),
-                height=180, margin=dict(l=0, r=0, t=35, b=0),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(showgrid=False, tickfont=dict(size=9, color=LIA["text_muted"])),
-                yaxis=dict(showgrid=True, gridcolor="#F0F0F0", tickfont=dict(size=9, color=LIA["text_muted"])),
+                title=dict(text="Cliques/Dia", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
+                height=220, margin=dict(l=10, r=10, t=40, b=30),
+                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 showlegend=False
             )
             st.plotly_chart(fig1, use_container_width=True)
@@ -1000,16 +1000,16 @@ if len(trends_data) > 0:
             fig2 = go.Figure()
             fig2.add_trace(go.Scatter(
                 x=trends_data["Data"], y=trends_data["CTR"],
-                mode="lines+markers", line=dict(color=LIA["secondary"], width=2),
-                marker=dict(size=6, color=LIA["secondary"]),
-                fill="tozeroy", fillcolor="rgba(251,113,133,0.1)"
+                mode="lines+markers", line=dict(color=LIA["secondary"], width=3),
+                marker=dict(size=10, color=LIA["secondary"], line=dict(width=2, color="white")),
+                fill="tozeroy", fillcolor="rgba(251,113,133,0.25)"
             ))
             fig2.update_layout(
-                title=dict(text="CTR/Dia (%)", font=dict(size=13, color=LIA["text_dark"])),
-                height=180, margin=dict(l=0, r=0, t=35, b=0),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(showgrid=False, tickfont=dict(size=9, color=LIA["text_muted"])),
-                yaxis=dict(showgrid=True, gridcolor="#F0F0F0", tickfont=dict(size=9, color=LIA["text_muted"])),
+                title=dict(text="CTR/Dia (%)", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
+                height=220, margin=dict(l=10, r=10, t=40, b=30),
+                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 showlegend=False
             )
             st.plotly_chart(fig2, use_container_width=True)
@@ -1020,16 +1020,16 @@ if len(trends_data) > 0:
             fig3 = go.Figure()
             fig3.add_trace(go.Scatter(
                 x=trends_data["Data"], y=trends_data["CPC"],
-                mode="lines+markers", line=dict(color=LIA["success"], width=2),
-                marker=dict(size=6, color=LIA["success"]),
-                fill="tozeroy", fillcolor="rgba(22,163,74,0.1)"
+                mode="lines+markers", line=dict(color=LIA["success"], width=3),
+                marker=dict(size=10, color=LIA["success"], line=dict(width=2, color="white")),
+                fill="tozeroy", fillcolor="rgba(22,163,74,0.25)"
             ))
             fig3.update_layout(
-                title=dict(text="CPC/Dia ($)", font=dict(size=13, color=LIA["text_dark"])),
-                height=180, margin=dict(l=0, r=0, t=35, b=0),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(showgrid=False, tickfont=dict(size=9, color=LIA["text_muted"])),
-                yaxis=dict(showgrid=True, gridcolor="#F0F0F0", tickfont=dict(size=9, color=LIA["text_muted"])),
+                title=dict(text="CPC/Dia ($)", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
+                height=220, margin=dict(l=10, r=10, t=40, b=30),
+                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 showlegend=False
             )
             st.plotly_chart(fig3, use_container_width=True)

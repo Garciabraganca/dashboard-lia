@@ -122,12 +122,12 @@ class DataProvider:
         }
         return mapping.get(period, "last_7d")
 
-    def get_meta_metrics(self, period="7d", level="campaign", filters=None):
+    def get_meta_metrics(self, period="7d", level="campaign", filters=None, campaign_filter=None):
         # Tentar dados reais primeiro
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                insights = self.meta_client.get_ad_insights(date_range=api_period)
+                insights = self.meta_client.get_ad_insights(date_range=api_period, campaign_name_filter=campaign_filter)
                 if not insights.empty:
                     return self._process_meta_insights(insights)
             except Exception as e:
@@ -770,17 +770,20 @@ with filter_cols[1]:
 with filter_cols[2]:
     nivel = st.selectbox("Nivel", ["Campanha", "Conjunto", "Criativo"], index=0, key="nivel")
 with filter_cols[3]:
-    campanha = st.selectbox("Campanha", ["Todas", "LIA_Awareness_BR", "LIA_Trafego_BR"], index=0, key="campanha")
+    campanha = st.selectbox("Campanha", ["Ciclo 1"], index=0, key="campanha")
 st.markdown('</div>', unsafe_allow_html=True)
 
 period_map = {"Hoje": "today", "Ontem": "yesterday", "Ultimos 7 dias": "7d", "Ultimos 14 dias": "14d"}
 selected_period = period_map.get(periodo, "7d")
 
+# Mapear nome da campanha para filtro
+campaign_filter = campanha if campanha != "Todas" else None
+
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)
 # -----------------------------------------------------------------------------
 try:
-    meta_data = data_provider.get_meta_metrics(period=selected_period)
+    meta_data = data_provider.get_meta_metrics(period=selected_period, campaign_filter=campaign_filter)
     ga4_data = data_provider.get_ga4_metrics(period=selected_period)
     creative_data = data_provider.get_creative_performance()
     trends_data = data_provider.get_daily_trends(period=selected_period)

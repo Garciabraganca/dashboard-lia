@@ -82,13 +82,14 @@ class MetaAdsIntegration:
             print(f"Erro ao obter campanhas do Meta: {str(e)}")
             return pd.DataFrame()
 
-    def get_ad_insights(self, date_range: str = "last_7d", fields: List[str] = None) -> pd.DataFrame:
+    def get_ad_insights(self, date_range: str = "last_7d", fields: List[str] = None, campaign_name_filter: str = None) -> pd.DataFrame:
         """
         Obtém insights de anúncios do Meta
 
         Args:
             date_range: Período (last_7d, last_14d, today, yesterday)
             fields: Lista de campos a recuperar
+            campaign_name_filter: Nome da campanha para filtrar (opcional)
 
         Returns:
             DataFrame com dados de insights
@@ -145,6 +146,10 @@ class MetaAdsIntegration:
 
             # Converter para DataFrame
             df = pd.DataFrame(insights)
+
+            # Filtrar por nome da campanha se especificado
+            if campaign_name_filter and not df.empty and 'campaign_name' in df.columns:
+                df = df[df['campaign_name'].str.contains(campaign_name_filter, case=False, na=False)]
 
             # Converter valores numéricos
             numeric_fields = ['spend', 'impressions', 'reach', 'frequency', 'clicks', 'ctr', 'cpc', 'cpm']

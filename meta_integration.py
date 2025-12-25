@@ -53,12 +53,11 @@ class MetaAdsIntegration:
             start_date_str = start_date.strftime("%Y-%m-%d")
             end_date_str = end_date.strftime("%Y-%m-%d")
 
-            # Buscar campanhas
+            # Buscar apenas campanhas ATIVAS
             url = f"{self.base_url}/{self.ad_account_id}/campaigns"
             params = {
-                "fields": "id,name,status,spend,impressions,reach,frequency,clicks,ctr,cpc,cpm,created_time",
-                "date_preset": f"custom_{start_date_str}_{end_date_str}",
-                "time_range": f"{{'since':'{start_date_str}','until':'{end_date_str}'}}",
+                "fields": "id,name,status,effective_status",
+                "filtering": "[{'field':'effective_status','operator':'IN','value':['ACTIVE']}]",
                 "access_token": self.access_token
             }
 
@@ -127,12 +126,14 @@ class MetaAdsIntegration:
             start_date_str = start_date.strftime("%Y-%m-%d")
             end_date_str = end_date.strftime("%Y-%m-%d")
 
-            # Buscar insights
+            # Buscar insights apenas de campanhas ATIVAS
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
                 "fields": ",".join(fields),
                 "time_range": f"{{'since':'{start_date_str}','until':'{end_date_str}'}}",
                 "time_increment": "1",
+                "level": "campaign",
+                "filtering": "[{'field':'campaign.effective_status','operator':'IN','value':['ACTIVE']}]",
                 "access_token": self.access_token
             }
 

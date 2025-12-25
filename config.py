@@ -31,7 +31,10 @@ class Config:
         """Obtém um secret do Streamlit de forma segura"""
         if HAS_STREAMLIT:
             try:
-                return st.secrets.get(key, default)
+                # st.secrets usa acesso por chave, não .get()
+                if key in st.secrets:
+                    return st.secrets[key]
+                return default
             except Exception:
                 return default
         return default

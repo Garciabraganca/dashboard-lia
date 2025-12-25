@@ -20,7 +20,7 @@ class Config:
 
     # Meta Ads
     META_ACCESS_TOKEN: Optional[str] = os.getenv("META_ACCESS_TOKEN")
-    META_AD_ACCOUNT_ID: str = os.getenv("META_AD_ACCOUNT_ID", "393721042321443")
+    META_AD_ACCOUNT_ID: str = os.getenv("META_AD_ACCOUNT_ID", "3937210423214443")
 
     # Google Analytics 4
     GA4_PROPERTY_ID: str = os.getenv("GA4_PROPERTY_ID", "487806406")

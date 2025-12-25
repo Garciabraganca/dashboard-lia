@@ -169,3 +169,78 @@ class MetaAdsIntegration:
         except Exception as e:
             print(f"Erro ao obter insights do Meta: {str(e)}")
             return pd.DataFrame()
+
+    def get_creative_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None) -> pd.DataFrame:
+        """
+        Obtém insights por criativo/anúncio do Meta
+
+        Args:
+            date_range: Período (last_7d, last_14d, today, yesterday)
+            campaign_name_filter: Nome da campanha para filtrar (opcional)
+
+        Returns:
+            DataFrame com dados de criativos
+        """
+        fields = [
+            "ad_id",
+            "ad_name",
+            "campaign_name",
+            "spend",
+            "impressions",
+            "clicks",
+            "ctr",
+            "cpc",
+            "cpm"
+        ]
+
+        try:
+            # Definir datas
+            end_date = datetime.now()
+            if date_range == "last_7d":
+                start_date = end_date - timedelta(days=7)
+            elif date_range == "last_14d":
+                start_date = end_date - timedelta(days=14)
+            elif date_range == "today":
+                start_date = end_date.replace(hour=0, minute=0, second=0)
+            elif date_range == "yesterday":
+                start_date = (end_date - timedelta(days=1)).replace(hour=0, minute=0, second=0)
+                end_date = end_date.replace(hour=0, minute=0, second=0)
+            else:
+                start_date = end_date - timedelta(days=7)
+
+            start_date_str = start_date.strftime("%Y-%m-%d")
+            end_date_str = end_date.strftime("%Y-%m-%d")
+
+            # Buscar insights no nível de anúncio
+            url = f"{self.base_url}/{self.ad_account_id}/insights"
+            params = {
+                "fields": ",".join(fields),
+                "time_range": f"{{'since':'{start_date_str}','until':'{end_date_str}'}}",
+                "level": "ad",
+                "filtering": "[{'field':'ad.effective_status','operator':'IN','value':['ACTIVE']}]",
+                "access_token": self.access_token
+            }
+
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+
+            data = response.json()
+            insights = data.get("data", [])
+
+            df = pd.DataFrame(insights)
+
+            # Filtrar por campanha se especificado
+            if campaign_name_filter and not df.empty and 'campaign_name' in df.columns:
+                df = df[df['campaign_name'].str.contains(campaign_name_filter, case=False, na=False)]
+
+            # Converter valores numéricos
+            numeric_fields = ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm']
+            for col in numeric_fields:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+            return df
+
+        except Exception as e:
+            print(f"Erro ao obter insights de criativos: {str(e)}")
+            return pd.DataFrame()

@@ -840,14 +840,14 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
     """).strip()
 
 kpi_cards = [
-    {"icon": "💰", "label": "Investimento", "value": f"R$ {meta_data['investimento']:,.2f}", "delta": meta_data['delta_investimento'], "suffix": "%"},
+    {"icon": "💰", "label": "Investimento", "value": f"$ {meta_data['investimento']:,.2f}", "delta": meta_data['delta_investimento'], "suffix": "%"},
     {"icon": "👀", "label": "Impressoes", "value": f"{meta_data['impressoes']:,.0f}", "delta": meta_data['delta_impressoes'], "suffix": "%"},
     {"icon": "📡", "label": "Alcance", "value": f"{meta_data['alcance']:,.0f}", "delta": meta_data['delta_alcance'], "suffix": "%"},
     {"icon": "🔁", "label": "Frequencia", "value": f"{meta_data['frequencia']:.2f}", "delta": meta_data['delta_frequencia'], "suffix": "", "precision": 2},
     {"icon": "🖱️", "label": "Cliques Link", "value": f"{meta_data['cliques_link']:,.0f}", "delta": meta_data['delta_cliques'], "suffix": "%"},
     {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data['ctr_link']:.2f}%", "delta": meta_data['delta_ctr'], "suffix": "pp", "precision": 2},
-    {"icon": "💡", "label": "CPC Link", "value": f"R$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
-    {"icon": "📊", "label": "CPM", "value": f"R$ {meta_data['cpm']:.2f}", "delta": meta_data['delta_cpm'], "suffix": "%", "invert": True},
+    {"icon": "💡", "label": "CPC Link", "value": f"$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
+    {"icon": "📊", "label": "CPM", "value": f"$ {meta_data['cpm']:.2f}", "delta": meta_data['delta_cpm'], "suffix": "%", "invert": True},
 ]
 
 kpi_cards_html = "\n".join(
@@ -890,7 +890,7 @@ if len(creative_data) > 0:
         st.markdown(f'''
         <div class="badge-row">
             <div class="badge badge-orange">Melhor CTR: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}%)</div>
-            <div class="badge badge-green">Menor CPC: {best_cpc_name}... (R$ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
+            <div class="badge badge-green">Menor CPC: {best_cpc_name}... ($ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
         </div>
         ''', unsafe_allow_html=True)
 
@@ -900,9 +900,9 @@ if len(creative_data) > 0:
         creative_sorted = creative_data.sort_values("Cliques", ascending=False)
         st.dataframe(
             creative_sorted.style.format({
-                "Investimento": "R$ {:.2f}", "Impressoes": "{:,.0f}",
+                "Investimento": "$ {:.2f}", "Impressoes": "{:,.0f}",
                 "Cliques": "{:,.0f}", "CTR": "{:.2f}%",
-                "CPC": "R$ {:.2f}", "CPM": "R$ {:.2f}"
+                "CPC": "$ {:.2f}", "CPM": "$ {:.2f}"
             }),
             use_container_width=True, hide_index=True
         )
@@ -989,7 +989,7 @@ if len(trends_data) > 0:
                 fill="tozeroy", fillcolor="rgba(22,163,74,0.1)"
             ))
             fig3.update_layout(
-                title=dict(text="CPC/Dia (R$)", font=dict(size=13, color=LIA["text_dark"])),
+                title=dict(text="CPC/Dia ($)", font=dict(size=13, color=LIA["text_dark"])),
                 height=180, margin=dict(l=0, r=0, t=35, b=0),
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(showgrid=False, tickfont=dict(size=9, color=LIA["text_muted"])),

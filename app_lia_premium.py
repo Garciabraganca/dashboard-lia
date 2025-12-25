@@ -951,7 +951,7 @@ if len(trends_data) > 0:
             fig1.update_layout(
                 title=dict(text="Cliques/Dia", font=dict(size=13, color=LIA["text_dark"])),
                 height=180, margin=dict(l=0, r=0, t=35, b=0),
-                paper_bgcolor="transparent", plot_bgcolor="transparent",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(showgrid=False, tickfont=dict(size=9, color=LIA["text_muted"])),
                 yaxis=dict(showgrid=True, gridcolor="#F0F0F0", tickfont=dict(size=9, color=LIA["text_muted"])),
                 showlegend=False
@@ -971,7 +971,7 @@ if len(trends_data) > 0:
             fig2.update_layout(
                 title=dict(text="CTR/Dia (%)", font=dict(size=13, color=LIA["text_dark"])),
                 height=180, margin=dict(l=0, r=0, t=35, b=0),
-                paper_bgcolor="transparent", plot_bgcolor="transparent",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(showgrid=False, tickfont=dict(size=9, color=LIA["text_muted"])),
                 yaxis=dict(showgrid=True, gridcolor="#F0F0F0", tickfont=dict(size=9, color=LIA["text_muted"])),
                 showlegend=False
@@ -991,7 +991,7 @@ if len(trends_data) > 0:
             fig3.update_layout(
                 title=dict(text="CPC/Dia (R$)", font=dict(size=13, color=LIA["text_dark"])),
                 height=180, margin=dict(l=0, r=0, t=35, b=0),
-                paper_bgcolor="transparent", plot_bgcolor="transparent",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(showgrid=False, tickfont=dict(size=9, color=LIA["text_muted"])),
                 yaxis=dict(showgrid=True, gridcolor="#F0F0F0", tickfont=dict(size=9, color=LIA["text_muted"])),
                 showlegend=False

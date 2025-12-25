@@ -129,15 +129,19 @@ class DataProvider:
                 api_period = self._period_to_api_format(period)
                 insights = self.meta_client.get_ad_insights(date_range=api_period, campaign_name_filter=campaign_filter)
                 if not insights.empty:
-                    return self._process_meta_insights(insights)
+                    result = self._process_meta_insights(insights)
+                    result["_data_source"] = "real"
+                    return result
             except Exception as e:
                 logger.error(f"Erro ao obter dados reais do Meta: {e}")
 
         # Fallback para mock
-        return self._safe_execute(
+        result = self._safe_execute(
             lambda: self._get_mock_meta_metrics(period, level),
             default=self._empty_meta_metrics()
         )
+        result["_data_source"] = "mock"
+        return result
 
     def _process_meta_insights(self, df):
         """Processa insights do Meta para formato do dashboard"""
@@ -819,6 +823,13 @@ st.markdown(f'''
     </div>
 </div>
 ''', unsafe_allow_html=True)
+
+# Indicador de fonte de dados (para debug)
+data_source = meta_data.get("_data_source", "unknown")
+if data_source == "mock":
+    st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
+elif data_source == "real":
+    st.success("✅ Conectado à API Meta Ads - dados reais")
 
 # -----------------------------------------------------------------------------
 # KPIs PRINCIPAIS (em cards brancos)

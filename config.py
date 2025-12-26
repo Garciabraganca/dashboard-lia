@@ -26,6 +26,9 @@ class Config:
     GA4_PROPERTY_ID: str = os.getenv("GA4_PROPERTY_ID", "487806406")
     GCP_CREDENTIALS_JSON: Optional[str] = os.getenv("GCP_CREDENTIALS_JSON")
 
+    # OpenAI
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+
     @staticmethod
     def _get_streamlit_secret(key: str, default: Any = None) -> Any:
         """Obtém um secret do Streamlit de forma segura"""
@@ -99,6 +102,21 @@ class Config:
         return {}
 
     @classmethod
+    def get_openai_api_key(cls) -> Optional[str]:
+        """Obtém a chave da API OpenAI"""
+        # Primeiro tenta variável de ambiente
+        if cls.OPENAI_API_KEY:
+            return cls.OPENAI_API_KEY
+
+        # Depois tenta Streamlit secrets
+        return cls._get_streamlit_secret("OPENAI_API_KEY")
+
+    @classmethod
+    def validate_openai_credentials(cls) -> bool:
+        """Valida se a chave da API OpenAI está disponível"""
+        return bool(cls.get_openai_api_key())
+
+    @classmethod
     def validate_meta_credentials(cls) -> bool:
         """Valida se as credenciais do Meta estão disponíveis"""
         return bool(cls.get_meta_access_token())
@@ -121,6 +139,7 @@ class Config:
         return {
             'meta': cls.validate_meta_credentials(),
             'ga4': cls.validate_ga4_credentials(),
+            'openai': cls.validate_openai_credentials(),
         }
 
     @classmethod
@@ -136,4 +155,5 @@ class Config:
         return {
             'meta': 'Conectado' if validation['meta'] else 'Não configurado',
             'ga4': 'Conectado' if validation['ga4'] else 'Não configurado',
+            'openai': 'Conectado' if validation['openai'] else 'Não configurado',
         }

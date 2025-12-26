@@ -29,8 +29,20 @@ class AIAgent:
         if not HAS_OPENAI:
             raise ImportError("O módulo 'openai' não está instalado. Execute: pip install openai")
 
-        self.client = OpenAI(api_key=api_key)
+        # Inicializar cliente OpenAI
+        # Usar http_client=None para evitar problemas com proxy no Streamlit Cloud
+        try:
+            import httpx
+            self.client = OpenAI(
+                api_key=api_key,
+                http_client=httpx.Client()
+            )
+        except Exception:
+            # Fallback simples
+            self.client = OpenAI(api_key=api_key)
+
         self.model = model
+        self._legacy_mode = False
 
     @staticmethod
     def is_available() -> bool:
@@ -164,7 +176,6 @@ Por favor, forneça:
                 temperature=0.7,
                 max_tokens=800
             )
-
             return response.choices[0].message.content
 
         except Exception as e:

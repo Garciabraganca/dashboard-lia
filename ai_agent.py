@@ -31,8 +31,11 @@ class AIAgent:
 
     def _build_system_prompt(self) -> str:
         """Constrói o prompt do sistema para o agente"""
-        return """Você é a LIA, uma assistente especialista em marketing digital e análise de campanhas.
-Seu papel é analisar os dados do dashboard e fornecer insights acionáveis.
+        return """Você é a LIA, uma assistente especialista em marketing digital, análise de campanhas e otimização de conversão.
+Seu papel é analisar os dados do dashboard e fornecer insights acionáveis focados em aumentar o engajamento.
+
+IMPORTANTE: Todos os valores monetários apresentados estão em DÓLARES AMERICANOS (USD/$).
+Ao mencionar valores na sua análise, use o símbolo $ e considere que são dólares.
 
 Diretrizes:
 - Seja direta e objetiva
@@ -42,11 +45,23 @@ Diretrizes:
 - Alerte sobre problemas críticos
 - Sugira próximos passos concretos
 
+Análise de Landing Page (baseada nos dados do GA4):
+- Avalie a taxa de engajamento e tempo médio na página
+- Se o engajamento estiver baixo (<50%), sugira mudanças específicas na landing page
+- Considere: headline, CTA, velocidade de carregamento, prova social, escassez, benefícios claros
+- Relacione os dados de sessões vs usuários para identificar problemas de retenção
+
+Análise de Criativos e Otimização:
+- Identifique o criativo vencedor (melhor CTR + menor CPC)
+- Analise O QUE faz esse criativo funcionar (gancho, promessa, visual, emoção)
+- Sugira como adaptar a landing page para manter a CONSISTÊNCIA com o criativo vencedor
+- A mensagem do anúncio deve ser refletida na landing page para aumentar conversão
+
 Formato da resposta:
 - Use emojis para destacar pontos importantes
 - Organize em seções claras
 - Priorize os insights mais relevantes
-- Mantenha a resposta concisa (máximo 300 palavras)
+- Seja específico nas recomendações (não genérico)
 """
 
     def _format_data_for_analysis(self, meta_data: Dict, ga4_data: Dict,
@@ -57,14 +72,14 @@ Formato da resposta:
 
         data_text = f"""
 ## DADOS DO META ADS (Facebook/Instagram)
-- Investimento: R$ {meta_data.get('investimento', 0):,.2f}
+- Investimento: $ {meta_data.get('investimento', 0):,.2f}
 - Impressões: {meta_data.get('impressoes', 0):,}
 - Alcance: {meta_data.get('alcance', 0):,}
 - Frequência: {meta_data.get('frequencia', 0):.2f}
 - Cliques no Link: {meta_data.get('cliques_link', 0):,}
 - CTR (Taxa de Cliques): {meta_data.get('ctr_link', 0):.2f}%
-- CPC (Custo por Clique): R$ {meta_data.get('cpc_link', 0):.2f}
-- CPM (Custo por Mil): R$ {meta_data.get('cpm', 0):.2f}
+- CPC (Custo por Clique): $ {meta_data.get('cpc_link', 0):.2f}
+- CPM (Custo por Mil): $ {meta_data.get('cpm', 0):.2f}
 
 Variações vs período anterior:
 - CTR: {meta_data.get('delta_ctr', 0):+.2f}pp
@@ -83,7 +98,7 @@ Variações vs período anterior:
         if creative_data is not None and len(creative_data) > 0:
             data_text += "\n## PERFORMANCE DOS CRIATIVOS\n"
             for _, row in creative_data.head(5).iterrows():
-                data_text += f"- {row.get('Criativo', 'N/A')}: CTR {row.get('CTR', 0):.2f}%, CPC R$ {row.get('CPC', 0):.2f}\n"
+                data_text += f"- {row.get('Criativo', 'N/A')}: CTR {row.get('CTR', 0):.2f}%, CPC $ {row.get('CPC', 0):.2f}\n"
 
         # Adicionar dados de origem/mídia se disponível
         if source_data is not None and len(source_data) > 0:
@@ -143,7 +158,9 @@ Por favor, forneça:
 1. 🎯 **Resumo da Performance** (2-3 frases)
 2. ✅ **O que está funcionando bem**
 3. ⚠️ **Pontos de atenção**
-4. 💡 **Recomendações de ação** (máximo 3)
+4. 🏆 **Criativo Vencedor** - Identifique qual criativo está performando melhor e explique POR QUE ele funciona (qual gancho, emoção ou promessa está ressoando com o público)
+5. 🏠 **Otimização da Landing Page** - Baseado nos dados do GA4 (engajamento, tempo na página) e no criativo vencedor, sugira mudanças ESPECÍFICAS para a landing page que mantenham consistência com o anúncio vencedor e aumentem o engajamento
+6. 💡 **Próximos Passos** (máximo 3 ações prioritárias)
 """
 
             # Chamar API diretamente com requests
@@ -159,7 +176,7 @@ Por favor, forneça:
                     {"role": "user", "content": user_prompt}
                 ],
                 "temperature": 0.7,
-                "max_tokens": 800
+                "max_tokens": 1200
             }
 
             response = requests.post(
@@ -213,7 +230,9 @@ Por favor, forneça:
 1. 🎯 **Resumo da Performance** (2-3 frases)
 2. ✅ **O que está funcionando bem**
 3. ⚠️ **Pontos de atenção**
-4. 💡 **Recomendações de ação** (máximo 3)
+4. 🏆 **Criativo Vencedor** - Identifique qual criativo está performando melhor e explique POR QUE ele funciona (qual gancho, emoção ou promessa está ressoando com o público)
+5. 🏠 **Otimização da Landing Page** - Baseado nos dados do GA4 (engajamento, tempo na página) e no criativo vencedor, sugira mudanças ESPECÍFICAS para a landing page que mantenham consistência com o anúncio vencedor e aumentem o engajamento
+6. 💡 **Próximos Passos** (máximo 3 ações prioritárias)
 """
 
             stream = self.client.chat.completions.create(
@@ -223,7 +242,7 @@ Por favor, forneça:
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.7,
-                max_tokens=800,
+                max_tokens=1200,
                 stream=True
             )
 

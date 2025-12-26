@@ -2,12 +2,19 @@
 Agente de IA para análise de dados do dashboard usando OpenAI GPT
 """
 
-from openai import OpenAI
 import logging
 from typing import Dict, Any, Optional
 import json
 
 logger = logging.getLogger(__name__)
+
+# Importação condicional do OpenAI
+try:
+    from openai import OpenAI
+    HAS_OPENAI = True
+except ImportError:
+    HAS_OPENAI = False
+    OpenAI = None
 
 
 class AIAgent:
@@ -19,8 +26,16 @@ class AIAgent:
             api_key: Chave da API OpenAI
             model: Modelo a usar (gpt-4o-mini é mais barato, gpt-4o é mais potente)
         """
+        if not HAS_OPENAI:
+            raise ImportError("O módulo 'openai' não está instalado. Execute: pip install openai")
+
         self.client = OpenAI(api_key=api_key)
         self.model = model
+
+    @staticmethod
+    def is_available() -> bool:
+        """Verifica se o módulo OpenAI está disponível"""
+        return HAS_OPENAI
 
     def _build_system_prompt(self) -> str:
         """Constrói o prompt do sistema para o agente"""

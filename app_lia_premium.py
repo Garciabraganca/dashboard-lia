@@ -11,6 +11,7 @@ import textwrap
 from config import Config
 from ga_integration import GA4Integration
 from meta_integration import MetaAdsIntegration
+from ai_agent import AIAgent
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -789,6 +790,72 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     font-size: 12px !important;
 }}
 
+/* ========== AGENTE DE IA ========== */
+.ai-agent-card {{
+    background: linear-gradient(135deg, rgba(244,124,60,0.1) 0%, rgba(251,113,133,0.1) 100%);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 2px solid {LIA["primary"]};
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 20px 40px rgba(244,124,60,0.15);
+}}
+
+.ai-agent-header {{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}}
+
+.ai-agent-icon {{
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, {LIA["primary"]}, {LIA["secondary"]});
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}}
+
+.ai-agent-title {{
+    font-size: 16px;
+    font-weight: 700;
+    color: {LIA["text_dark"]};
+}}
+
+.ai-agent-subtitle {{
+    font-size: 12px;
+    color: {LIA["text_secondary"]};
+}}
+
+.ai-agent-content {{
+    background: rgba(255,255,255,0.8);
+    border-radius: 12px;
+    padding: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: {LIA["text_dark"]};
+}}
+
+.ai-agent-content h1, .ai-agent-content h2, .ai-agent-content h3 {{
+    font-size: 14px;
+    font-weight: 700;
+    margin: 12px 0 8px 0;
+    color: {LIA["text_dark"]};
+}}
+
+.ai-agent-content p {{
+    margin: 8px 0;
+}}
+
+.ai-agent-content ul, .ai-agent-content ol {{
+    margin: 8px 0;
+    padding-left: 20px;
+}}
+
 /* ========== FOOTER ========== */
 .footer {{
     text-align: center;
@@ -918,6 +985,68 @@ if data_source == "mock":
     st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
 elif data_source == "real":
     st.success("✅ Conectado à API Meta Ads - dados reais")
+
+# -----------------------------------------------------------------------------
+# AGENTE DE IA - ANALISE INTELIGENTE
+# -----------------------------------------------------------------------------
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+st.markdown('''
+<div class="ai-agent-header">
+    <div class="ai-agent-icon">🤖</div>
+    <div>
+        <div class="ai-agent-title">LIA - Assistente de Marketing IA</div>
+        <div class="ai-agent-subtitle">Analise inteligente dos seus dados em tempo real</div>
+    </div>
+</div>
+''', unsafe_allow_html=True)
+
+# Verificar se a chave da API está configurada
+openai_api_key = Config.get_openai_api_key()
+
+if openai_api_key:
+    # Botão para gerar análise
+    if st.button("🔍 Gerar Analise com IA", key="ai_analyze_btn", use_container_width=True):
+        with st.spinner("🤖 LIA está analisando seus dados..."):
+            try:
+                # Inicializar agente
+                ai_agent = AIAgent(api_key=openai_api_key, model="gpt-4o-mini")
+
+                # Obter dados extras para análise
+                source_data_for_ai = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+                events_data_for_ai = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+
+                # Gerar análise
+                analysis = ai_agent.analyze(
+                    meta_data=meta_data,
+                    ga4_data=ga4_data,
+                    creative_data=creative_data,
+                    source_data=source_data_for_ai,
+                    events_data=events_data_for_ai,
+                    period=selected_period
+                )
+
+                # Salvar no session state para persistir
+                st.session_state['ai_analysis'] = analysis
+                st.session_state['ai_analysis_period'] = periodo
+
+            except Exception as e:
+                logger.error(f"Erro na análise de IA: {e}")
+                st.error(f"❌ Erro ao gerar análise: {str(e)}")
+
+    # Mostrar análise salva
+    if 'ai_analysis' in st.session_state:
+        st.markdown(f'''
+        <div class="ai-agent-content">
+            {st.session_state['ai_analysis']}
+        </div>
+        <p style="font-size:11px;color:#888;margin-top:8px;text-align:right;">
+            Analise gerada para: {st.session_state.get('ai_analysis_period', 'N/A')}
+        </p>
+        ''', unsafe_allow_html=True)
+else:
+    st.info("💡 Configure a chave OPENAI_API_KEY nos Streamlit Secrets para ativar a análise com IA")
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # KPIs PRINCIPAIS (em cards brancos)

@@ -12,13 +12,8 @@ from config import Config
 from ga_integration import GA4Integration
 from meta_integration import MetaAdsIntegration
 
-# Importação condicional do AIAgent
-try:
-    from ai_agent import AIAgent
-    HAS_AI_AGENT = AIAgent.is_available()
-except ImportError:
-    AIAgent = None
-    HAS_AI_AGENT = False
+# Importar AIAgent
+from ai_agent import AIAgent
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -1010,7 +1005,7 @@ st.markdown('''
 # Verificar se a chave da API está configurada e o módulo está disponível
 openai_api_key = Config.get_openai_api_key()
 
-if HAS_AI_AGENT and openai_api_key:
+if openai_api_key:
     # Botão para gerar análise
     if st.button("🔍 Gerar Analise com IA", key="ai_analyze_btn", use_container_width=True):
         with st.spinner("🤖 LIA está analisando seus dados..."):
@@ -1050,8 +1045,6 @@ if HAS_AI_AGENT and openai_api_key:
             Analise gerada para: {st.session_state.get('ai_analysis_period', 'N/A')}
         </p>
         ''', unsafe_allow_html=True)
-elif not HAS_AI_AGENT:
-    st.warning("⚠️ Módulo 'openai' não instalado. Execute: pip install openai")
 else:
     st.info("💡 Configure a chave OPENAI_API_KEY nos Streamlit Secrets para ativar a análise com IA")
 

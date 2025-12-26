@@ -118,16 +118,18 @@ class DataProvider:
             "today": "today",
             "yesterday": "yesterday",
             "7d": "last_7d",
-            "14d": "last_14d"
+            "14d": "last_14d",
+            "30d": "last_30d",
+            "custom": "custom"
         }
         return mapping.get(period, "last_7d")
 
-    def get_meta_metrics(self, period="7d", level="campaign", filters=None, campaign_filter=None):
+    def get_meta_metrics(self, period="7d", level="campaign", filters=None, campaign_filter=None, custom_start=None, custom_end=None):
         # Tentar dados reais primeiro
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                insights = self.meta_client.get_ad_insights(date_range=api_period, campaign_name_filter=campaign_filter)
+                insights = self.meta_client.get_ad_insights(date_range=api_period, campaign_name_filter=campaign_filter, custom_start=custom_start, custom_end=custom_end)
                 if not insights.empty:
                     result = self._process_meta_insights(insights)
                     result["_data_source"] = "real"
@@ -168,12 +170,12 @@ class DataProvider:
             logger.error(f"Erro ao processar insights Meta: {e}")
             return self._empty_meta_metrics()
 
-    def get_ga4_metrics(self, period="7d", filters=None):
+    def get_ga4_metrics(self, period="7d", filters=None, custom_start=None, custom_end=None):
         # Tentar dados reais primeiro
         if self.ga4_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                metrics = self.ga4_client.get_aggregated_metrics(date_range=api_period)
+                metrics = self.ga4_client.get_aggregated_metrics(date_range=api_period, custom_start=custom_start, custom_end=custom_end)
                 if metrics and metrics.get('sessoes', 0) > 0:
                     # Adicionar deltas (por enquanto zerados)
                     metrics['delta_sessoes'] = 0
@@ -190,12 +192,12 @@ class DataProvider:
             default=self._empty_ga4_metrics()
         )
 
-    def get_creative_performance(self, period="7d", campaign_filter=None):
+    def get_creative_performance(self, period="7d", campaign_filter=None, custom_start=None, custom_end=None):
         # Tentar dados reais primeiro
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=campaign_filter)
+                df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=campaign_filter, custom_start=custom_start, custom_end=custom_end)
                 if not df.empty:
                     # Formatar para o dashboard
                     result = pd.DataFrame({
@@ -224,12 +226,12 @@ class DataProvider:
             default=pd.DataFrame({"Data": [], "Cliques": [], "CTR": [], "CPC": []})
         )
 
-    def get_source_medium(self, period="7d"):
+    def get_source_medium(self, period="7d", custom_start=None, custom_end=None):
         # Tentar dados reais primeiro
         if self.ga4_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                source_data = self.ga4_client.get_source_medium_data(date_range=api_period)
+                source_data = self.ga4_client.get_source_medium_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end)
                 if not source_data.empty:
                     return source_data
             except Exception as e:
@@ -259,7 +261,7 @@ class DataProvider:
         }
 
     def _get_mock_meta_metrics(self, period, level):
-        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2}.get(period, 1)
+        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2, "30d": 4.3, "custom": 1}.get(period, 1)
         base = {
             "investimento": 850.00, "impressoes": 125000, "alcance": 89000,
             "frequencia": 1.40, "cliques_link": 3200, "ctr_link": 2.56,
@@ -273,7 +275,7 @@ class DataProvider:
                 for k, v in base.items()}
 
     def _get_mock_ga4_metrics(self, period):
-        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2}.get(period, 1)
+        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2, "30d": 4.3, "custom": 1}.get(period, 1)
         return {
             "sessoes": int(2850 * multiplier), "usuarios": int(2340 * multiplier),
             "pageviews": int(4200 * multiplier), "taxa_engajamento": 68.5,
@@ -298,7 +300,7 @@ class DataProvider:
         })
 
     def _get_mock_daily_trends(self, period):
-        days = {"today": 1, "yesterday": 1, "7d": 7, "14d": 14}.get(period, 7)
+        days = {"today": 1, "yesterday": 1, "7d": 7, "14d": 14, "30d": 30, "custom": 7}.get(period, 7)
         dates = [(datetime.now() - timedelta(days=i)).strftime("%d/%m") for i in range(days-1, -1, -1)]
         import random
         random.seed(42)
@@ -790,17 +792,32 @@ st.markdown('<div class="content-layer">', unsafe_allow_html=True)
 st.markdown('<div class="filter-card">', unsafe_allow_html=True)
 filter_cols = st.columns([1.5, 1, 1, 1.5])
 with filter_cols[0]:
-    periodo = st.selectbox("Periodo", ["Hoje", "Ontem", "Ultimos 7 dias", "Ultimos 14 dias"], index=2, key="periodo")
+    periodo = st.selectbox("Periodo", ["Hoje", "Ontem", "Ultimos 7 dias", "Ultimos 14 dias", "Ultimos 30 dias", "Personalizado"], index=2, key="periodo")
 with filter_cols[1]:
     fonte = st.selectbox("Fonte", ["Meta", "GA4", "Ambos"], index=0, key="fonte")
 with filter_cols[2]:
     nivel = st.selectbox("Nivel", ["Campanha", "Conjunto", "Criativo"], index=0, key="nivel")
 with filter_cols[3]:
     campanha = st.selectbox("Campanha", ["Ciclo 1"], index=0, key="campanha")
+
+# Campos de data personalizada
+custom_start_date = None
+custom_end_date = None
+if periodo == "Personalizado":
+    date_cols = st.columns(2)
+    with date_cols[0]:
+        custom_start_date = st.date_input("Data Inicio", value=datetime.now() - timedelta(days=7), key="custom_start")
+    with date_cols[1]:
+        custom_end_date = st.date_input("Data Fim", value=datetime.now(), key="custom_end")
+
 st.markdown('</div>', unsafe_allow_html=True)
 
-period_map = {"Hoje": "today", "Ontem": "yesterday", "Ultimos 7 dias": "7d", "Ultimos 14 dias": "14d"}
+period_map = {"Hoje": "today", "Ontem": "yesterday", "Ultimos 7 dias": "7d", "Ultimos 14 dias": "14d", "Ultimos 30 dias": "30d", "Personalizado": "custom"}
 selected_period = period_map.get(periodo, "7d")
+
+# Converter datas para string se personalizado
+custom_start_str = custom_start_date.strftime("%Y-%m-%d") if custom_start_date else None
+custom_end_str = custom_end_date.strftime("%Y-%m-%d") if custom_end_date else None
 
 # Mapear nome da campanha para filtro
 campaign_filter = campanha if campanha != "Todas" else None
@@ -809,9 +826,9 @@ campaign_filter = campanha if campanha != "Todas" else None
 # CARREGAR DADOS (com tratamento de erro)
 # -----------------------------------------------------------------------------
 try:
-    meta_data = data_provider.get_meta_metrics(period=selected_period, campaign_filter=campaign_filter)
-    ga4_data = data_provider.get_ga4_metrics(period=selected_period)
-    creative_data = data_provider.get_creative_performance(period=selected_period, campaign_filter=campaign_filter)
+    meta_data = data_provider.get_meta_metrics(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
+    ga4_data = data_provider.get_ga4_metrics(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+    creative_data = data_provider.get_creative_performance(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
     trends_data = data_provider.get_daily_trends(period=selected_period)
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
     has_error = data_provider.error_state
@@ -1077,7 +1094,7 @@ st.markdown(ga4_section, unsafe_allow_html=True)
 
 # Tabela Origem/Midia
 try:
-    source_data = data_provider.get_source_medium(period=selected_period)
+    source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
     if len(source_data) > 0:
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
         st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)

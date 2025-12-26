@@ -38,22 +38,29 @@ class GA4Integration:
         # Inicializar cliente
         self.client = BetaAnalyticsDataClient(credentials=self.credentials)
 
-    def _get_date_range(self, date_range: str) -> tuple:
+    def _get_date_range(self, date_range: str, custom_start: str = None, custom_end: str = None) -> tuple:
         """
         Calcula o período de datas com base no range especificado
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
             Tupla com (start_date_str, end_date_str)
         """
+        if date_range == "custom" and custom_start and custom_end:
+            return custom_start, custom_end
+
         end_date = datetime.now()
 
         if date_range == "last_7d":
             start_date = end_date - timedelta(days=7)
         elif date_range == "last_14d":
             start_date = end_date - timedelta(days=14)
+        elif date_range == "last_30d":
+            start_date = end_date - timedelta(days=30)
         elif date_range == "today":
             start_date = end_date.replace(hour=0, minute=0, second=0)
         elif date_range == "yesterday":
@@ -64,18 +71,20 @@ class GA4Integration:
 
         return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
-    def get_sessions_data(self, date_range: str = "last_7d") -> pd.DataFrame:
+    def get_sessions_data(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """
         Obtém dados de sessões do GA4
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
             DataFrame com dados de sessões
         """
         try:
-            start_date_str, end_date_str = self._get_date_range(date_range)
+            start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
 
             # Criar requisição
             request = RunReportRequest(
@@ -162,18 +171,20 @@ class GA4Integration:
             logger.error(f"Erro ao obter eventos do GA4: {str(e)}")
             return pd.DataFrame()
 
-    def get_aggregated_metrics(self, date_range: str = "last_7d") -> Dict[str, Any]:
+    def get_aggregated_metrics(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> Dict[str, Any]:
         """
         Obtém métricas agregadas do GA4 para uso no dashboard
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
             Dicionário com métricas agregadas
         """
         try:
-            start_date_str, end_date_str = self._get_date_range(date_range)
+            start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
 
             # Criar requisição para métricas agregadas
             request = RunReportRequest(
@@ -211,18 +222,20 @@ class GA4Integration:
             logger.error(f"Erro ao obter métricas agregadas do GA4: {str(e)}")
             return self._empty_metrics()
 
-    def get_source_medium_data(self, date_range: str = "last_7d") -> pd.DataFrame:
+    def get_source_medium_data(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """
         Obtém dados de origem/mídia do GA4
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
             DataFrame com dados de origem/mídia
         """
         try:
-            start_date_str, end_date_str = self._get_date_range(date_range)
+            start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
 
             # Criar requisição
             request = RunReportRequest(

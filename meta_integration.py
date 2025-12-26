@@ -21,34 +21,53 @@ class MetaAdsIntegration:
         self.ad_account_id = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
         self.base_url = "https://graph.facebook.com/v21.0"
 
-    def get_campaigns(self, date_range: str = "last_7d") -> pd.DataFrame:
+    def _parse_date_range(self, date_range: str, custom_start: str = None, custom_end: str = None) -> tuple:
+        """
+        Converte o período para datas de início e fim
+
+        Args:
+            date_range: Período (last_7d, last_14d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD)
+            custom_end: Data de fim personalizada (YYYY-MM-DD)
+
+        Returns:
+            Tupla com (start_date_str, end_date_str)
+        """
+        if date_range == "custom" and custom_start and custom_end:
+            return custom_start, custom_end
+
+        end_date = datetime.now()
+        if date_range == "last_7d":
+            start_date = end_date - timedelta(days=7)
+        elif date_range == "last_14d":
+            start_date = end_date - timedelta(days=14)
+        elif date_range == "last_30d":
+            start_date = end_date - timedelta(days=30)
+        elif date_range == "today":
+            start_date = end_date.replace(hour=0, minute=0, second=0)
+        elif date_range == "yesterday":
+            start_date = (end_date - timedelta(days=1)).replace(hour=0, minute=0, second=0)
+            end_date = end_date.replace(hour=0, minute=0, second=0)
+        else:
+            start_date = end_date - timedelta(days=7)
+
+        return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
+
+    def get_campaigns(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """
         Obtém dados de campanhas do Meta Ads
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
             DataFrame com dados das campanhas
         """
         try:
             # Definir datas com base no período
-            end_date = datetime.now()
-            if date_range == "last_7d":
-                start_date = end_date - timedelta(days=7)
-            elif date_range == "last_14d":
-                start_date = end_date - timedelta(days=14)
-            elif date_range == "today":
-                start_date = end_date.replace(hour=0, minute=0, second=0)
-            elif date_range == "yesterday":
-                start_date = (end_date - timedelta(days=1)).replace(hour=0, minute=0, second=0)
-                end_date = end_date.replace(hour=0, minute=0, second=0)
-            else:
-                start_date = end_date - timedelta(days=7)
-
-            # Formatar datas
-            start_date_str = start_date.strftime("%Y-%m-%d")
-            end_date_str = end_date.strftime("%Y-%m-%d")
+            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
 
             # Buscar apenas campanhas ATIVAS
             url = f"{self.base_url}/{self.ad_account_id}/campaigns"
@@ -79,14 +98,16 @@ class MetaAdsIntegration:
             print(f"Erro ao obter campanhas do Meta: {str(e)}")
             return pd.DataFrame()
 
-    def get_ad_insights(self, date_range: str = "last_7d", fields: List[str] = None, campaign_name_filter: str = None) -> pd.DataFrame:
+    def get_ad_insights(self, date_range: str = "last_7d", fields: List[str] = None, campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """
         Obtém insights de anúncios do Meta
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
             fields: Lista de campos a recuperar
             campaign_name_filter: Nome da campanha para filtrar (opcional)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
             DataFrame com dados de insights
@@ -108,21 +129,7 @@ class MetaAdsIntegration:
 
         try:
             # Definir datas
-            end_date = datetime.now()
-            if date_range == "last_7d":
-                start_date = end_date - timedelta(days=7)
-            elif date_range == "last_14d":
-                start_date = end_date - timedelta(days=14)
-            elif date_range == "today":
-                start_date = end_date.replace(hour=0, minute=0, second=0)
-            elif date_range == "yesterday":
-                start_date = (end_date - timedelta(days=1)).replace(hour=0, minute=0, second=0)
-                end_date = end_date.replace(hour=0, minute=0, second=0)
-            else:
-                start_date = end_date - timedelta(days=7)
-
-            start_date_str = start_date.strftime("%Y-%m-%d")
-            end_date_str = end_date.strftime("%Y-%m-%d")
+            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
 
             # Buscar insights apenas de campanhas ATIVAS
             url = f"{self.base_url}/{self.ad_account_id}/insights"
@@ -170,13 +177,15 @@ class MetaAdsIntegration:
             print(f"Erro ao obter insights do Meta: {str(e)}")
             return pd.DataFrame()
 
-    def get_creative_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None) -> pd.DataFrame:
+    def get_creative_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """
         Obtém insights por criativo/anúncio do Meta
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
             campaign_name_filter: Nome da campanha para filtrar (opcional)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
             DataFrame com dados de criativos
@@ -195,21 +204,7 @@ class MetaAdsIntegration:
 
         try:
             # Definir datas
-            end_date = datetime.now()
-            if date_range == "last_7d":
-                start_date = end_date - timedelta(days=7)
-            elif date_range == "last_14d":
-                start_date = end_date - timedelta(days=14)
-            elif date_range == "today":
-                start_date = end_date.replace(hour=0, minute=0, second=0)
-            elif date_range == "yesterday":
-                start_date = (end_date - timedelta(days=1)).replace(hour=0, minute=0, second=0)
-                end_date = end_date.replace(hour=0, minute=0, second=0)
-            else:
-                start_date = end_date - timedelta(days=7)
-
-            start_date_str = start_date.strftime("%Y-%m-%d")
-            end_date_str = end_date.strftime("%Y-%m-%d")
+            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
 
             # Buscar insights no nível de anúncio
             url = f"{self.base_url}/{self.ad_account_id}/insights"

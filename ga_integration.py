@@ -125,29 +125,37 @@ class GA4Integration:
             logger.error(f"Erro ao obter dados do GA4: {str(e)}")
             return pd.DataFrame()
 
-    def get_events_data(self, date_range: str = "last_7d") -> pd.DataFrame:
+    def get_events_data(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """
-        Obtém dados de eventos do GA4
+        Obtém dados de eventos do GA4 com métricas detalhadas
 
         Args:
-            date_range: Período (last_7d, last_14d, today, yesterday)
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
 
         Returns:
-            DataFrame com dados de eventos
+            DataFrame com dados de eventos incluindo:
+            - Nome do evento
+            - Contagem de eventos (com % do total)
+            - Total de usuários (com % do total)
+            - Contagem de eventos por usuário ativo
+            - Receita total
         """
         try:
-            start_date_str, end_date_str = self._get_date_range(date_range)
+            start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
 
-            # Criar requisição
+            # Criar requisição com métricas detalhadas
             request = RunReportRequest(
                 property=f"properties/{self.property_id}",
                 date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
                 dimensions=[
-                    Dimension(name="date"),
                     Dimension(name="eventName"),
                 ],
                 metrics=[
                     Metric(name="eventCount"),
+                    Metric(name="totalUsers"),
+                    Metric(name="eventCountPerUser"),
                     Metric(name="eventValue"),
                 ],
             )
@@ -159,13 +167,28 @@ class GA4Integration:
             data = []
             for row in response.rows:
                 data.append({
-                    'date': row.dimension_values[0].value,
-                    'event_name': row.dimension_values[1].value,
+                    'event_name': row.dimension_values[0].value,
                     'event_count': int(row.metric_values[0].value),
-                    'event_value': float(row.metric_values[1].value),
+                    'total_users': int(row.metric_values[1].value),
+                    'events_per_user': float(row.metric_values[2].value),
+                    'event_value': float(row.metric_values[3].value),
                 })
 
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
+
+            if not df.empty:
+                # Calcular totais para percentuais
+                total_events = df['event_count'].sum()
+                total_users = df['total_users'].max()  # Usuários únicos totais
+
+                # Adicionar colunas de percentual
+                df['event_count_pct'] = (df['event_count'] / total_events * 100).round(2)
+                df['users_pct'] = (df['total_users'] / total_users * 100).round(2) if total_users > 0 else 0
+
+                # Ordenar por contagem de eventos (descendente)
+                df = df.sort_values('event_count', ascending=False)
+
+            return df
 
         except Exception as e:
             logger.error(f"Erro ao obter eventos do GA4: {str(e)}")

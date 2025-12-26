@@ -243,6 +243,36 @@ class DataProvider:
             default=pd.DataFrame()
         )
 
+    def get_events_data(self, period="7d", custom_start=None, custom_end=None):
+        """Obtém dados de eventos do GA4"""
+        # Tentar dados reais primeiro
+        if self.ga4_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                events_data = self.ga4_client.get_events_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end)
+                if not events_data.empty:
+                    # Formatar para exibição na tabela
+                    formatted_df = pd.DataFrame({
+                        'Nome do Evento': events_data['event_name'],
+                        'Contagem de Eventos': events_data.apply(
+                            lambda row: f"{row['event_count']:,} ({row['event_count_pct']:.2f}%)", axis=1
+                        ),
+                        'Total de Usuarios': events_data.apply(
+                            lambda row: f"{row['total_users']:,} ({row['users_pct']:.2f}%)", axis=1
+                        ),
+                        'Eventos por Usuario': events_data['events_per_user'].apply(lambda x: f"{x:.2f}"),
+                        'Receita Total': events_data['event_value'].apply(lambda x: f"R$ {x:,.2f}")
+                    })
+                    return formatted_df
+            except Exception as e:
+                logger.error(f"Erro ao obter eventos do GA4: {e}")
+
+        # Fallback para mock
+        return self._safe_execute(
+            lambda: self._get_mock_events_data(),
+            default=pd.DataFrame()
+        )
+
     def _empty_meta_metrics(self):
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
@@ -318,6 +348,25 @@ class DataProvider:
             "Usuarios": [1200, 750, 240, 95, 55],
             "Engajamento": ["72.3%", "68.9%", "58.2%", "45.1%", "62.8%"],
             "Tempo Medio": ["1m 58s", "1m 42s", "1m 15s", "0m 48s", "2m 05s"],
+        })
+
+    def _get_mock_events_data(self):
+        """Retorna dados mock de eventos do GA4"""
+        return pd.DataFrame({
+            "Nome do Evento": [
+                "page_view", "session_start", "first_visit", "scroll",
+                "user_engagement", "scroll_50", "cta_baixe_agora_click"
+            ],
+            "Contagem de Eventos": [
+                "2.050 (33,19%)", "1.992 (32,25%)", "1.958 (31,70%)", "78 (1,26%)",
+                "78 (1,26%)", "17 (0,28%)", "3 (0,05%)"
+            ],
+            "Total de Usuarios": [
+                "1.968 (100%)", "1.968 (100%)", "1.958 (99,49%)", "68 (3,46%)",
+                "38 (1,93%)", "14 (0,71%)", "3 (0,15%)"
+            ],
+            "Eventos por Usuario": ["1,04", "1,01", "1,00", "1,15", "2,05", "1,21", "1,00"],
+            "Receita Total": ["R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00"]
         })
 
     def get_cycle_status(self, period, meta_data, creative_data):
@@ -1092,16 +1141,32 @@ ga4_section = textwrap.dedent(f"""
 
 st.markdown(ga4_section, unsafe_allow_html=True)
 
-# Tabela Origem/Midia
-try:
-    source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
-    if len(source_data) > 0:
-        st.markdown('<div class="table-container">', unsafe_allow_html=True)
-        st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
-        st.dataframe(source_data, use_container_width=True, hide_index=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-except Exception as e:
-    logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")
+# Tabelas lado a lado: Origem/Midia e Eventos
+table_cols = st.columns(2)
+
+with table_cols[0]:
+    # Tabela Origem/Midia
+    try:
+        source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+        if len(source_data) > 0:
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
+            st.dataframe(source_data, use_container_width=True, hide_index=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")
+
+with table_cols[1]:
+    # Tabela de Eventos do GA4
+    try:
+        events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+        if len(events_data) > 0:
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span></div>', unsafe_allow_html=True)
+            st.dataframe(events_data, use_container_width=True, hide_index=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Erro ao renderizar tabela de eventos: {e}")
 
 st.markdown('</div>', unsafe_allow_html=True)
 

@@ -1,20 +1,14 @@
 """
 Agente de IA para análise de dados do dashboard usando OpenAI GPT
+Usa requests diretamente para evitar problemas de proxy no Streamlit Cloud
 """
 
 import logging
 from typing import Dict, Any, Optional
 import json
+import requests
 
 logger = logging.getLogger(__name__)
-
-# Importação condicional do OpenAI
-try:
-    from openai import OpenAI
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
-    OpenAI = None
 
 
 class AIAgent:
@@ -26,33 +20,14 @@ class AIAgent:
             api_key: Chave da API OpenAI
             model: Modelo a usar (gpt-4o-mini é mais barato, gpt-4o é mais potente)
         """
-        if not HAS_OPENAI:
-            raise ImportError("O módulo 'openai' não está instalado. Execute: pip install openai")
-
-        # Inicializar cliente OpenAI
-        # Desabilitar proxy para evitar conflitos no Streamlit Cloud
-        import os
-
-        # Salvar e limpar variáveis de proxy temporariamente
-        saved_proxies = {}
-        proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']
-        for var in proxy_vars:
-            if var in os.environ:
-                saved_proxies[var] = os.environ.pop(var)
-
-        try:
-            self.client = OpenAI(api_key=api_key)
-        finally:
-            # Restaurar variáveis de proxy
-            for var, value in saved_proxies.items():
-                os.environ[var] = value
-
+        self.api_key = api_key
         self.model = model
+        self.api_url = "https://api.openai.com/v1/chat/completions"
 
     @staticmethod
     def is_available() -> bool:
-        """Verifica se o módulo OpenAI está disponível"""
-        return HAS_OPENAI
+        """Verifica se o agente está disponível"""
+        return True
 
     def _build_system_prompt(self) -> str:
         """Constrói o prompt do sistema para o agente"""
@@ -171,17 +146,35 @@ Por favor, forneça:
 4. 💡 **Recomendações de ação** (máximo 3)
 """
 
-            # Chamar API
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
+            # Chamar API diretamente com requests
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": self._build_system_prompt()},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.7,
-                max_tokens=800
+                "temperature": 0.7,
+                "max_tokens": 800
+            }
+
+            response = requests.post(
+                self.api_url,
+                headers=headers,
+                json=payload,
+                timeout=60
             )
-            return response.choices[0].message.content
+
+            if response.status_code != 200:
+                error_msg = response.json().get('error', {}).get('message', response.text)
+                return f"❌ Erro da API OpenAI: {error_msg}"
+
+            result = response.json()
+            return result['choices'][0]['message']['content']
 
         except Exception as e:
             logger.error(f"Erro na análise de IA: {e}")

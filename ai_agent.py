@@ -5,6 +5,7 @@ Agente de IA para análise de dados do dashboard usando OpenAI GPT
 import logging
 from typing import Dict, Any, Optional
 import json
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,9 @@ class AIAgent:
         if not HAS_OPENAI:
             raise ImportError("O módulo 'openai' não está instalado. Execute: pip install openai")
 
-        self.client = OpenAI(api_key=api_key)
+        # Forçar um cliente HTTP compatível (evita problemas de compatibilidade de proxies entre
+        # versões recentes do httpx e do SDK do OpenAI)
+        self.client = OpenAI(api_key=api_key, http_client=httpx.Client())
         self.model = model
 
     @staticmethod

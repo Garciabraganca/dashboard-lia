@@ -30,19 +30,24 @@ class AIAgent:
             raise ImportError("O módulo 'openai' não está instalado. Execute: pip install openai")
 
         # Inicializar cliente OpenAI
-        # Usar http_client=None para evitar problemas com proxy no Streamlit Cloud
+        # Desabilitar proxy para evitar conflitos no Streamlit Cloud
+        import os
+
+        # Salvar e limpar variáveis de proxy temporariamente
+        saved_proxies = {}
+        proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy', 'ALL_PROXY', 'all_proxy']
+        for var in proxy_vars:
+            if var in os.environ:
+                saved_proxies[var] = os.environ.pop(var)
+
         try:
-            import httpx
-            self.client = OpenAI(
-                api_key=api_key,
-                http_client=httpx.Client()
-            )
-        except Exception:
-            # Fallback simples
             self.client = OpenAI(api_key=api_key)
+        finally:
+            # Restaurar variáveis de proxy
+            for var, value in saved_proxies.items():
+                os.environ[var] = value
 
         self.model = model
-        self._legacy_mode = False
 
     @staticmethod
     def is_available() -> bool:

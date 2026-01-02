@@ -132,11 +132,15 @@ class DataProvider:
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
+                logger.info(f"Buscando Meta insights: period={period}, api_period={api_period}")
                 insights = self.meta_client.get_ad_insights(date_range=api_period, campaign_name_filter=campaign_filter, custom_start=custom_start, custom_end=custom_end)
+                logger.info(f"Meta insights retornados: {len(insights)} registros")
                 if not insights.empty:
                     result = self._process_meta_insights(insights)
                     result["_data_source"] = "real"
                     return result
+                else:
+                    logger.warning(f"Nenhum insight retornado para o período {api_period}")
             except Exception as e:
                 logger.error(f"Erro ao obter dados reais do Meta: {e}")
 

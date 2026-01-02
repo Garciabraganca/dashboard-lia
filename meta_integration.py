@@ -21,6 +21,115 @@ class MetaAdsIntegration:
         self.ad_account_id = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
         self.base_url = "https://graph.facebook.com/v21.0"
 
+    def verify_connection(self) -> Dict[str, Any]:
+        """
+        Verifica a conexão com a API Meta Ads
+
+        Returns:
+            Dicionário com status da conexão:
+            - connected: bool - se a conexão foi bem sucedida
+            - message: str - mensagem descritiva do status
+            - account_info: dict - informações da conta (se conectado)
+            - error_code: str - código do erro (se houver)
+            - error_details: str - detalhes do erro (se houver)
+        """
+        result = {
+            "connected": False,
+            "message": "",
+            "account_info": {},
+            "error_code": None,
+            "error_details": None
+        }
+
+        # Verificar se token está configurado
+        if not self.access_token:
+            result["message"] = "Token de acesso não configurado"
+            result["error_code"] = "NO_TOKEN"
+            return result
+
+        # Verificar se account_id está configurado
+        if not self.ad_account_id:
+            result["message"] = "ID da conta de anúncios não configurado"
+            result["error_code"] = "NO_ACCOUNT_ID"
+            return result
+
+        try:
+            # Fazer chamada para obter informações da conta
+            url = f"{self.base_url}/{self.ad_account_id}"
+            params = {
+                "fields": "id,name,account_status,currency,timezone_name,business_name",
+                "access_token": self.access_token
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+
+            if response.status_code == 200:
+                data = response.json()
+
+                # Mapear status da conta
+                account_status_map = {
+                    1: "ACTIVE",
+                    2: "DISABLED",
+                    3: "UNSETTLED",
+                    7: "PENDING_RISK_REVIEW",
+                    8: "PENDING_SETTLEMENT",
+                    9: "IN_GRACE_PERIOD",
+                    100: "PENDING_CLOSURE",
+                    101: "CLOSED",
+                    201: "ANY_ACTIVE",
+                    202: "ANY_CLOSED"
+                }
+
+                status_code = data.get("account_status", 0)
+                status_name = account_status_map.get(status_code, f"UNKNOWN ({status_code})")
+
+                result["connected"] = True
+                result["message"] = f"Conexão estabelecida com sucesso"
+                result["account_info"] = {
+                    "id": data.get("id", "").replace("act_", ""),
+                    "name": data.get("name", "N/A"),
+                    "business_name": data.get("business_name", "N/A"),
+                    "status": status_name,
+                    "status_code": status_code,
+                    "currency": data.get("currency", "N/A"),
+                    "timezone": data.get("timezone_name", "N/A")
+                }
+            else:
+                error_data = response.json() if response.text else {}
+                error = error_data.get('error', {})
+                error_msg = error.get('message', 'Erro desconhecido')
+                error_code = error.get('code', 'N/A')
+                error_type = error.get('type', 'N/A')
+
+                result["message"] = f"Erro na API Meta: {error_msg}"
+                result["error_code"] = str(error_code)
+                result["error_details"] = f"Type: {error_type}, Code: {error_code}"
+
+                # Mensagens amigáveis para erros comuns
+                if error_code == 190:
+                    result["message"] = "Token de acesso inválido ou expirado"
+                elif error_code == 100:
+                    result["message"] = "ID da conta de anúncios inválido ou sem permissão"
+                elif error_code == 17:
+                    result["message"] = "Limite de requisições excedido (rate limit)"
+
+        except requests.exceptions.Timeout:
+            result["message"] = "Timeout na conexão com a API Meta"
+            result["error_code"] = "TIMEOUT"
+            result["error_details"] = "A requisição excedeu o tempo limite de 30 segundos"
+
+        except requests.exceptions.ConnectionError as e:
+            result["message"] = "Erro de conexão com a API Meta"
+            result["error_code"] = "CONNECTION_ERROR"
+            result["error_details"] = str(e)
+
+        except Exception as e:
+            result["message"] = f"Erro inesperado: {str(e)}"
+            result["error_code"] = "UNKNOWN_ERROR"
+            result["error_details"] = str(e)
+
+        return result
+
     def _parse_date_range(self, date_range: str, custom_start: str = None, custom_end: str = None) -> tuple:
         """
         Converte o período para datas de início e fim

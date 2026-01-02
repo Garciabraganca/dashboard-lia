@@ -981,12 +981,36 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
-# Indicador de fonte de dados (para debug)
+# Indicador de fonte de dados e diagnóstico de conexão
 data_source = meta_data.get("_data_source", "unknown")
 if data_source == "mock":
     st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
 elif data_source == "real":
     st.success("✅ Conectado à API Meta Ads - dados reais")
+
+# Expander com diagnóstico detalhado da conexão
+with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
+    if data_provider.meta_client:
+        connection_status = data_provider.meta_client.verify_connection()
+        if connection_status["connected"]:
+            st.success(f"✅ {connection_status['message']}")
+            info = connection_status["account_info"]
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**ID da Conta:** {info.get('id', 'N/A')}")
+                st.markdown(f"**Nome:** {info.get('name', 'N/A')}")
+                st.markdown(f"**Empresa:** {info.get('business_name', 'N/A')}")
+            with col2:
+                st.markdown(f"**Status:** {info.get('status', 'N/A')}")
+                st.markdown(f"**Moeda:** {info.get('currency', 'N/A')}")
+                st.markdown(f"**Timezone:** {info.get('timezone', 'N/A')}")
+        else:
+            st.error(f"❌ {connection_status['message']}")
+            if connection_status["error_code"]:
+                st.code(f"Código: {connection_status['error_code']}\nDetalhes: {connection_status['error_details']}")
+    else:
+        st.error("❌ Cliente Meta Ads não inicializado")
+        st.info("Verifique se META_ACCESS_TOKEN está configurado no Streamlit Secrets.")
 
 # -----------------------------------------------------------------------------
 # AGENTE DE IA - ANALISE INTELIGENTE

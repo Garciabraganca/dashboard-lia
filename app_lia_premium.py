@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # CONFIGURACAO DA PAGINA
 # =============================================================================
 st.set_page_config(
-    page_title="LIA Dashboard - Ciclo 1",
+    page_title="LIA Dashboard - Ciclo 2",
     page_icon="logo_lia.png",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -891,11 +891,11 @@ st.markdown(f'''
     <div class="lia-header-left">
         {logo_img}
         <div>
-            <div class="lia-brand-name">LIA Dashboard - Ciclo 1</div>
-            <div class="lia-brand-tagline">Performance de midia ate clique na landing</div>
+            <div class="lia-brand-name">LIA Dashboard - Ciclo 2</div>
+            <div class="lia-brand-tagline">Performance de midia e conversoes na landing</div>
         </div>
     </div>
-    <div class="lia-cycle-badge">Ciclo 1 - Trafego</div>
+    <div class="lia-cycle-badge">Ciclo 2 - Conversao</div>
 </div>
 ''', unsafe_allow_html=True)
 
@@ -916,7 +916,7 @@ with filter_cols[1]:
 with filter_cols[2]:
     nivel = st.selectbox("Nivel", ["Campanha", "Conjunto", "Criativo"], index=0, key="nivel")
 with filter_cols[3]:
-    campanha = st.selectbox("Campanha", ["Ciclo 1"], index=0, key="campanha")
+    campanha = st.selectbox("Campanha", ["Ciclo 2", "Ciclo 1", "Todas"], index=0, key="campanha")
 
 # Campos de data personalizada
 custom_start_date = None
@@ -974,7 +974,7 @@ st.markdown(f'''
 <div class="status-card">
     {owl_img}
     <div style="flex:1;">
-        <div class="status-title">Status do Ciclo 1</div>
+        <div class="status-title">Status do Ciclo 2</div>
         <div class="status-text">{status_line}</div>
         <div class="status-badge">{cycle_status["phase"]}</div>
     </div>
@@ -1182,7 +1182,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 st.markdown(f'''
 <div class="scope-card">
     <span style="font-size:18px;">i</span>
-    <span class="scope-text"><strong>Ciclo 1 analisa midia ate clique/sessao.</strong> Conversoes finais entram em ciclos posteriores.</span>
+    <span class="scope-text"><strong>Ciclo 2 analisa midia e conversoes na landing page.</strong> Acompanhamento completo do funil de conversao.</span>
 </div>
 ''', unsafe_allow_html=True)
 
@@ -1328,7 +1328,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # Footer
 st.markdown(f'''
 <div class="footer glass-card">
-    Dashboard Ciclo 1 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real
+    Dashboard Ciclo 2 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real
 </div>
 ''', unsafe_allow_html=True)
 

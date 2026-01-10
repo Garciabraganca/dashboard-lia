@@ -189,12 +189,13 @@ Variações vs período anterior:
             # Construir prompt do usuário baseado no ciclo
             if cycle == "Ciclo 2":
                 user_prompt = f"""Analise os dados de campanha do período: {period_text}
-Estamos no {cycle} - FASE DE CONVERSÃO.
 
 {data_text}
 
+IMPORTANTE: Comece sua análise identificando claramente que está analisando o **{cycle} - FASE DE CONVERSÃO**.
+
 Por favor, forneça uma análise POSITIVA e OBJETIVA:
-1. 🎯 **Resumo da Performance** (2-3 frases celebrando os resultados)
+1. 🎯 **Resumo da Performance do {cycle}** (2-3 frases celebrando os resultados)
 2. 🏆 **Destaques Positivos** - O que está funcionando muito bem
 3. 📊 **Métricas em Números** - Apresente os dados de forma objetiva (sem julgamentos negativos)
 4. 🌟 **Criativo Vencedor** - Qual criativo está performando melhor e POR QUE ele funciona
@@ -205,12 +206,13 @@ LEMBRE-SE: Foco no positivo! O gestor vai decidir se precisa ajustar algo basead
 """
             else:
                 user_prompt = f"""Analise os dados de campanha do período: {period_text}
-Estamos no {cycle} - FASE DE TRÁFEGO.
 
 {data_text}
 
+IMPORTANTE: Comece sua análise identificando claramente que está analisando o **{cycle} - FASE DE TRÁFEGO**.
+
 Por favor, forneça:
-1. 🎯 **Resumo da Performance** (2-3 frases)
+1. 🎯 **Resumo da Performance do {cycle}** (2-3 frases)
 2. ✅ **O que está funcionando bem**
 3. ⚠️ **Pontos de atenção**
 4. 🏆 **Criativo Vencedor** - Identifique qual criativo está performando melhor e explique POR QUE ele funciona (qual gancho, emoção ou promessa está ressoando com o público)

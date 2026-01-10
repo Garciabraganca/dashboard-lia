@@ -173,12 +173,12 @@ class DataProvider:
             logger.error(f"Erro ao processar insights Meta: {e}")
             return self._empty_meta_metrics()
 
-    def get_ga4_metrics(self, period="7d", filters=None, custom_start=None, custom_end=None):
+    def get_ga4_metrics(self, period="7d", filters=None, custom_start=None, custom_end=None, campaign_filter=None):
         # Tentar dados reais primeiro
         if self.ga4_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                metrics = self.ga4_client.get_aggregated_metrics(date_range=api_period, custom_start=custom_start, custom_end=custom_end)
+                metrics = self.ga4_client.get_aggregated_metrics(date_range=api_period, custom_start=custom_start, custom_end=custom_end, campaign_filter=campaign_filter)
                 if metrics and metrics.get('sessoes', 0) > 0:
                     # Adicionar deltas (por enquanto zerados)
                     metrics['delta_sessoes'] = 0
@@ -229,12 +229,12 @@ class DataProvider:
             default=pd.DataFrame({"Data": [], "Cliques": [], "CTR": [], "CPC": []})
         )
 
-    def get_source_medium(self, period="7d", custom_start=None, custom_end=None):
+    def get_source_medium(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
         # Tentar dados reais primeiro
         if self.ga4_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                source_data = self.ga4_client.get_source_medium_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end)
+                source_data = self.ga4_client.get_source_medium_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end, campaign_filter=campaign_filter)
                 if not source_data.empty:
                     return source_data
             except Exception as e:
@@ -246,13 +246,13 @@ class DataProvider:
             default=pd.DataFrame()
         )
 
-    def get_events_data(self, period="7d", custom_start=None, custom_end=None):
+    def get_events_data(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
         """Obtém dados de eventos do GA4"""
         # Tentar dados reais primeiro
         if self.ga4_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                events_data = self.ga4_client.get_events_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end)
+                events_data = self.ga4_client.get_events_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end, campaign_filter=campaign_filter)
                 if not events_data.empty:
                     # Formatar para exibição na tabela
                     formatted_df = pd.DataFrame({
@@ -945,7 +945,7 @@ campaign_filter = campanha if campanha != "Todas" else None
 # -----------------------------------------------------------------------------
 try:
     meta_data = data_provider.get_meta_metrics(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
-    ga4_data = data_provider.get_ga4_metrics(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+    ga4_data = data_provider.get_ga4_metrics(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
     creative_data = data_provider.get_creative_performance(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
     trends_data = data_provider.get_daily_trends(period=selected_period)
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
@@ -1038,8 +1038,8 @@ if openai_api_key:
                 ai_agent = AIAgent(api_key=openai_api_key, model="gpt-4o-mini")
 
                 # Obter dados extras para análise
-                source_data_for_ai = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
-                events_data_for_ai = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+                source_data_for_ai = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
+                events_data_for_ai = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
 
                 # Gerar análise
                 analysis = ai_agent.analyze(
@@ -1302,7 +1302,7 @@ table_cols = st.columns(2)
 with table_cols[0]:
     # Tabela Origem/Midia
     try:
-        source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+        source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(source_data) > 0:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
@@ -1314,7 +1314,7 @@ with table_cols[0]:
 with table_cols[1]:
     # Tabela de Eventos do GA4
     try:
-        events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
+        events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(events_data) > 0:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span></div>', unsafe_allow_html=True)

@@ -185,15 +185,25 @@ class DataProvider:
                     metrics['delta_usuarios'] = 0
                     metrics['delta_pageviews'] = 0
                     metrics['delta_engajamento'] = 0
+                    metrics['_data_source'] = 'real'
+                    metrics['_campaign_filter'] = campaign_filter
                     return metrics
+                else:
+                    # GA4 conectado mas sem dados para este filtro
+                    result = self._get_mock_ga4_metrics(period)
+                    result['_data_source'] = 'no_data'
+                    result['_campaign_filter'] = campaign_filter
+                    return result
             except Exception as e:
                 logger.error(f"Erro ao obter dados reais do GA4: {e}")
 
         # Fallback para mock
-        return self._safe_execute(
+        result = self._safe_execute(
             lambda: self._get_mock_ga4_metrics(period),
             default=self._empty_ga4_metrics()
         )
+        result['_data_source'] = 'mock'
+        return result
 
     def get_creative_performance(self, period="7d", campaign_filter=None, custom_start=None, custom_end=None):
         # Tentar dados reais primeiro
@@ -1266,6 +1276,16 @@ st.markdown('</div>', unsafe_allow_html=True)
 # -----------------------------------------------------------------------------
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title"><div class="section-icon">@</div> Landing Page (GA4)</div>', unsafe_allow_html=True)
+
+# Indicador de fonte de dados GA4
+ga4_source = ga4_data.get("_data_source", "unknown")
+ga4_filter = ga4_data.get("_campaign_filter", None)
+if ga4_source == "real":
+    st.success(f"✅ Dados reais do GA4 - Filtro: {ga4_filter if ga4_filter else 'Todas as campanhas'}")
+elif ga4_source == "no_data":
+    st.warning(f"⚠️ GA4 conectado, mas sem sessoes para campanha '{ga4_filter}'. Aguarde as UTMs serem processadas (ate 24-48h).")
+elif ga4_source == "mock":
+    st.info("💡 Usando dados de demonstracao. Verifique as credenciais GA4 no Streamlit Secrets.")
 
 ga4_cards = [
     {"icon": "🌐", "label": "Sessoes", "value": f"{ga4_data['sessoes']:,.0f}", "delta": ga4_data['delta_sessoes']},

@@ -1051,14 +1051,15 @@ if openai_api_key:
                 source_data_for_ai = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
                 events_data_for_ai = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
 
-                # Gerar análise
+                # Gerar análise (passa o ciclo selecionado para ajustar o tom da análise)
                 analysis = ai_agent.analyze(
                     meta_data=meta_data,
                     ga4_data=ga4_data,
                     creative_data=creative_data,
                     source_data=source_data_for_ai,
                     events_data=events_data_for_ai,
-                    period=selected_period
+                    period=selected_period,
+                    cycle=campanha if campanha in ["Ciclo 1", "Ciclo 2"] else "Ciclo 2"
                 )
 
                 # Salvar no session state para persistir

@@ -29,13 +29,48 @@ class AIAgent:
         """Verifica se o agente está disponível"""
         return True
 
-    def _build_system_prompt(self) -> str:
-        """Constrói o prompt do sistema para o agente"""
-        return """Você é a LIA, uma assistente especialista em marketing digital, análise de campanhas e otimização de conversão.
-Seu papel é analisar os dados do dashboard e fornecer insights acionáveis focados em aumentar o engajamento.
+    def _build_system_prompt(self, cycle: str = "Ciclo 2") -> str:
+        """Constrói o prompt do sistema para o agente baseado no ciclo"""
+
+        base_prompt = """Você é a LIA, uma assistente especialista em marketing digital, análise de campanhas e otimização de conversão.
+Seu papel é analisar os dados do dashboard e fornecer insights acionáveis.
 
 IMPORTANTE: Todos os valores monetários apresentados estão em DÓLARES AMERICANOS (USD/$).
 Ao mencionar valores na sua análise, use o símbolo $ e considere que são dólares.
+
+"""
+
+        if cycle == "Ciclo 2":
+            # Ciclo 2: Foco em conversão, análise positiva, sem criticar landing page
+            return base_prompt + """CONTEXTO: Estamos no CICLO 2 - FASE DE CONVERSÃO.
+Nesta fase, a landing page já foi otimizada e estamos focados em escalar resultados.
+
+DIRETRIZES IMPORTANTES PARA O CICLO 2:
+- FOQUE SEMPRE NO LADO POSITIVO dos resultados
+- NÃO critique a landing page - ela já está otimizada
+- NÃO sugira mudanças na landing page
+- Apresente os NÚMEROS DE FORMA OBJETIVA para que o gestor decida
+- Destaque CONQUISTAS e RESULTADOS POSITIVOS
+- Celebre métricas que estão performando bem
+- Se algo não está ideal, apresente o dado sem julgamento negativo
+- O gestor decide se precisa ajustar algo baseado nos números
+
+Análise de Criativos:
+- Identifique o criativo vencedor (melhor CTR + menor CPC)
+- Explique O QUE faz esse criativo funcionar (gancho, promessa, emoção)
+- Sugira como ESCALAR o sucesso do criativo vencedor
+
+Formato da resposta:
+- Use emojis para destacar pontos positivos
+- Organize em seções claras
+- Seja objetiva e apresente os dados
+- Destaque as conquistas e resultados
+- Tom otimista e celebratório
+"""
+        else:
+            # Ciclo 1: Foco em tráfego e otimização da landing page
+            return base_prompt + """CONTEXTO: Estamos no CICLO 1 - FASE DE TRÁFEGO.
+Nesta fase, o foco é otimizar a landing page e os criativos para maximizar engajamento.
 
 Diretrizes:
 - Seja direta e objetiva
@@ -118,7 +153,8 @@ Variações vs período anterior:
                 creative_data: Any = None,
                 source_data: Any = None,
                 events_data: Any = None,
-                period: str = "7d") -> str:
+                period: str = "7d",
+                cycle: str = "Ciclo 2") -> str:
         """
         Analisa os dados do dashboard e retorna insights
 
@@ -129,6 +165,7 @@ Variações vs período anterior:
             source_data: DataFrame com origens de tráfego
             events_data: DataFrame com eventos do GA4
             period: Período selecionado
+            cycle: Ciclo atual (Ciclo 1 ou Ciclo 2)
 
         Returns:
             String com análise e recomendações
@@ -149,8 +186,26 @@ Variações vs período anterior:
                 "custom": "período personalizado"
             }.get(period, period)
 
-            # Construir prompt do usuário
-            user_prompt = f"""Analise os dados de campanha do período: {period_text}
+            # Construir prompt do usuário baseado no ciclo
+            if cycle == "Ciclo 2":
+                user_prompt = f"""Analise os dados de campanha do período: {period_text}
+Estamos no {cycle} - FASE DE CONVERSÃO.
+
+{data_text}
+
+Por favor, forneça uma análise POSITIVA e OBJETIVA:
+1. 🎯 **Resumo da Performance** (2-3 frases celebrando os resultados)
+2. 🏆 **Destaques Positivos** - O que está funcionando muito bem
+3. 📊 **Métricas em Números** - Apresente os dados de forma objetiva (sem julgamentos negativos)
+4. 🌟 **Criativo Vencedor** - Qual criativo está performando melhor e POR QUE ele funciona
+5. 🚀 **Oportunidades de Escala** - Como amplificar o que já está dando certo
+6. 💡 **Próximos Passos** (máximo 3 ações para escalar resultados)
+
+LEMBRE-SE: Foco no positivo! O gestor vai decidir se precisa ajustar algo baseado nos números.
+"""
+            else:
+                user_prompt = f"""Analise os dados de campanha do período: {period_text}
+Estamos no {cycle} - FASE DE TRÁFEGO.
 
 {data_text}
 
@@ -172,7 +227,7 @@ Por favor, forneça:
             payload = {
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": self._build_system_prompt()},
+                    {"role": "system", "content": self._build_system_prompt(cycle)},
                     {"role": "user", "content": user_prompt}
                 ],
                 "temperature": 0.7,

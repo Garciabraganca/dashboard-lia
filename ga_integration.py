@@ -8,6 +8,8 @@ from google.analytics.data_v1beta.types import (
     Dimension,
     Metric,
     DateRange,
+    FilterExpression,
+    Filter,
 )
 from google.oauth2 import service_account
 import pandas as pd
@@ -37,6 +39,27 @@ class GA4Integration:
 
         # Inicializar cliente
         self.client = BetaAnalyticsDataClient(credentials=self.credentials)
+
+    def _build_campaign_filter(self, campaign_filter: str) -> FilterExpression:
+        """
+        Cria filtro por campanha (utm_campaign) para as queries GA4
+
+        Args:
+            campaign_filter: Nome da campanha para filtrar (ex: "Ciclo 2")
+
+        Returns:
+            FilterExpression para usar na query
+        """
+        return FilterExpression(
+            filter=Filter(
+                field_name="sessionCampaign",
+                string_filter=Filter.StringFilter(
+                    match_type=Filter.StringFilter.MatchType.CONTAINS,
+                    value=campaign_filter,
+                    case_sensitive=False
+                )
+            )
+        )
 
     def _get_date_range(self, date_range: str, custom_start: str = None, custom_end: str = None) -> tuple:
         """
@@ -125,7 +148,7 @@ class GA4Integration:
             logger.error(f"Erro ao obter dados do GA4: {str(e)}")
             return pd.DataFrame()
 
-    def get_events_data(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
+    def get_events_data(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_filter: str = None) -> pd.DataFrame:
         """
         Obtém dados de eventos do GA4 com métricas detalhadas
 
@@ -133,6 +156,7 @@ class GA4Integration:
             date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
             custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
             custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            campaign_filter: Filtro por nome da campanha (utm_campaign)
 
         Returns:
             DataFrame com dados de eventos incluindo:
@@ -146,19 +170,25 @@ class GA4Integration:
             start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
 
             # Criar requisição com métricas detalhadas
-            request = RunReportRequest(
-                property=f"properties/{self.property_id}",
-                date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
-                dimensions=[
+            request_params = {
+                "property": f"properties/{self.property_id}",
+                "date_ranges": [DateRange(start_date=start_date_str, end_date=end_date_str)],
+                "dimensions": [
                     Dimension(name="eventName"),
                 ],
-                metrics=[
+                "metrics": [
                     Metric(name="eventCount"),
                     Metric(name="totalUsers"),
                     Metric(name="eventCountPerUser"),
                     Metric(name="eventValue"),
                 ],
-            )
+            }
+
+            # Adicionar filtro de campanha se especificado
+            if campaign_filter:
+                request_params["dimension_filter"] = self._build_campaign_filter(campaign_filter)
+
+            request = RunReportRequest(**request_params)
 
             # Executar requisição
             response = self.client.run_report(request)
@@ -194,7 +224,7 @@ class GA4Integration:
             logger.error(f"Erro ao obter eventos do GA4: {str(e)}")
             return pd.DataFrame()
 
-    def get_aggregated_metrics(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> Dict[str, Any]:
+    def get_aggregated_metrics(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_filter: str = None) -> Dict[str, Any]:
         """
         Obtém métricas agregadas do GA4 para uso no dashboard
 
@@ -202,6 +232,7 @@ class GA4Integration:
             date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
             custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
             custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            campaign_filter: Filtro por nome da campanha (utm_campaign)
 
         Returns:
             Dicionário com métricas agregadas
@@ -210,17 +241,23 @@ class GA4Integration:
             start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
 
             # Criar requisição para métricas agregadas
-            request = RunReportRequest(
-                property=f"properties/{self.property_id}",
-                date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
-                metrics=[
+            request_params = {
+                "property": f"properties/{self.property_id}",
+                "date_ranges": [DateRange(start_date=start_date_str, end_date=end_date_str)],
+                "metrics": [
                     Metric(name="sessions"),
                     Metric(name="totalUsers"),
                     Metric(name="screenPageViews"),
                     Metric(name="engagementRate"),
                     Metric(name="averageSessionDuration"),
                 ],
-            )
+            }
+
+            # Adicionar filtro de campanha se especificado
+            if campaign_filter:
+                request_params["dimension_filter"] = self._build_campaign_filter(campaign_filter)
+
+            request = RunReportRequest(**request_params)
 
             # Executar requisição
             response = self.client.run_report(request)
@@ -245,7 +282,7 @@ class GA4Integration:
             logger.error(f"Erro ao obter métricas agregadas do GA4: {str(e)}")
             return self._empty_metrics()
 
-    def get_source_medium_data(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
+    def get_source_medium_data(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_filter: str = None) -> pd.DataFrame:
         """
         Obtém dados de origem/mídia do GA4
 
@@ -253,6 +290,7 @@ class GA4Integration:
             date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
             custom_start: Data de início personalizada (YYYY-MM-DD) - usado quando date_range="custom"
             custom_end: Data de fim personalizada (YYYY-MM-DD) - usado quando date_range="custom"
+            campaign_filter: Filtro por nome da campanha (utm_campaign)
 
         Returns:
             DataFrame com dados de origem/mídia
@@ -261,19 +299,25 @@ class GA4Integration:
             start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
 
             # Criar requisição
-            request = RunReportRequest(
-                property=f"properties/{self.property_id}",
-                date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
-                dimensions=[
+            request_params = {
+                "property": f"properties/{self.property_id}",
+                "date_ranges": [DateRange(start_date=start_date_str, end_date=end_date_str)],
+                "dimensions": [
                     Dimension(name="sessionSourceMedium"),
                 ],
-                metrics=[
+                "metrics": [
                     Metric(name="sessions"),
                     Metric(name="totalUsers"),
                     Metric(name="engagementRate"),
                     Metric(name="averageSessionDuration"),
                 ],
-            )
+            }
+
+            # Adicionar filtro de campanha se especificado
+            if campaign_filter:
+                request_params["dimension_filter"] = self._build_campaign_filter(campaign_filter)
+
+            request = RunReportRequest(**request_params)
 
             # Executar requisição
             response = self.client.run_report(request)

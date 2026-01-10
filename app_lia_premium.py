@@ -233,9 +233,9 @@ class DataProvider:
             default=pd.DataFrame()
         )
 
-    def get_daily_trends(self, period="7d"):
+    def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
         return self._safe_execute(
-            lambda: self._get_mock_daily_trends(period),
+            lambda: self._get_mock_daily_trends(period, custom_start, custom_end),
             default=pd.DataFrame({"Data": [], "Cliques": [], "CTR": [], "CPC": []})
         )
 
@@ -342,16 +342,36 @@ class DataProvider:
             "CPM": [6.79, 6.29, 6.35, 6.94, 10.00],
         })
 
-    def _get_mock_daily_trends(self, period):
-        days = {"today": 1, "yesterday": 1, "7d": 7, "14d": 14, "30d": 30, "custom": 7}.get(period, 7)
-        dates = [(datetime.now() - timedelta(days=i)).strftime("%d/%m") for i in range(days-1, -1, -1)]
+    def _get_mock_daily_trends(self, period, custom_start=None, custom_end=None):
         import random
         random.seed(42)
+
+        # Calcular dias baseado no período ou datas personalizadas
+        if period == "custom" and custom_start and custom_end:
+            start_date = datetime.strptime(custom_start, "%Y-%m-%d")
+            end_date = datetime.strptime(custom_end, "%Y-%m-%d")
+            days = (end_date - start_date).days + 1
+            dates = [(start_date + timedelta(days=i)).strftime("%d/%m") for i in range(days)]
+        else:
+            days = {"today": 1, "yesterday": 1, "7d": 7, "14d": 14, "30d": 30}.get(period, 7)
+            dates = [(datetime.now() - timedelta(days=i)).strftime("%d/%m") for i in range(days-1, -1, -1)]
+
+        # Gerar dados mock para o número correto de dias
+        base_cliques = [380, 420, 395, 450, 480, 510, 565, 520, 490, 530, 560, 580, 540, 500]
+        base_ctr = [2.3, 2.4, 2.35, 2.5, 2.55, 2.6, 2.75, 2.65, 2.58, 2.7, 2.8, 2.85, 2.72, 2.62]
+        base_cpc = [0.30, 0.28, 0.29, 0.27, 0.26, 0.25, 0.24, 0.25, 0.26, 0.24, 0.23, 0.22, 0.24, 0.25]
+
+        # Estender dados se necessário
+        while len(base_cliques) < days:
+            base_cliques.extend([random.randint(380, 600) for _ in range(7)])
+            base_ctr.extend([round(random.uniform(2.2, 2.9), 2) for _ in range(7)])
+            base_cpc.extend([round(random.uniform(0.22, 0.32), 2) for _ in range(7)])
+
         return pd.DataFrame({
             "Data": dates,
-            "Cliques": [380, 420, 395, 450, 480, 510, 565][:days],
-            "CTR": [2.3, 2.4, 2.35, 2.5, 2.55, 2.6, 2.75][:days],
-            "CPC": [0.30, 0.28, 0.29, 0.27, 0.26, 0.25, 0.24][:days],
+            "Cliques": base_cliques[:days],
+            "CTR": base_ctr[:days],
+            "CPC": base_cpc[:days],
         })
 
     def _get_mock_source_medium(self):
@@ -957,7 +977,7 @@ try:
     meta_data = data_provider.get_meta_metrics(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
     ga4_data = data_provider.get_ga4_metrics(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
     creative_data = data_provider.get_creative_performance(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
-    trends_data = data_provider.get_daily_trends(period=selected_period)
+    trends_data = data_provider.get_daily_trends(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
     has_error = data_provider.error_state
 except Exception as e:

@@ -338,6 +338,8 @@ class GA4Integration:
                 })
 
             df = pd.DataFrame(data)
+            if df.empty:
+                return df
             return df.sort_values('Sessoes', ascending=False).head(10)
 
         except Exception as e:

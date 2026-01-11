@@ -52,7 +52,7 @@ class GA4Integration:
         """
         return FilterExpression(
             filter=Filter(
-                field_name="sessionCampaign",
+                field_name="sessionCampaignName",
                 string_filter=Filter.StringFilter(
                     match_type=Filter.StringFilter.MatchType.CONTAINS,
                     value=campaign_filter,
@@ -365,7 +365,7 @@ class GA4Integration:
                 property=f"properties/{self.property_id}",
                 date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
                 dimensions=[
-                    Dimension(name="sessionCampaign"),
+                    Dimension(name="sessionCampaignName"),
                 ],
                 metrics=[
                     Metric(name="sessions"),

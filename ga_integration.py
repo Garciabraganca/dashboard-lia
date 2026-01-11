@@ -344,6 +344,127 @@ class GA4Integration:
             logger.error(f"Erro ao obter dados de origem/mídia do GA4: {str(e)}")
             return pd.DataFrame()
 
+    def get_available_campaigns(self, date_range: str = "last_30d", custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
+        """
+        Obtém lista de campanhas (utm_campaign) disponíveis no GA4
+        Útil para diagnóstico e verificação de UTMs
+
+        Args:
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD)
+            custom_end: Data de fim personalizada (YYYY-MM-DD)
+
+        Returns:
+            DataFrame com campanhas e suas sessões
+        """
+        try:
+            start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
+
+            # Criar requisição para listar campanhas
+            request = RunReportRequest(
+                property=f"properties/{self.property_id}",
+                date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
+                dimensions=[
+                    Dimension(name="sessionCampaign"),
+                ],
+                metrics=[
+                    Metric(name="sessions"),
+                    Metric(name="totalUsers"),
+                ],
+            )
+
+            # Executar requisição
+            response = self.client.run_report(request)
+
+            # Converter para DataFrame
+            data = []
+            for row in response.rows:
+                campaign_name = row.dimension_values[0].value
+                # Ignorar campanhas vazias ou "(not set)"
+                if campaign_name and campaign_name not in ['(not set)', '(direct)']:
+                    data.append({
+                        'campaign': campaign_name,
+                        'sessions': int(row.metric_values[0].value),
+                        'users': int(row.metric_values[1].value),
+                    })
+
+            df = pd.DataFrame(data)
+            if not df.empty:
+                df = df.sort_values('sessions', ascending=False)
+            return df
+
+        except Exception as e:
+            logger.error(f"Erro ao obter campanhas do GA4: {str(e)}")
+            return pd.DataFrame()
+
+    def diagnose_utm_tracking(self, campaign_filter: str = None, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> Dict[str, Any]:
+        """
+        Diagnóstico completo do tracking de UTMs no GA4
+
+        Args:
+            campaign_filter: Nome da campanha para verificar
+            date_range: Período
+            custom_start: Data de início personalizada
+            custom_end: Data de fim personalizada
+
+        Returns:
+            Dicionário com informações de diagnóstico
+        """
+        try:
+            start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
+
+            # 1. Verificar conexão básica (total de sessões)
+            basic_request = RunReportRequest(
+                property=f"properties/{self.property_id}",
+                date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
+                metrics=[
+                    Metric(name="sessions"),
+                ],
+            )
+            basic_response = self.client.run_report(basic_request)
+            total_sessions = int(basic_response.rows[0].metric_values[0].value) if basic_response.rows else 0
+
+            # 2. Obter campanhas disponíveis
+            available_campaigns = self.get_available_campaigns(date_range, custom_start, custom_end)
+
+            # 3. Verificar se o filtro específico existe
+            filter_match = None
+            sessions_with_filter = 0
+            if campaign_filter and not available_campaigns.empty:
+                # Buscar matches parciais (case insensitive)
+                matches = available_campaigns[
+                    available_campaigns['campaign'].str.lower().str.contains(campaign_filter.lower(), na=False)
+                ]
+                if not matches.empty:
+                    filter_match = matches.to_dict('records')
+                    sessions_with_filter = matches['sessions'].sum()
+
+            # 4. Obter dados com o filtro aplicado
+            if campaign_filter:
+                filtered_metrics = self.get_aggregated_metrics(date_range, custom_start, custom_end, campaign_filter)
+            else:
+                filtered_metrics = None
+
+            return {
+                'connected': True,
+                'date_range': f"{start_date_str} to {end_date_str}",
+                'total_sessions': total_sessions,
+                'available_campaigns': available_campaigns.to_dict('records') if not available_campaigns.empty else [],
+                'campaign_filter_used': campaign_filter,
+                'filter_matches': filter_match,
+                'sessions_with_filter': sessions_with_filter,
+                'filtered_metrics': filtered_metrics,
+                'status': 'ok' if sessions_with_filter > 0 else 'no_data_for_filter'
+            }
+
+        except Exception as e:
+            logger.error(f"Erro no diagnóstico GA4: {str(e)}")
+            return {
+                'connected': False,
+                'error': str(e),
+                'status': 'error'
+            }
+
     def _empty_metrics(self) -> Dict[str, Any]:
         """Retorna métricas vazias em caso de erro"""
         return {

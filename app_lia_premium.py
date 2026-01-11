@@ -1042,6 +1042,63 @@ with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
         st.error("❌ Cliente Meta Ads não inicializado")
         st.info("Verifique se META_ACCESS_TOKEN está configurado no Streamlit Secrets.")
 
+# Expander com diagnóstico detalhado do GA4 e UTM tracking
+with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
+    if data_provider.ga4_client:
+        api_period = data_provider._period_to_api_format(selected_period)
+        diagnosis = data_provider.ga4_client.diagnose_utm_tracking(
+            campaign_filter=campaign_filter,
+            date_range=api_period,
+            custom_start=custom_start_str,
+            custom_end=custom_end_str
+        )
+
+        if diagnosis.get('connected'):
+            st.success(f"✅ GA4 conectado - Período: {diagnosis.get('date_range')}")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Total de Sessões (sem filtro):** {diagnosis.get('total_sessions', 0):,}")
+                st.markdown(f"**Filtro usado:** {diagnosis.get('campaign_filter_used') or 'Nenhum'}")
+                st.markdown(f"**Sessões com filtro:** {diagnosis.get('sessions_with_filter', 0):,}")
+
+            with col2:
+                st.markdown(f"**Status:** {diagnosis.get('status')}")
+                if diagnosis.get('filtered_metrics'):
+                    metrics = diagnosis['filtered_metrics']
+                    st.markdown(f"**Sessões filtradas:** {metrics.get('sessoes', 0):,}")
+                    st.markdown(f"**Usuários filtrados:** {metrics.get('usuarios', 0):,}")
+
+            # Mostrar campanhas disponíveis
+            st.markdown("---")
+            st.markdown("**Campanhas (utm_campaign) disponíveis no GA4:**")
+            campaigns = diagnosis.get('available_campaigns', [])
+            if campaigns:
+                import pandas as pd
+                campaigns_df = pd.DataFrame(campaigns)
+                campaigns_df.columns = ['Campanha (utm_campaign)', 'Sessões', 'Usuários']
+                st.dataframe(campaigns_df, use_container_width=True, hide_index=True)
+
+                # Verificar se há match com o filtro
+                if campaign_filter:
+                    matches = diagnosis.get('filter_matches')
+                    if matches:
+                        st.success(f"✅ Encontrado match para '{campaign_filter}': {len(matches)} campanha(s)")
+                    else:
+                        st.warning(f"⚠️ Nenhuma campanha contém '{campaign_filter}'. Verifique o utm_campaign nos anúncios.")
+                        st.info("**Dica:** O filtro busca campanhas que CONTENHAM o texto. Certifique-se que o utm_campaign nos anúncios inclui exatamente 'Ciclo 2' ou 'Ciclo 1'.")
+            else:
+                st.warning("⚠️ Nenhuma campanha com utm_campaign encontrada no período selecionado.")
+                st.info("**Possíveis causas:**\n"
+                       "1. Os anúncios não têm UTMs configurados\n"
+                       "2. Os UTMs foram adicionados recentemente (GA4 pode levar até 24-48h)\n"
+                       "3. O período selecionado não inclui dados com UTMs")
+        else:
+            st.error(f"❌ Erro na conexão GA4: {diagnosis.get('error', 'Erro desconhecido')}")
+    else:
+        st.error("❌ Cliente GA4 não inicializado")
+        st.info("Verifique se as credenciais GA4 estão configuradas no Streamlit Secrets.")
+
 # -----------------------------------------------------------------------------
 # AGENTE DE IA - ANALISE INTELIGENTE
 # -----------------------------------------------------------------------------

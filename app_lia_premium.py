@@ -179,21 +179,41 @@ class DataProvider:
             try:
                 api_period = self._period_to_api_format(period)
                 metrics = self.ga4_client.get_aggregated_metrics(date_range=api_period, custom_start=custom_start, custom_end=custom_end, campaign_filter=campaign_filter)
-                if metrics and metrics.get('sessoes', 0) > 0:
-                    # Adicionar deltas (por enquanto zerados)
-                    metrics['delta_sessoes'] = 0
-                    metrics['delta_usuarios'] = 0
-                    metrics['delta_pageviews'] = 0
-                    metrics['delta_engajamento'] = 0
-                    metrics['_data_source'] = 'real'
-                    metrics['_campaign_filter'] = campaign_filter
-                    return metrics
-                else:
-                    # GA4 conectado mas sem dados para este filtro
-                    result = self._get_mock_ga4_metrics(period)
-                    result['_data_source'] = 'no_data'
-                    result['_campaign_filter'] = campaign_filter
-                    return result
+
+                if metrics:
+                    sessions = metrics.get('sessoes', 0)
+                    users = metrics.get('usuarios', 0)
+                    pageviews = metrics.get('pageviews', 0)
+
+                    # Log para diagnóstico
+                    logger.info(f"GA4 metrics retrieved - sessions: {sessions}, users: {users}, pageviews: {pageviews}, filter: {campaign_filter}")
+
+                    # Verificar se há dados significativos (não apenas sessions)
+                    has_meaningful_data = sessions > 0 or users > 0 or pageviews > 0
+
+                    if has_meaningful_data:
+                        # Adicionar deltas (por enquanto zerados)
+                        metrics['delta_sessoes'] = 0
+                        metrics['delta_usuarios'] = 0
+                        metrics['delta_pageviews'] = 0
+                        metrics['delta_engajamento'] = 0
+                        metrics['_campaign_filter'] = campaign_filter
+
+                        # Indicar se dados são completos ou parciais
+                        if sessions > 0:
+                            metrics['_data_source'] = 'real'
+                        else:
+                            # Dados parciais: há pageviews/users mas não sessions
+                            metrics['_data_source'] = 'partial'
+                            logger.warning(f"GA4 partial data: sessions=0 but users={users}, pageviews={pageviews}")
+                        return metrics
+
+                # GA4 conectado mas sem dados para este filtro
+                logger.info(f"GA4 no data for filter '{campaign_filter}' in period '{period}'")
+                result = self._get_mock_ga4_metrics(period)
+                result['_data_source'] = 'no_data'
+                result['_campaign_filter'] = campaign_filter
+                return result
             except Exception as e:
                 logger.error(f"Erro ao obter dados reais do GA4: {e}")
 
@@ -1360,8 +1380,10 @@ ga4_source = ga4_data.get("_data_source", "unknown")
 ga4_filter = ga4_data.get("_campaign_filter", None)
 if ga4_source == "real":
     st.success(f"✅ Dados reais do GA4 - Filtro: {ga4_filter if ga4_filter else 'Todas as campanhas'}")
+elif ga4_source == "partial":
+    st.warning(f"⚠️ Dados parciais do GA4 (pageviews/usuarios sem sessoes) - Filtro: {ga4_filter if ga4_filter else 'Todas as campanhas'}. Verifique se o gtag.js esta configurado corretamente.")
 elif ga4_source == "no_data":
-    st.warning(f"⚠️ GA4 conectado, mas sem sessoes para campanha '{ga4_filter}'. Aguarde as UTMs serem processadas (ate 24-48h).")
+    st.warning(f"⚠️ GA4 conectado, mas sem dados para campanha '{ga4_filter}'. Aguarde as UTMs serem processadas (ate 24-48h).")
 elif ga4_source == "mock":
     st.info("💡 Usando dados de demonstracao. Verifique as credenciais GA4 no Streamlit Secrets.")
 

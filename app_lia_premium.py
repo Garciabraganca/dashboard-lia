@@ -275,7 +275,15 @@ class DataProvider:
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
+                
+                # Primeiro tenta com filtro
                 df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=campaign_filter, custom_start=custom_start, custom_end=custom_end)
+                
+                # Se não encontrou com filtro, tenta sem filtro (fallback)
+                if df.empty and campaign_filter:
+                    logger.info(f"Meta Creative: No data found for filter '{campaign_filter}', trying without filter")
+                    df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=None, custom_start=custom_start, custom_end=custom_end)
+
                 if not df.empty:
                     # Formatar para o dashboard
                     result = pd.DataFrame({
@@ -1402,7 +1410,7 @@ if len(creative_data) > 0:
         ''', unsafe_allow_html=True)
 
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
-        st.markdown('<div class="table-header"><span class="table-header-title">Criativos Ativos</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="table-header"><span class="table-header-title">Performance por Criativo</span></div>', unsafe_allow_html=True)
 
         creative_sorted = creative_data.sort_values("Cliques", ascending=False)
         st.dataframe(
@@ -1420,7 +1428,7 @@ if len(creative_data) > 0:
 else:
     st.markdown(f'''
     <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:32px;text-align:center;border:1px dashed rgba(255,255,255,0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
-        <p style="color:{LIA["text_muted"]};margin:0;">Nenhum criativo ativo no periodo selecionado.</p>
+        <p style="color:{LIA["text_muted"]};margin:0;">Nenhum dado de criativo encontrado no periodo selecionado.</p>
     </div>
     ''', unsafe_allow_html=True)
 

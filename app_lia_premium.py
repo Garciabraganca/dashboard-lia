@@ -292,11 +292,12 @@ class DataProvider:
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")
 
-        # Fallback para mock
-        return self._safe_execute(
-            lambda: self._get_mock_creative_data(),
-            default=pd.DataFrame()
-        )
+        if self.mode == "mock":
+            return self._safe_execute(
+                lambda: self._get_mock_creative_data(),
+                default=pd.DataFrame()
+            )
+        return pd.DataFrame()
 
     def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
         return self._safe_execute(
@@ -1082,143 +1083,146 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
-# Indicador de fonte de dados e diagnóstico de conexão
-data_source = meta_data.get("_data_source", "unknown")
-if data_source == "mock":
-    st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
-elif data_source == "real":
-    filter_applied = meta_data.get("_filter_applied")
-    if filter_applied:
-        st.success(f"✅ Conectado à API Meta Ads - dados reais (filtro: {filter_applied})")
-    else:
-        st.success("✅ Conectado à API Meta Ads - dados reais")
-elif data_source == "real_no_filter":
-    requested_filter = meta_data.get("_requested_filter", "")
-    available_campaigns = meta_data.get("_available_campaigns", [])
-    st.warning(f"⚠️ Dados reais do Meta - filtro '{requested_filter}' não encontrou campanhas correspondentes. Exibindo todas as campanhas.")
-    if available_campaigns:
-        with st.expander("📋 Campanhas disponíveis no Meta"):
-            for camp in available_campaigns:
-                st.write(f"• {camp}")
-
-# Expander com diagnóstico detalhado da conexão
-with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
-    if data_provider.meta_client:
-        connection_status = data_provider.meta_client.verify_connection()
-        if connection_status["connected"]:
-            st.success(f"✅ {connection_status['message']}")
-            info = connection_status["account_info"]
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**ID da Conta:** {info.get('id', 'N/A')}")
-                st.markdown(f"**Nome:** {info.get('name', 'N/A')}")
-                st.markdown(f"**Empresa:** {info.get('business_name', 'N/A')}")
-            with col2:
-                st.markdown(f"**Status:** {info.get('status', 'N/A')}")
-                st.markdown(f"**Moeda:** {info.get('currency', 'N/A')}")
-                st.markdown(f"**Timezone:** {info.get('timezone', 'N/A')}")
+with st.expander("⚙️ Configurações de integração"):
+    # Indicador de fonte de dados e diagnóstico de conexão
+    data_source = meta_data.get("_data_source", "unknown")
+    if data_source == "mock":
+        st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
+    elif data_source == "real":
+        filter_applied = meta_data.get("_filter_applied")
+        if filter_applied:
+            st.success(f"✅ Conectado à API Meta Ads - dados reais (filtro: {filter_applied})")
         else:
-            st.error(f"❌ {connection_status['message']}")
-            if connection_status["error_code"]:
-                st.code(f"Código: {connection_status['error_code']}\nDetalhes: {connection_status['error_details']}")
-    else:
-        st.error("❌ Cliente Meta Ads não inicializado")
-        st.info("Verifique se META_ACCESS_TOKEN está configurado no Streamlit Secrets.")
+            st.success("✅ Conectado à API Meta Ads - dados reais")
+    elif data_source == "real_no_filter":
+        requested_filter = meta_data.get("_requested_filter", "")
+        available_campaigns = meta_data.get("_available_campaigns", [])
+        st.success("✅ Dados reais do Meta - exibindo todas as campanhas disponíveis.")
+        if requested_filter:
+            st.caption(f"Filtro solicitado: '{requested_filter}'.")
+        if available_campaigns:
+            with st.expander("📋 Campanhas disponíveis no Meta"):
+                for camp in available_campaigns:
+                    st.write(f"• {camp}")
 
-        # Mostrar diagnóstico detalhado das credenciais Meta
-        st.markdown("**Diagnóstico de credenciais Meta:**")
-        meta_token = Config.get_meta_access_token()
-        meta_account_id = Config.get_meta_ad_account_id()
-
-        if meta_token:
-            st.success(f"✅ META_ACCESS_TOKEN encontrado (comprimento: {len(meta_token)})")
-        else:
-            st.error("❌ META_ACCESS_TOKEN não encontrado")
-            st.markdown("Configure em uma das seguintes formas:")
-            st.code("# Variável de ambiente\nexport META_ACCESS_TOKEN='seu_token_aqui'\n\n# Ou em .streamlit/secrets.toml\nMETA_ACCESS_TOKEN = \"seu_token_aqui\"")
-
-        if meta_account_id:
-            st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id}")
-        else:
-            st.error("❌ META_AD_ACCOUNT_ID não encontrado")
-
-# Expander com diagnóstico detalhado do GA4 e UTM tracking
-with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
-    if data_provider.ga4_client:
-        api_period = data_provider._period_to_api_format(selected_period)
-        diagnosis = data_provider.ga4_client.diagnose_utm_tracking(
-            campaign_filter=campaign_filter,
-            date_range=api_period,
-            custom_start=custom_start_str,
-            custom_end=custom_end_str
-        )
-
-        if diagnosis.get('connected'):
-            st.success(f"✅ GA4 conectado - Período: {diagnosis.get('date_range')}")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**Total de Sessões (sem filtro):** {diagnosis.get('total_sessions', 0):,}")
-                st.markdown(f"**Filtro usado:** {diagnosis.get('campaign_filter_used') or 'Nenhum'}")
-                st.markdown(f"**Sessões com filtro:** {diagnosis.get('sessions_with_filter', 0):,}")
-
-            with col2:
-                st.markdown(f"**Status:** {diagnosis.get('status')}")
-                if diagnosis.get('filtered_metrics'):
-                    metrics = diagnosis['filtered_metrics']
-                    st.markdown(f"**Sessões filtradas:** {metrics.get('sessoes', 0):,}")
-                    st.markdown(f"**Usuários filtrados:** {metrics.get('usuarios', 0):,}")
-
-            # Mostrar campanhas disponíveis
-            st.markdown("---")
-            st.markdown("**Campanhas (utm_campaign) disponíveis no GA4:**")
-            campaigns = diagnosis.get('available_campaigns', [])
-            if campaigns:
-                import pandas as pd
-                campaigns_df = pd.DataFrame(campaigns)
-                campaigns_df.columns = ['Campanha (utm_campaign)', 'Sessões', 'Usuários']
-                st.dataframe(campaigns_df, use_container_width=True, hide_index=True)
-
-                # Verificar se há match com o filtro
-                if campaign_filter:
-                    matches = diagnosis.get('filter_matches')
-                    if matches:
-                        st.success(f"✅ Encontrado match para '{campaign_filter}': {len(matches)} campanha(s)")
-                    else:
-                        st.warning(f"⚠️ Nenhuma campanha contém '{campaign_filter}'. Verifique o utm_campaign nos anúncios.")
-                        st.info("**Dica:** O filtro busca campanhas que CONTENHAM 'ciclo1' ou 'ciclo2' (sem espaço). Ex: lia_ciclo2_conversao")
+    # Expander com diagnóstico detalhado da conexão
+    with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
+        if data_provider.meta_client:
+            connection_status = data_provider.meta_client.verify_connection()
+            if connection_status["connected"]:
+                st.success(f"✅ {connection_status['message']}")
+                info = connection_status["account_info"]
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"**ID da Conta:** {info.get('id', 'N/A')}")
+                    st.markdown(f"**Nome:** {info.get('name', 'N/A')}")
+                    st.markdown(f"**Empresa:** {info.get('business_name', 'N/A')}")
+                with col2:
+                    st.markdown(f"**Status:** {info.get('status', 'N/A')}")
+                    st.markdown(f"**Moeda:** {info.get('currency', 'N/A')}")
+                    st.markdown(f"**Timezone:** {info.get('timezone', 'N/A')}")
             else:
-                st.warning("⚠️ Nenhuma campanha com utm_campaign encontrada no período selecionado.")
-                st.info("**Possíveis causas:**\n"
-                       "1. Os anúncios não têm UTMs configurados\n"
-                       "2. Os UTMs foram adicionados recentemente (GA4 pode levar até 24-48h)\n"
-                       "3. O período selecionado não inclui dados com UTMs")
+                st.error(f"❌ {connection_status['message']}")
+                if connection_status["error_code"]:
+                    st.code(f"Código: {connection_status['error_code']}\nDetalhes: {connection_status['error_details']}")
         else:
-            st.error(f"❌ Erro na conexão GA4: {diagnosis.get('error', 'Erro desconhecido')}")
-    else:
-        st.error("❌ Cliente GA4 não inicializado")
-        st.info("Verifique se as credenciais GA4 estão configuradas no Streamlit Secrets.")
+            st.error("❌ Cliente Meta Ads não inicializado")
+            st.info("Verifique se META_ACCESS_TOKEN está configurado no Streamlit Secrets.")
 
-        # Mostrar diagnóstico detalhado das credenciais
-        st.markdown("**Diagnóstico de credenciais:**")
-        creds = Config.get_ga4_credentials()
-        property_id = Config.get_ga4_property_id()
+            # Mostrar diagnóstico detalhado das credenciais Meta
+            st.markdown("**Diagnóstico de credenciais Meta:**")
+            meta_token = Config.get_meta_access_token()
+            meta_account_id = Config.get_meta_ad_account_id()
 
-        if creds:
-            st.success(f"✅ GCP_CREDENTIALS encontrado com {len(creds)} campos")
-            required_keys = ['type', 'project_id', 'private_key', 'client_email']
-            for key in required_keys:
-                if key in creds:
-                    if key == 'private_key':
-                        st.write(f"   ✅ {key}: {'***' if creds[key] else 'VAZIO'}")
-                    else:
-                        st.write(f"   ✅ {key}: {creds.get(key, 'N/A')}")
+            if meta_token:
+                st.success(f"✅ META_ACCESS_TOKEN encontrado (comprimento: {len(meta_token)})")
+            else:
+                st.error("❌ META_ACCESS_TOKEN não encontrado")
+                st.markdown("Configure em uma das seguintes formas:")
+                st.code("# Variável de ambiente\nexport META_ACCESS_TOKEN='seu_token_aqui'\n\n# Ou em .streamlit/secrets.toml\nMETA_ACCESS_TOKEN = \"seu_token_aqui\"")
+
+            if meta_account_id:
+                st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id}")
+            else:
+                st.error("❌ META_AD_ACCOUNT_ID não encontrado")
+
+    # Expander com diagnóstico detalhado do GA4 e UTM tracking
+    with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
+        if data_provider.ga4_client:
+            api_period = data_provider._period_to_api_format(selected_period)
+            diagnosis = data_provider.ga4_client.diagnose_utm_tracking(
+                campaign_filter=campaign_filter,
+                date_range=api_period,
+                custom_start=custom_start_str,
+                custom_end=custom_end_str
+            )
+
+            if diagnosis.get('connected'):
+                st.success(f"✅ GA4 conectado - Período: {diagnosis.get('date_range')}")
+
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown(f"**Total de Sessões (sem filtro):** {diagnosis.get('total_sessions', 0):,}")
+                    st.markdown(f"**Filtro usado:** {diagnosis.get('campaign_filter_used') or 'Nenhum'}")
+                    st.markdown(f"**Sessões com filtro:** {diagnosis.get('sessions_with_filter', 0):,}")
+
+                with col2:
+                    st.markdown(f"**Status:** {diagnosis.get('status')}")
+                    if diagnosis.get('filtered_metrics'):
+                        metrics = diagnosis['filtered_metrics']
+                        st.markdown(f"**Sessões filtradas:** {metrics.get('sessoes', 0):,}")
+                        st.markdown(f"**Usuários filtrados:** {metrics.get('usuarios', 0):,}")
+
+                # Mostrar campanhas disponíveis
+                st.markdown("---")
+                st.markdown("**Campanhas (utm_campaign) disponíveis no GA4:**")
+                campaigns = diagnosis.get('available_campaigns', [])
+                if campaigns:
+                    import pandas as pd
+                    campaigns_df = pd.DataFrame(campaigns)
+                    campaigns_df.columns = ['Campanha (utm_campaign)', 'Sessões', 'Usuários']
+                    st.dataframe(campaigns_df, use_container_width=True, hide_index=True)
+
+                    # Verificar se há match com o filtro
+                    if campaign_filter:
+                        matches = diagnosis.get('filter_matches')
+                        if matches:
+                            st.success(f"✅ Encontrado match para '{campaign_filter}': {len(matches)} campanha(s)")
+                        else:
+                            st.warning(f"⚠️ Nenhuma campanha contém '{campaign_filter}'. Verifique o utm_campaign nos anúncios.")
+                            st.info("**Dica:** O filtro busca campanhas que CONTENHAM 'ciclo1' ou 'ciclo2' (sem espaço). Ex: lia_ciclo2_conversao")
                 else:
-                    st.write(f"   ❌ {key}: FALTANDO")
+                    st.warning("⚠️ Nenhuma campanha com utm_campaign encontrada no período selecionado.")
+                    st.info("**Possíveis causas:**\n"
+                           "1. Os anúncios não têm UTMs configurados\n"
+                           "2. Os UTMs foram adicionados recentemente (GA4 pode levar até 24-48h)\n"
+                           "3. O período selecionado não inclui dados com UTMs")
+            else:
+                st.error(f"❌ Erro na conexão GA4: {diagnosis.get('error', 'Erro desconhecido')}")
         else:
-            st.error("❌ GCP_CREDENTIALS não encontrado ou vazio")
+            st.error("❌ Cliente GA4 não inicializado")
+            st.info("Verifique se as credenciais GA4 estão configuradas no Streamlit Secrets.")
 
-        st.write(f"**GA4_PROPERTY_ID:** {property_id}")
+            # Mostrar diagnóstico detalhado das credenciais
+            st.markdown("**Diagnóstico de credenciais:**")
+            creds = Config.get_ga4_credentials()
+            property_id = Config.get_ga4_property_id()
+
+            if creds:
+                st.success(f"✅ GCP_CREDENTIALS encontrado com {len(creds)} campos")
+                required_keys = ['type', 'project_id', 'private_key', 'client_email']
+                for key in required_keys:
+                    if key in creds:
+                        if key == 'private_key':
+                            st.write(f"   ✅ {key}: {'***' if creds[key] else 'VAZIO'}")
+                        else:
+                            st.write(f"   ✅ {key}: {creds.get(key, 'N/A')}")
+                    else:
+                        st.write(f"   ❌ {key}: FALTANDO")
+            else:
+                st.error("❌ GCP_CREDENTIALS não encontrado ou vazio")
+
+            st.write(f"**GA4_PROPERTY_ID:** {property_id}")
 
 # -----------------------------------------------------------------------------
 # AGENTE DE IA - ANALISE INTELIGENTE

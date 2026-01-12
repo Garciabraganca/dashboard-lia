@@ -1101,6 +1101,35 @@ with st.expander("⚙️ Configurações de integração"):
         if requested_filter:
             st.caption(f"Filtro solicitado: '{requested_filter}'.")
         if available_campaigns:
+            st.markdown("**📋 Campanhas disponíveis no Meta**")
+            for camp in available_campaigns:
+                st.write(f"• {camp}")
+
+    st.divider()
+    st.markdown("### 🔧 Diagnóstico de Conexão Meta Ads")
+    if data_provider.meta_client:
+        connection_status = data_provider.meta_client.verify_connection()
+        if connection_status["connected"]:
+            st.success(f"✅ {connection_status['message']}")
+            info = connection_status["account_info"]
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**ID da Conta:** {info.get('id', 'N/A')}")
+                st.markdown(f"**Nome:** {info.get('name', 'N/A')}")
+                st.markdown(f"**Empresa:** {info.get('business_name', 'N/A')}")
+            with col2:
+                st.markdown(f"**Status:** {info.get('status', 'N/A')}")
+                st.markdown(f"**Moeda:** {info.get('currency', 'N/A')}")
+                st.markdown(f"**Timezone:** {info.get('timezone', 'N/A')}")
+        else:
+            st.success("✅ Conectado à API Meta Ads - dados reais")
+    elif data_source == "real_no_filter":
+        requested_filter = meta_data.get("_requested_filter", "")
+        available_campaigns = meta_data.get("_available_campaigns", [])
+        st.success("✅ Dados reais do Meta - exibindo todas as campanhas disponíveis.")
+        if requested_filter:
+            st.caption(f"Filtro solicitado: '{requested_filter}'.")
+        if available_campaigns:
             with st.expander("📋 Campanhas disponíveis no Meta"):
                 for camp in available_campaigns:
                     st.write(f"• {camp}")
@@ -1141,21 +1170,21 @@ with st.expander("⚙️ Configurações de integração"):
                 st.markdown("Configure em uma das seguintes formas:")
                 st.code("# Variável de ambiente\nexport META_ACCESS_TOKEN='seu_token_aqui'\n\n# Ou em .streamlit/secrets.toml\nMETA_ACCESS_TOKEN = \"seu_token_aqui\"")
 
-            if meta_account_id:
-                st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id}")
-            else:
-                st.error("❌ META_AD_ACCOUNT_ID não encontrado")
+        if meta_account_id:
+            st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id}")
+        else:
+            st.error("❌ META_AD_ACCOUNT_ID não encontrado")
 
-    # Expander com diagnóstico detalhado do GA4 e UTM tracking
-    with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
-        if data_provider.ga4_client:
-            api_period = data_provider._period_to_api_format(selected_period)
-            diagnosis = data_provider.ga4_client.diagnose_utm_tracking(
-                campaign_filter=campaign_filter,
-                date_range=api_period,
-                custom_start=custom_start_str,
-                custom_end=custom_end_str
-            )
+    st.divider()
+    st.markdown("### 🔧 Diagnóstico GA4 / UTM Tracking")
+    if data_provider.ga4_client:
+        api_period = data_provider._period_to_api_format(selected_period)
+        diagnosis = data_provider.ga4_client.diagnose_utm_tracking(
+            campaign_filter=campaign_filter,
+            date_range=api_period,
+            custom_start=custom_start_str,
+            custom_end=custom_end_str
+        )
 
             if diagnosis.get('connected'):
                 st.success(f"✅ GA4 conectado - Período: {diagnosis.get('date_range')}")

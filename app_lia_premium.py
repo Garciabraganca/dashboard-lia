@@ -292,11 +292,12 @@ class DataProvider:
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")
 
-        # Fallback para mock
-        return self._safe_execute(
-            lambda: self._get_mock_creative_data(),
-            default=pd.DataFrame()
-        )
+        if self.mode == "mock":
+            return self._safe_execute(
+                lambda: self._get_mock_creative_data(),
+                default=pd.DataFrame()
+            )
+        return pd.DataFrame()
 
     def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
         return self._safe_execute(
@@ -1095,7 +1096,9 @@ elif data_source == "real":
 elif data_source == "real_no_filter":
     requested_filter = meta_data.get("_requested_filter", "")
     available_campaigns = meta_data.get("_available_campaigns", [])
-    st.warning(f"⚠️ Dados reais do Meta - filtro '{requested_filter}' não encontrou campanhas correspondentes. Exibindo todas as campanhas.")
+    st.success("✅ Dados reais do Meta - exibindo todas as campanhas disponíveis.")
+    if requested_filter:
+        st.caption(f"Filtro solicitado: '{requested_filter}'.")
     if available_campaigns:
         with st.expander("📋 Campanhas disponíveis no Meta"):
             for camp in available_campaigns:

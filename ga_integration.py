@@ -50,12 +50,16 @@ class GA4Integration:
         Returns:
             FilterExpression para usar na query
         """
+        # Normalizar o filtro: remover espaços para encontrar variações
+        # Ex: "Ciclo 2" -> "ciclo2" encontra "lia_ciclo2_conversao"
+        normalized_filter = campaign_filter.replace(" ", "").lower()
+
         return FilterExpression(
             filter=Filter(
                 field_name="sessionCampaignName",
                 string_filter=Filter.StringFilter(
                     match_type=Filter.StringFilter.MatchType.CONTAINS,
-                    value=campaign_filter,
+                    value=normalized_filter,
                     case_sensitive=False
                 )
             )
@@ -433,9 +437,11 @@ class GA4Integration:
             filter_match = None
             sessions_with_filter = 0
             if campaign_filter and not available_campaigns.empty:
-                # Buscar matches parciais (case insensitive)
+                # Normalizar filtro: remover espaços (ex: "Ciclo 2" -> "ciclo2")
+                normalized_filter = campaign_filter.replace(" ", "").lower()
+                # Buscar matches parciais (case insensitive, sem espaços)
                 matches = available_campaigns[
-                    available_campaigns['campaign'].str.lower().str.contains(campaign_filter.lower(), na=False)
+                    available_campaigns['campaign'].str.lower().str.replace(" ", "", regex=False).str.contains(normalized_filter, na=False)
                 ]
                 if not matches.empty:
                     filter_match = matches.to_dict('records')

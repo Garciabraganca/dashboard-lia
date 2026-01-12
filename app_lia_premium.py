@@ -1083,7 +1083,13 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
-with st.expander("⚙️ Configurações de integração"):
+if "show_integration_settings" not in st.session_state:
+    st.session_state.show_integration_settings = False
+
+if st.button("⚙️ Configurações de integração", key="toggle_integration_settings", use_container_width=True):
+    st.session_state.show_integration_settings = not st.session_state.show_integration_settings
+
+if st.session_state.show_integration_settings:
     # Indicador de fonte de dados e diagnóstico de conexão
     data_source = meta_data.get("_data_source", "unknown")
     if data_source == "mock":

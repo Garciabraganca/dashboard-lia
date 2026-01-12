@@ -132,11 +132,34 @@ class DataProvider:
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
+
+                # Primeiro busca COM filtro de campanha
                 insights = self.meta_client.get_ad_insights(date_range=api_period, campaign_name_filter=campaign_filter, custom_start=custom_start, custom_end=custom_end)
+
                 if not insights.empty:
                     result = self._process_meta_insights(insights)
                     result["_data_source"] = "real"
+                    result["_filter_applied"] = campaign_filter
                     return result
+
+                # Se não encontrou com filtro, tenta SEM filtro para ver se há dados
+                if campaign_filter:
+                    logger.info(f"Meta: No data found for filter '{campaign_filter}', trying without filter")
+                    insights_no_filter = self.meta_client.get_ad_insights(date_range=api_period, campaign_name_filter=None, custom_start=custom_start, custom_end=custom_end)
+
+                    if not insights_no_filter.empty:
+                        # Há dados mas não com o filtro especificado
+                        result = self._process_meta_insights(insights_no_filter)
+                        result["_data_source"] = "real_no_filter"
+                        result["_filter_applied"] = None
+                        result["_requested_filter"] = campaign_filter
+                        # Log das campanhas disponíveis para debug
+                        if 'campaign_name' in insights_no_filter.columns:
+                            available = insights_no_filter['campaign_name'].unique().tolist()
+                            logger.info(f"Meta: Available campaigns: {available}")
+                            result["_available_campaigns"] = available
+                        return result
+
             except Exception as e:
                 logger.error(f"Erro ao obter dados reais do Meta: {e}")
 
@@ -1064,7 +1087,19 @@ data_source = meta_data.get("_data_source", "unknown")
 if data_source == "mock":
     st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
 elif data_source == "real":
-    st.success("✅ Conectado à API Meta Ads - dados reais")
+    filter_applied = meta_data.get("_filter_applied")
+    if filter_applied:
+        st.success(f"✅ Conectado à API Meta Ads - dados reais (filtro: {filter_applied})")
+    else:
+        st.success("✅ Conectado à API Meta Ads - dados reais")
+elif data_source == "real_no_filter":
+    requested_filter = meta_data.get("_requested_filter", "")
+    available_campaigns = meta_data.get("_available_campaigns", [])
+    st.warning(f"⚠️ Dados reais do Meta - filtro '{requested_filter}' não encontrou campanhas correspondentes. Exibindo todas as campanhas.")
+    if available_campaigns:
+        with st.expander("📋 Campanhas disponíveis no Meta"):
+            for camp in available_campaigns:
+                st.write(f"• {camp}")
 
 # Expander com diagnóstico detalhado da conexão
 with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):

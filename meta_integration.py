@@ -178,11 +178,11 @@ class MetaAdsIntegration:
             # Definir datas com base no período
             start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
 
-            # Buscar apenas campanhas ATIVAS
+            # Buscar campanhas (removido filtro de apenas ativas para ver histórico)
             url = f"{self.base_url}/{self.ad_account_id}/campaigns"
             params = {
                 "fields": "id,name,status,effective_status",
-                "filtering": "[{'field':'effective_status','operator':'IN','value':['ACTIVE']}]",
+                # "filtering": "[{'field':'effective_status','operator':'IN','value':['ACTIVE']}]",
                 "access_token": self.access_token
             }
 
@@ -247,7 +247,7 @@ class MetaAdsIntegration:
                 "time_range": f"{{'since':'{start_date_str}','until':'{end_date_str}'}}",
                 "time_increment": "1",
                 "level": "campaign",
-                "filtering": "[{'field':'campaign.effective_status','operator':'IN','value':['ACTIVE']}]",
+                # "filtering": "[{'field':'campaign.effective_status','operator':'IN','value':['ACTIVE']}]",
                 "access_token": self.access_token
             }
 
@@ -321,7 +321,7 @@ class MetaAdsIntegration:
                 "fields": ",".join(fields),
                 "time_range": f"{{'since':'{start_date_str}','until':'{end_date_str}'}}",
                 "level": "ad",
-                "filtering": "[{'field':'ad.effective_status','operator':'IN','value':['ACTIVE']}]",
+                # "filtering": "[{'field':'ad.effective_status','operator':'IN','value':['ACTIVE']}]",
                 "access_token": self.access_token
             }
 

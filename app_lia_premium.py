@@ -292,11 +292,12 @@ class DataProvider:
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")
 
-        # Fallback para mock
-        return self._safe_execute(
-            lambda: self._get_mock_creative_data(),
-            default=pd.DataFrame()
-        )
+        if self.mode == "mock":
+            return self._safe_execute(
+                lambda: self._get_mock_creative_data(),
+                default=pd.DataFrame()
+            )
+        return pd.DataFrame()
 
     def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
         return self._safe_execute(

@@ -150,16 +150,38 @@ class DataProvider:
 
     def _process_meta_insights(self, df):
         """Processa insights do Meta para formato do dashboard"""
+        import math
+
+        def safe_sum(col):
+            """Soma segura que trata NaN"""
+            if col not in df.columns:
+                return 0
+            val = df[col].sum()
+            return 0 if (pd.isna(val) or math.isnan(val)) else val
+
+        def safe_mean(col):
+            """Média segura que trata NaN"""
+            if col not in df.columns:
+                return 0
+            val = df[col].mean()
+            return 0 if (pd.isna(val) or math.isnan(val)) else val
+
+        def safe_int(val):
+            """Conversão segura para int"""
+            if pd.isna(val) or (isinstance(val, float) and math.isnan(val)):
+                return 0
+            return int(val)
+
         try:
             return {
-                "investimento": df['spend'].sum() if 'spend' in df.columns else 0,
-                "impressoes": int(df['impressions'].sum()) if 'impressions' in df.columns else 0,
-                "alcance": int(df['reach'].sum()) if 'reach' in df.columns else 0,
-                "frequencia": df['frequency'].mean() if 'frequency' in df.columns else 0,
-                "cliques_link": int(df['clicks'].sum()) if 'clicks' in df.columns else 0,
-                "ctr_link": df['ctr'].mean() if 'ctr' in df.columns else 0,
-                "cpc_link": df['cpc'].mean() if 'cpc' in df.columns else 0,
-                "cpm": df['cpm'].mean() if 'cpm' in df.columns else 0,
+                "investimento": safe_sum('spend'),
+                "impressoes": safe_int(safe_sum('impressions')),
+                "alcance": safe_int(safe_sum('reach')),
+                "frequencia": safe_mean('frequency'),
+                "cliques_link": safe_int(safe_sum('clicks')),
+                "ctr_link": safe_mean('ctr'),
+                "cpc_link": safe_mean('cpc'),
+                "cpm": safe_mean('cpm'),
                 "delta_investimento": 0,
                 "delta_impressoes": 0,
                 "delta_alcance": 0,

@@ -150,16 +150,38 @@ class DataProvider:
 
     def _process_meta_insights(self, df):
         """Processa insights do Meta para formato do dashboard"""
+        import math
+
+        def safe_sum(col):
+            """Soma segura que trata NaN"""
+            if col not in df.columns:
+                return 0
+            val = df[col].sum()
+            return 0 if (pd.isna(val) or math.isnan(val)) else val
+
+        def safe_mean(col):
+            """Média segura que trata NaN"""
+            if col not in df.columns:
+                return 0
+            val = df[col].mean()
+            return 0 if (pd.isna(val) or math.isnan(val)) else val
+
+        def safe_int(val):
+            """Conversão segura para int"""
+            if pd.isna(val) or (isinstance(val, float) and math.isnan(val)):
+                return 0
+            return int(val)
+
         try:
             return {
-                "investimento": df['spend'].sum() if 'spend' in df.columns else 0,
-                "impressoes": int(df['impressions'].sum()) if 'impressions' in df.columns else 0,
-                "alcance": int(df['reach'].sum()) if 'reach' in df.columns else 0,
-                "frequencia": df['frequency'].mean() if 'frequency' in df.columns else 0,
-                "cliques_link": int(df['clicks'].sum()) if 'clicks' in df.columns else 0,
-                "ctr_link": df['ctr'].mean() if 'ctr' in df.columns else 0,
-                "cpc_link": df['cpc'].mean() if 'cpc' in df.columns else 0,
-                "cpm": df['cpm'].mean() if 'cpm' in df.columns else 0,
+                "investimento": safe_sum('spend'),
+                "impressoes": safe_int(safe_sum('impressions')),
+                "alcance": safe_int(safe_sum('reach')),
+                "frequencia": safe_mean('frequency'),
+                "cliques_link": safe_int(safe_sum('clicks')),
+                "ctr_link": safe_mean('ctr'),
+                "cpc_link": safe_mean('cpc'),
+                "cpm": safe_mean('cpm'),
                 "delta_investimento": 0,
                 "delta_impressoes": 0,
                 "delta_alcance": 0,
@@ -1067,6 +1089,23 @@ with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
     else:
         st.error("❌ Cliente Meta Ads não inicializado")
         st.info("Verifique se META_ACCESS_TOKEN está configurado no Streamlit Secrets.")
+
+        # Mostrar diagnóstico detalhado das credenciais Meta
+        st.markdown("**Diagnóstico de credenciais Meta:**")
+        meta_token = Config.get_meta_access_token()
+        meta_account_id = Config.get_meta_ad_account_id()
+
+        if meta_token:
+            st.success(f"✅ META_ACCESS_TOKEN encontrado (comprimento: {len(meta_token)})")
+        else:
+            st.error("❌ META_ACCESS_TOKEN não encontrado")
+            st.markdown("Configure em uma das seguintes formas:")
+            st.code("# Variável de ambiente\nexport META_ACCESS_TOKEN='seu_token_aqui'\n\n# Ou em .streamlit/secrets.toml\nMETA_ACCESS_TOKEN = \"seu_token_aqui\"")
+
+        if meta_account_id:
+            st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id}")
+        else:
+            st.error("❌ META_AD_ACCOUNT_ID não encontrado")
 
 # Expander com diagnóstico detalhado do GA4 e UTM tracking
 with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):

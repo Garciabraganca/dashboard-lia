@@ -32,25 +32,44 @@ class Config:
     @staticmethod
     def _get_streamlit_secret(key: str, default: Any = None) -> Any:
         """Obtém um secret do Streamlit de forma segura"""
+        import logging
+        logger = logging.getLogger(__name__)
+
         if HAS_STREAMLIT:
             try:
                 # st.secrets usa acesso por chave, não .get()
                 if key in st.secrets:
-                    return st.secrets[key]
+                    value = st.secrets[key]
+                    logger.info(f"Secret '{key}' loaded from Streamlit secrets")
+                    return value
+                logger.debug(f"Secret '{key}' not found in Streamlit secrets")
                 return default
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Error accessing Streamlit secret '{key}': {e}")
                 return default
+        logger.debug("Streamlit not available, cannot access secrets")
         return default
 
     @classmethod
     def get_meta_access_token(cls) -> Optional[str]:
         """Obtém o token de acesso do Meta"""
-        # Primeiro tenta variável de ambiente
-        if cls.META_ACCESS_TOKEN:
-            return cls.META_ACCESS_TOKEN
+        import logging
+        logger = logging.getLogger(__name__)
+
+        # Primeiro tenta variável de ambiente (refresh a cada chamada)
+        env_token = os.getenv("META_ACCESS_TOKEN")
+        if env_token:
+            logger.info("META_ACCESS_TOKEN loaded from environment variable")
+            return env_token
 
         # Depois tenta Streamlit secrets
-        return cls._get_streamlit_secret("META_ACCESS_TOKEN")
+        secret_token = cls._get_streamlit_secret("META_ACCESS_TOKEN")
+        if secret_token:
+            logger.info("META_ACCESS_TOKEN loaded from Streamlit secrets")
+            return secret_token
+
+        logger.warning("META_ACCESS_TOKEN not found in environment or Streamlit secrets")
+        return None
 
     @classmethod
     def get_meta_ad_account_id(cls) -> str:

@@ -987,8 +987,14 @@ selected_period = period_map.get(periodo, "7d")
 custom_start_str = custom_start_date.strftime("%Y-%m-%d") if custom_start_date else None
 custom_end_str = custom_end_date.strftime("%Y-%m-%d") if custom_end_date else None
 
-# Mapear nome da campanha para filtro
-campaign_filter = campanha if campanha != "Todas" else None
+# Mapear nome da campanha para filtro de UTM
+# Os UTMs reais usam "ciclo1" e "ciclo2" (sem espaço), ex: lia_ciclo2_conversao
+campaign_filter_map = {
+    "Ciclo 2": "ciclo2",
+    "Ciclo 1": "ciclo1",
+    "Todas": None
+}
+campaign_filter = campaign_filter_map.get(campanha, None)
 
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)
@@ -1106,7 +1112,7 @@ with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
                         st.success(f"✅ Encontrado match para '{campaign_filter}': {len(matches)} campanha(s)")
                     else:
                         st.warning(f"⚠️ Nenhuma campanha contém '{campaign_filter}'. Verifique o utm_campaign nos anúncios.")
-                        st.info("**Dica:** O filtro busca campanhas que CONTENHAM o texto. Certifique-se que o utm_campaign nos anúncios inclui exatamente 'Ciclo 2' ou 'Ciclo 1'.")
+                        st.info("**Dica:** O filtro busca campanhas que CONTENHAM 'ciclo1' ou 'ciclo2' (sem espaço). Ex: lia_ciclo2_conversao")
             else:
                 st.warning("⚠️ Nenhuma campanha com utm_campaign encontrada no período selecionado.")
                 st.info("**Possíveis causas:**\n"

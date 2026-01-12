@@ -1095,7 +1095,9 @@ elif data_source == "real":
 elif data_source == "real_no_filter":
     requested_filter = meta_data.get("_requested_filter", "")
     available_campaigns = meta_data.get("_available_campaigns", [])
-    st.warning(f"⚠️ Dados reais do Meta - filtro '{requested_filter}' não encontrou campanhas correspondentes. Exibindo todas as campanhas.")
+    st.success("✅ Dados reais do Meta - exibindo todas as campanhas disponíveis.")
+    if requested_filter:
+        st.caption(f"Filtro solicitado: '{requested_filter}'.")
     if available_campaigns:
         with st.expander("📋 Campanhas disponíveis no Meta"):
             for camp in available_campaigns:

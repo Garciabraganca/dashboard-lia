@@ -1192,21 +1192,21 @@ if st.session_state.show_integration_settings:
             custom_end=custom_end_str
         )
 
-            if diagnosis.get('connected'):
-                st.success(f"✅ GA4 conectado - Período: {diagnosis.get('date_range')}")
+        if diagnosis.get('connected'):
+            st.success(f"✅ GA4 conectado - Período: {diagnosis.get('date_range')}")
 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown(f"**Total de Sessões (sem filtro):** {diagnosis.get('total_sessions', 0):,}")
-                    st.markdown(f"**Filtro usado:** {diagnosis.get('campaign_filter_used') or 'Nenhum'}")
-                    st.markdown(f"**Sessões com filtro:** {diagnosis.get('sessions_with_filter', 0):,}")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown(f"**Total de Sessões (sem filtro):** {diagnosis.get('total_sessions', 0):,}")
+                st.markdown(f"**Filtro usado:** {diagnosis.get('campaign_filter_used') or 'Nenhum'}")
+                st.markdown(f"**Sessões com filtro:** {diagnosis.get('sessions_with_filter', 0):,}")
 
-                with col2:
-                    st.markdown(f"**Status:** {diagnosis.get('status')}")
-                    if diagnosis.get('filtered_metrics'):
-                        metrics = diagnosis['filtered_metrics']
-                        st.markdown(f"**Sessões filtradas:** {metrics.get('sessoes', 0):,}")
-                        st.markdown(f"**Usuários filtrados:** {metrics.get('usuarios', 0):,}")
+            with col2:
+                st.markdown(f"**Status:** {diagnosis.get('status')}")
+                if diagnosis.get('filtered_metrics'):
+                    metrics = diagnosis['filtered_metrics']
+                    st.markdown(f"**Sessões filtradas:** {metrics.get('sessoes', 0):,}")
+                    st.markdown(f"**Usuários filtrados:** {metrics.get('usuarios', 0):,}")
 
                 # Mostrar campanhas disponíveis
                 st.markdown("---")
@@ -1232,32 +1232,34 @@ if st.session_state.show_integration_settings:
                            "1. Os anúncios não têm UTMs configurados\n"
                            "2. Os UTMs foram adicionados recentemente (GA4 pode levar até 24-48h)\n"
                            "3. O período selecionado não inclui dados com UTMs")
-            else:
-                st.error(f"❌ Erro na conexão GA4: {diagnosis.get('error', 'Erro desconhecido')}")
         else:
-            st.error("❌ Cliente GA4 não inicializado")
-            st.info("Verifique se as credenciais GA4 estão configuradas no Streamlit Secrets.")
+            st.error(f"❌ Erro na conexão GA4: {diagnosis.get('error', 'Erro desconhecido')}")
+    else:
+        st.error("❌ Cliente GA4 não inicializado")
+        st.info("Verifique se as credenciais GA4 estão configuradas no Streamlit Secrets.")
 
-            # Mostrar diagnóstico detalhado das credenciais
-            st.markdown("**Diagnóstico de credenciais:**")
-            creds = Config.get_ga4_credentials()
-            property_id = Config.get_ga4_property_id()
+        # Mostrar diagnóstico detalhado das credenciais
+        st.markdown("**Diagnóstico de credenciais:**")
+        creds = Config.get_ga4_credentials()
+        property_id = Config.get_ga4_property_id()
 
-            if creds:
-                st.success(f"✅ GCP_CREDENTIALS encontrado com {len(creds)} campos")
-                required_keys = ['type', 'project_id', 'private_key', 'client_email']
-                for key in required_keys:
-                    if key in creds:
-                        if key == 'private_key':
-                            st.write(f"   ✅ {key}: {'***' if creds[key] else 'VAZIO'}")
-                        else:
-                            st.write(f"   ✅ {key}: {creds.get(key, 'N/A')}")
-                    else:
-                        st.write(f"   ❌ {key}: FALTANDO")
-            else:
-                st.error("❌ GCP_CREDENTIALS não encontrado ou vazio")
+        if creds:
+            st.success(f"✅ GCP_CREDENTIALS encontrado com {len(creds)} campos")
+            required_keys = ['type', 'project_id', 'private_key', 'client_email']
+            for key in required_keys:
+                if key in creds:
+                    st.write(f"- {key}: ✅")
+                else:
+                    st.write(f"- {key}: ❌")
+        else:
+            st.error("❌ GCP_CREDENTIALS não encontrado")
 
-            st.write(f"**GA4_PROPERTY_ID:** {property_id}")
+        if property_id:
+            st.success(f"✅ GA4_PROPERTY_ID encontrado: {property_id}")
+        else:
+            st.error("❌ GA4_PROPERTY_ID não encontrado")
+
+        st.write(f"**GA4_PROPERTY_ID:** {property_id}")
 
 # -----------------------------------------------------------------------------
 # AGENTE DE IA - ANALISE INTELIGENTE

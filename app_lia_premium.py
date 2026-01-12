@@ -1167,7 +1167,7 @@ if st.session_state.show_integration_settings:
             # Mostrar diagnóstico detalhado das credenciais Meta
             st.markdown("**Diagnóstico de credenciais Meta:**")
             meta_token = Config.get_meta_access_token()
-            meta_account_id = Config.get_meta_ad_account_id()
+            meta_account_id_diag = Config.get_meta_ad_account_id()
 
             if meta_token:
                 st.success(f"✅ META_ACCESS_TOKEN encontrado (comprimento: {len(meta_token)})")
@@ -1176,10 +1176,10 @@ if st.session_state.show_integration_settings:
                 st.markdown("Configure em uma das seguintes formas:")
                 st.code("# Variável de ambiente\nexport META_ACCESS_TOKEN='seu_token_aqui'\n\n# Ou em .streamlit/secrets.toml\nMETA_ACCESS_TOKEN = \"seu_token_aqui\"")
 
-        if meta_account_id:
-            st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id}")
-        else:
-            st.error("❌ META_AD_ACCOUNT_ID não encontrado")
+            if meta_account_id_diag:
+                st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id_diag}")
+            else:
+                st.error("❌ META_AD_ACCOUNT_ID não encontrado")
 
     st.divider()
     st.markdown("### 🔧 Diagnóstico GA4 / UTM Tracking")

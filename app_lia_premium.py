@@ -292,11 +292,12 @@ class DataProvider:
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")
 
-        # Fallback para mock
-        return self._safe_execute(
-            lambda: self._get_mock_creative_data(),
-            default=pd.DataFrame()
-        )
+        if self.mode == "mock":
+            return self._safe_execute(
+                lambda: self._get_mock_creative_data(),
+                default=pd.DataFrame()
+            )
+        return pd.DataFrame()
 
     def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
         return self._safe_execute(
@@ -1082,27 +1083,30 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
-# Indicador de fonte de dados e diagnóstico de conexão
-data_source = meta_data.get("_data_source", "unknown")
-if data_source == "mock":
-    st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
-elif data_source == "real":
-    filter_applied = meta_data.get("_filter_applied")
-    if filter_applied:
-        st.success(f"✅ Conectado à API Meta Ads - dados reais (filtro: {filter_applied})")
-    else:
-        st.success("✅ Conectado à API Meta Ads - dados reais")
-elif data_source == "real_no_filter":
-    requested_filter = meta_data.get("_requested_filter", "")
-    available_campaigns = meta_data.get("_available_campaigns", [])
-    st.warning(f"⚠️ Dados reais do Meta - filtro '{requested_filter}' não encontrou campanhas correspondentes. Exibindo todas as campanhas.")
-    if available_campaigns:
-        with st.expander("📋 Campanhas disponíveis no Meta"):
+with st.expander("⚙️ Configurações de integração"):
+    # Indicador de fonte de dados e diagnóstico de conexão
+    data_source = meta_data.get("_data_source", "unknown")
+    if data_source == "mock":
+        st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
+    elif data_source == "real":
+        filter_applied = meta_data.get("_filter_applied")
+        if filter_applied:
+            st.success(f"✅ Conectado à API Meta Ads - dados reais (filtro: {filter_applied})")
+        else:
+            st.success("✅ Conectado à API Meta Ads - dados reais")
+    elif data_source == "real_no_filter":
+        requested_filter = meta_data.get("_requested_filter", "")
+        available_campaigns = meta_data.get("_available_campaigns", [])
+        st.success("✅ Dados reais do Meta - exibindo todas as campanhas disponíveis.")
+        if requested_filter:
+            st.caption(f"Filtro solicitado: '{requested_filter}'.")
+        if available_campaigns:
+            st.markdown("**📋 Campanhas disponíveis no Meta**")
             for camp in available_campaigns:
                 st.write(f"• {camp}")
 
-# Expander com diagnóstico detalhado da conexão
-with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
+    st.divider()
+    st.markdown("### 🔧 Diagnóstico de Conexão Meta Ads")
     if data_provider.meta_client:
         connection_status = data_provider.meta_client.verify_connection()
         if connection_status["connected"]:
@@ -1142,8 +1146,8 @@ with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
         else:
             st.error("❌ META_AD_ACCOUNT_ID não encontrado")
 
-# Expander com diagnóstico detalhado do GA4 e UTM tracking
-with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
+    st.divider()
+    st.markdown("### 🔧 Diagnóstico GA4 / UTM Tracking")
     if data_provider.ga4_client:
         api_period = data_provider._period_to_api_format(selected_period)
         diagnosis = data_provider.ga4_client.diagnose_utm_tracking(

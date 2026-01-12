@@ -1119,6 +1119,27 @@ with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
         st.error("❌ Cliente GA4 não inicializado")
         st.info("Verifique se as credenciais GA4 estão configuradas no Streamlit Secrets.")
 
+        # Mostrar diagnóstico detalhado das credenciais
+        st.markdown("**Diagnóstico de credenciais:**")
+        creds = Config.get_ga4_credentials()
+        property_id = Config.get_ga4_property_id()
+
+        if creds:
+            st.success(f"✅ GCP_CREDENTIALS encontrado com {len(creds)} campos")
+            required_keys = ['type', 'project_id', 'private_key', 'client_email']
+            for key in required_keys:
+                if key in creds:
+                    if key == 'private_key':
+                        st.write(f"   ✅ {key}: {'***' if creds[key] else 'VAZIO'}")
+                    else:
+                        st.write(f"   ✅ {key}: {creds.get(key, 'N/A')}")
+                else:
+                    st.write(f"   ❌ {key}: FALTANDO")
+        else:
+            st.error("❌ GCP_CREDENTIALS não encontrado ou vazio")
+
+        st.write(f"**GA4_PROPERTY_ID:** {property_id}")
+
 # -----------------------------------------------------------------------------
 # AGENTE DE IA - ANALISE INTELIGENTE
 # -----------------------------------------------------------------------------

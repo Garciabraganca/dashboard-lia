@@ -82,23 +82,35 @@ class Config:
         Returns:
             Dicionário com credenciais da service account
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         # Tentar variável de ambiente primeiro
         if cls.GCP_CREDENTIALS_JSON:
             try:
-                return json.loads(cls.GCP_CREDENTIALS_JSON)
-            except json.JSONDecodeError:
-                pass
+                creds = json.loads(cls.GCP_CREDENTIALS_JSON)
+                logger.info("GA4 credentials loaded from environment variable")
+                return creds
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse GCP_CREDENTIALS_JSON: {e}")
 
         # Tentar Streamlit secrets
         if HAS_STREAMLIT:
             try:
-                gcp_creds = st.secrets.get("GCP_CREDENTIALS")
-                if gcp_creds:
-                    # Converter AttrDict para dict normal
-                    return dict(gcp_creds)
-            except Exception:
-                pass
+                # Usar acesso direto em vez de .get()
+                if "GCP_CREDENTIALS" in st.secrets:
+                    gcp_creds = st.secrets["GCP_CREDENTIALS"]
+                    # Converter AttrDict para dict recursivamente
+                    creds_dict = {key: str(value) if key == "private_key" else value
+                                  for key, value in dict(gcp_creds).items()}
+                    logger.info(f"GA4 credentials loaded from Streamlit secrets, keys: {list(creds_dict.keys())}")
+                    return creds_dict
+                else:
+                    logger.warning("GCP_CREDENTIALS not found in Streamlit secrets")
+            except Exception as e:
+                logger.error(f"Error loading GA4 credentials from Streamlit secrets: {e}")
 
+        logger.warning("No GA4 credentials found")
         return {}
 
     @classmethod

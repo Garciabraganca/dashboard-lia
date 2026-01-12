@@ -1068,6 +1068,23 @@ with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
         st.error("❌ Cliente Meta Ads não inicializado")
         st.info("Verifique se META_ACCESS_TOKEN está configurado no Streamlit Secrets.")
 
+        # Mostrar diagnóstico detalhado das credenciais Meta
+        st.markdown("**Diagnóstico de credenciais Meta:**")
+        meta_token = Config.get_meta_access_token()
+        meta_account_id = Config.get_meta_ad_account_id()
+
+        if meta_token:
+            st.success(f"✅ META_ACCESS_TOKEN encontrado (comprimento: {len(meta_token)})")
+        else:
+            st.error("❌ META_ACCESS_TOKEN não encontrado")
+            st.markdown("Configure em uma das seguintes formas:")
+            st.code("# Variável de ambiente\nexport META_ACCESS_TOKEN='seu_token_aqui'\n\n# Ou em .streamlit/secrets.toml\nMETA_ACCESS_TOKEN = \"seu_token_aqui\"")
+
+        if meta_account_id:
+            st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id}")
+        else:
+            st.error("❌ META_AD_ACCOUNT_ID não encontrado")
+
 # Expander com diagnóstico detalhado do GA4 e UTM tracking
 with st.expander("🔧 Diagnóstico GA4 / UTM Tracking"):
     if data_provider.ga4_client:

@@ -1050,6 +1050,20 @@ campaign_filter_map = {
 }
 campaign_filter = campaign_filter_map.get(campanha, None)
 
+# Ajustar datas automaticamente quando um ciclo é selecionado
+# Isso evita misturar dados de períodos diferentes ao selecionar um ciclo específico
+if campanha == "Ciclo 2" and selected_period != "custom":
+    # Ciclo 2: iniciado em 2026-01-09
+    custom_start_str = "2026-01-09"
+    custom_end_str = datetime.now().strftime("%Y-%m-%d")
+    selected_period = "custom"
+
+if campanha == "Ciclo 1" and selected_period != "custom":
+    # Ciclo 1: 2025-12-22 a 2026-01-08
+    custom_start_str = "2025-12-22"
+    custom_end_str = "2026-01-08"
+    selected_period = "custom"
+
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)
 # -----------------------------------------------------------------------------
@@ -1358,10 +1372,10 @@ kpi_cards = [
     {"icon": "💰", "label": "Investimento", "value": f"$ {meta_data['investimento']:,.2f}", "delta": meta_data['delta_investimento'], "suffix": "%"},
     {"icon": "👀", "label": "Impressoes", "value": f"{meta_data['impressoes']:,.0f}", "delta": meta_data['delta_impressoes'], "suffix": "%"},
     {"icon": "📡", "label": "Alcance", "value": f"{meta_data['alcance']:,.0f}", "delta": meta_data['delta_alcance'], "suffix": "%"},
-    {"icon": "🔁", "label": "Frequencia", "value": f"{meta_data['frequencia']:.2f}", "delta": meta_data['delta_frequencia'], "suffix": "", "precision": 2},
+    {"icon": "🔁", "label": "Frequência (média de vezes por pessoa)", "value": f"{meta_data['frequencia']:.2f}", "delta": meta_data['delta_frequencia'], "suffix": "", "precision": 2},
     {"icon": "🖱️", "label": "Cliques Link", "value": f"{meta_data['cliques_link']:,.0f}", "delta": meta_data['delta_cliques'], "suffix": "%"},
-    {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data['ctr_link']:.2f}%", "delta": meta_data['delta_ctr'], "suffix": "pp", "precision": 2},
-    {"icon": "💡", "label": "CPC Link", "value": f"$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
+    {"icon": "🎯", "label": "% que clicou no link", "value": f"{meta_data['ctr_link']:.2f}%", "delta": meta_data['delta_ctr'], "suffix": "pp", "precision": 2},
+    {"icon": "💡", "label": "Custo por clique no link", "value": f"$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
     {"icon": "📊", "label": "CPM", "value": f"$ {meta_data['cpm']:.2f}", "delta": meta_data['delta_cpm'], "suffix": "%", "invert": True},
 ]
 
@@ -1517,6 +1531,40 @@ if len(trends_data) > 0:
         logger.error(f"Erro ao renderizar graficos: {e}")
         render_error_card("Graficos indisponiveis", "Estamos processando os dados de tendencia.")
 
+st.markdown('</div>', unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# FUNIL DE CONVERSÃO SIMPLES (Impressões -> Cliques -> Loja -> Instalações)
+# -----------------------------------------------------------------------------
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
+
+# Buscar eventos GA4 para contar cliques na loja
+events_data_for_funnel = data_provider.get_events_data(
+    period=selected_period,
+    custom_start=custom_start_str,
+    custom_end=custom_end_str,
+    campaign_filter=campaign_filter
+)
+cta_count = 0
+if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
+    cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'cta_baixe_agora_click']
+    if not cta_row.empty:
+        # extrai número "2.050" de "2.050 (33,19%)"
+        raw_str = cta_row.iloc[0]['Contagem de Eventos']
+        cta_count = int(raw_str.split()[0].replace('.', '').replace(',', ''))
+
+instalacoes = 0  # placeholder até integrar SDK
+
+funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações"]
+funnel_values = [meta_data['impressoes'], meta_data['cliques_link'], cta_count, instalacoes]
+
+funnel_df = pd.DataFrame({"Etapa": funnel_labels, "Valor": funnel_values})
+fig_funnel = go.Figure(go.Funnel(y=funnel_df['Etapa'], x=funnel_df['Valor'],
+                                 textposition="inside", textinfo="value+percent initial"))
+fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
+                         paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)")
+st.plotly_chart(fig_funnel, use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

@@ -458,22 +458,25 @@ class DataProvider:
         })
 
     def _get_mock_events_data(self):
-        """Retorna dados mock de eventos do GA4"""
+        """Retorna dados mock de eventos do GA4 com eventos de funil"""
         return pd.DataFrame({
             "Nome do Evento": [
-                "page_view", "session_start", "first_visit", "scroll",
-                "user_engagement", "scroll_50", "cta_baixe_agora_click"
+                "page_view", "session_start", "first_visit", "landing_visit",
+                "scroll_25", "scroll_50", "scroll_75",
+                "primary_cta_click", "store_click", "user_engagement"
             ],
             "Contagem de Eventos": [
-                "2.050 (33,19%)", "1.992 (32,25%)", "1.958 (31,70%)", "78 (1,26%)",
-                "78 (1,26%)", "17 (0,28%)", "3 (0,05%)"
+                "2.050 (31,50%)", "1.992 (30,61%)", "1.958 (30,08%)", "1.450 (22,28%)",
+                "980 (15,06%)", "650 (9,99%)", "420 (6,45%)",
+                "185 (2,84%)", "92 (1,41%)", "78 (1,20%)"
             ],
             "Total de Usuarios": [
-                "1.968 (100%)", "1.968 (100%)", "1.958 (99,49%)", "68 (3,46%)",
-                "38 (1,93%)", "14 (0,71%)", "3 (0,15%)"
+                "1.968 (100%)", "1.968 (100%)", "1.958 (99,49%)", "1.450 (73,68%)",
+                "890 (45,22%)", "580 (29,47%)", "380 (19,31%)",
+                "175 (8,89%)", "88 (4,47%)", "38 (1,93%)"
             ],
-            "Eventos por Usuario": ["1,04", "1,01", "1,00", "1,15", "2,05", "1,21", "1,00"],
-            "Receita Total": ["R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00"]
+            "Eventos por Usuario": ["1,04", "1,01", "1,00", "1,00", "1,10", "1,12", "1,11", "1,06", "1,05", "2,05"],
+            "Receita Total": ["R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00"]
         })
 
     def get_cycle_status(self, period, meta_data, creative_data):
@@ -1546,40 +1549,50 @@ st.markdown('</div>', unsafe_allow_html=True)
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
 
-# Buscar eventos GA4 para contar cliques na loja
+# Buscar eventos GA4 para contar cliques no CTA e loja
 events_data_for_funnel = data_provider.get_events_data(
     period=selected_period,
     custom_start=custom_start_str,
     custom_end=custom_end_str,
     campaign_filter=campaign_filter
 )
-cta_count = 0
-if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
-    cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'cta_baixe_agora_click']
-    if not cta_row.empty:
-        # extrai número "2.050" de "2.050 (33,19%)" ou valor numérico direto
-        try:
-            raw_val = cta_row.iloc[0]['Contagem de Eventos']
-            if isinstance(raw_val, (int, float)):
-                cta_count = int(raw_val)
-            else:
-                raw_str = str(raw_val)
-                # Pega apenas a parte numérica antes do parêntese (se houver)
-                num_part = raw_str.split('(')[0].strip().split()[0] if '(' in raw_str else raw_str.split()[0]
-                # Remove separadores de milhar (ponto no BR, vírgula no US)
-                cta_count = int(num_part.replace('.', '').replace(',', ''))
-        except (ValueError, IndexError, TypeError) as e:
-            logger.warning(f"Erro ao parsear cta_count: {e}, raw_val={raw_val}")
-            cta_count = 0
 
+def extract_event_count(df, event_name):
+    """Extrai contagem de um evento do DataFrame de eventos"""
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return 0
+    event_row = df[df['Nome do Evento'] == event_name]
+    if event_row.empty:
+        return 0
+    try:
+        raw_val = event_row.iloc[0]['Contagem de Eventos']
+        if isinstance(raw_val, (int, float)):
+            return int(raw_val)
+        raw_str = str(raw_val)
+        # Pega apenas a parte numérica antes do parêntese (se houver)
+        num_part = raw_str.split('(')[0].strip().split()[0] if '(' in raw_str else raw_str.split()[0]
+        # Remove separadores de milhar (ponto no BR, vírgula no US)
+        return int(num_part.replace('.', '').replace(',', ''))
+    except (ValueError, IndexError, TypeError) as e:
+        logger.warning(f"Erro ao parsear {event_name}: {e}")
+        return 0
+
+# Extrair contagens dos eventos de funil
+cta_count = extract_event_count(events_data_for_funnel, 'primary_cta_click')
+# Fallback para evento antigo se o novo não existir
+if cta_count == 0:
+    cta_count = extract_event_count(events_data_for_funnel, 'cta_baixe_agora_click')
+
+store_count = extract_event_count(events_data_for_funnel, 'store_click')
 instalacoes = 0  # placeholder até integrar SDK (Tanaka)
 
 # Garantir que todos os valores do funil são inteiros válidos (evita None quebrar o Plotly)
-funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK em implantação)"]
+funnel_labels = ["Impressões", "Cliques no link", "Cliques CTA", "Cliques loja", "Instalações (SDK)"]
 funnel_values = [
     int(meta_data.get('impressoes', 0) or 0),
     int(meta_data.get('cliques_link', 0) or 0),
     int(cta_count or 0),
+    int(store_count or 0),
     int(instalacoes or 0)
 ]
 
@@ -1591,7 +1604,7 @@ fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
 st.plotly_chart(fig_funnel, use_container_width=True)
 
 # Legenda explicativa do funil
-st.caption("**Cliques na loja** = evento GA4 `cta_baixe_agora_click` | **Instalações** = aguardando integração SDK")
+st.caption("**Cliques CTA** = `primary_cta_click` | **Cliques loja** = `store_click` (Play/App Store) | **Instalações** = aguardando SDK")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

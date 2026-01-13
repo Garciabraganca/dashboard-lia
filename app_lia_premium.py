@@ -1575,7 +1575,7 @@ if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funn
 instalacoes = 0  # placeholder até integrar SDK (Tanaka)
 
 # Garantir que todos os valores do funil são inteiros válidos (evita None quebrar o Plotly)
-funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações"]
+funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK em implantação)"]
 funnel_values = [
     int(meta_data.get('impressoes', 0) or 0),
     int(meta_data.get('cliques_link', 0) or 0),
@@ -1591,7 +1591,7 @@ fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
 st.plotly_chart(fig_funnel, use_container_width=True)
 
 # Legenda explicativa do funil
-st.caption("**Cliques na loja** = evento GA4 `cta_baixe_agora_click` | **Instalações** = pendente de SDK (Tanaka)")
+st.caption("**Cliques na loja** = evento GA4 `cta_baixe_agora_click` | **Instalações** = aguardando integração SDK")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

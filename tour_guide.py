@@ -112,7 +112,7 @@ TOUR_SECTIONS = {
         """
     },
     "etapa_acao": {
-        "titulo": "📲 4. AÇÃO • Instalações",
+        "titulo": "📲 4. AÇÃO • Instalações (SDK em implantação)",
         "conteudo": """
         **Quarta e última etapa:**
 

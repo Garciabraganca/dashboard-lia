@@ -1052,17 +1052,24 @@ campaign_filter = campaign_filter_map.get(campanha, None)
 
 # Ajustar datas automaticamente quando um ciclo é selecionado
 # Isso evita misturar dados de períodos diferentes ao selecionar um ciclo específico
+periodo_travado = False
 if campanha == "Ciclo 2" and selected_period != "custom":
     # Ciclo 2: iniciado em 2026-01-09
     custom_start_str = "2026-01-09"
     custom_end_str = datetime.now().strftime("%Y-%m-%d")
     selected_period = "custom"
+    periodo_travado = True
 
 if campanha == "Ciclo 1" and selected_period != "custom":
     # Ciclo 1: 2025-12-22 a 2026-01-08
     custom_start_str = "2025-12-22"
     custom_end_str = "2026-01-08"
     selected_period = "custom"
+    periodo_travado = True
+
+# Feedback visual do período travado pelo ciclo
+if periodo_travado:
+    st.info(f"📅 Período ajustado automaticamente para **{campanha}**: {custom_start_str} a {custom_end_str}")
 
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)
@@ -1550,14 +1557,31 @@ cta_count = 0
 if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
     cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'cta_baixe_agora_click']
     if not cta_row.empty:
-        # extrai número "2.050" de "2.050 (33,19%)"
-        raw_str = cta_row.iloc[0]['Contagem de Eventos']
-        cta_count = int(raw_str.split()[0].replace('.', '').replace(',', ''))
+        # extrai número "2.050" de "2.050 (33,19%)" ou valor numérico direto
+        try:
+            raw_val = cta_row.iloc[0]['Contagem de Eventos']
+            if isinstance(raw_val, (int, float)):
+                cta_count = int(raw_val)
+            else:
+                raw_str = str(raw_val)
+                # Pega apenas a parte numérica antes do parêntese (se houver)
+                num_part = raw_str.split('(')[0].strip().split()[0] if '(' in raw_str else raw_str.split()[0]
+                # Remove separadores de milhar (ponto no BR, vírgula no US)
+                cta_count = int(num_part.replace('.', '').replace(',', ''))
+        except (ValueError, IndexError, TypeError) as e:
+            logger.warning(f"Erro ao parsear cta_count: {e}, raw_val={raw_val}")
+            cta_count = 0
 
-instalacoes = 0  # placeholder até integrar SDK
+instalacoes = 0  # placeholder até integrar SDK (Tanaka)
 
+# Garantir que todos os valores do funil são inteiros válidos (evita None quebrar o Plotly)
 funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações"]
-funnel_values = [meta_data['impressoes'], meta_data['cliques_link'], cta_count, instalacoes]
+funnel_values = [
+    int(meta_data.get('impressoes', 0) or 0),
+    int(meta_data.get('cliques_link', 0) or 0),
+    int(cta_count or 0),
+    int(instalacoes or 0)
+]
 
 funnel_df = pd.DataFrame({"Etapa": funnel_labels, "Valor": funnel_values})
 fig_funnel = go.Figure(go.Funnel(y=funnel_df['Etapa'], x=funnel_df['Valor'],
@@ -1565,6 +1589,9 @@ fig_funnel = go.Figure(go.Funnel(y=funnel_df['Etapa'], x=funnel_df['Valor'],
 fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
                          paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)")
 st.plotly_chart(fig_funnel, use_container_width=True)
+
+# Legenda explicativa do funil
+st.caption("**Cliques na loja** = evento GA4 `cta_baixe_agora_click` | **Instalações** = pendente de SDK (Tanaka)")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

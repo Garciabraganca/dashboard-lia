@@ -1645,13 +1645,55 @@ st.markdown(ga4_section, unsafe_allow_html=True)
 table_cols = st.columns(2)
 
 with table_cols[0]:
-    # Tabela Origem/Midia
+    # Tabela Origem/Midia (HTML customizado para melhor contraste)
     try:
         source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(source_data) > 0:
+            # CSS inline para garantir estilos da tabela
+            st.markdown('''
+            <style>
+            .source-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+            }
+            .source-table th {
+                background: rgba(30, 136, 229, 0.1);
+                padding: 10px;
+                text-align: left;
+                border-bottom: 2px solid #1E88E5;
+                font-weight: 600;
+                color: #1A1A1A;
+            }
+            .source-table td {
+                padding: 8px 10px;
+                border-bottom: 1px solid rgba(0,0,0,0.08);
+                color: #1A1A1A;
+            }
+            .source-table tr:hover {
+                background: rgba(30, 136, 229, 0.05);
+            }
+            </style>
+            ''', unsafe_allow_html=True)
+
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
-            st.dataframe(source_data, use_container_width=True, hide_index=True)
+
+            # Criar tabela HTML com mesmo padrão da tabela de eventos
+            source_html = '<table class="source-table"><thead><tr>'
+            for col in source_data.columns:
+                source_html += f'<th>{col}</th>'
+            source_html += '</tr></thead><tbody>'
+
+            for _, row in source_data.iterrows():
+                source_html += '<tr>'
+                for col in source_data.columns:
+                    cell_value = row[col]
+                    source_html += f'<td>{cell_value}</td>'
+                source_html += '</tr>'
+            source_html += '</tbody></table>'
+
+            st.markdown(source_html, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")
@@ -1679,45 +1721,64 @@ with table_cols[1]:
                 "install": "Instalações do app no celular.",
             }
 
-            # Função para criar tooltip HTML
+            # Função para criar tooltip HTML com ícone de interrogação minimalista
             def create_event_with_tooltip(event_name, tooltip_text):
                 tooltip_text_escaped = tooltip_text.replace('"', '&quot;').replace("'", "&#39;")
-                return f'<span class="event-tooltip" title="{tooltip_text_escaped}">{event_name} ℹ️</span>'
+                return f'<span class="event-tooltip" title="{tooltip_text_escaped}">{event_name} <span class="tooltip-icon">?</span></span>'
 
-            # Adicionar CSS para tooltips
+            # Adicionar CSS para tooltips e tabelas
             st.markdown('''
             <style>
             .event-tooltip {
                 cursor: help;
-                border-bottom: 1px dotted #666;
             }
             .event-tooltip:hover {
                 color: #1E88E5;
             }
-            .events-table {
+            .tooltip-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 14px;
+                height: 14px;
+                background: #888;
+                color: white;
+                border-radius: 50%;
+                font-size: 10px;
+                font-weight: 600;
+                margin-left: 4px;
+                vertical-align: middle;
+                cursor: help;
+            }
+            .tooltip-icon:hover {
+                background: #1E88E5;
+            }
+            .events-table, .source-table {
                 width: 100%;
                 border-collapse: collapse;
                 font-size: 14px;
             }
-            .events-table th {
+            .events-table th, .source-table th {
                 background: rgba(30, 136, 229, 0.1);
                 padding: 10px;
                 text-align: left;
                 border-bottom: 2px solid #1E88E5;
                 font-weight: 600;
+                color: #1A1A1A;
             }
-            .events-table td {
+            .events-table td, .source-table td {
                 padding: 8px 10px;
-                border-bottom: 1px solid rgba(255,255,255,0.1);
+                border-bottom: 1px solid rgba(0,0,0,0.08);
+                color: #1A1A1A;
             }
-            .events-table tr:hover {
+            .events-table tr:hover, .source-table tr:hover {
                 background: rgba(30, 136, 229, 0.05);
             }
             </style>
             ''', unsafe_allow_html=True)
 
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span> <small style="opacity:0.7">(passe o mouse no ℹ️ para ver explicação)</small></div>', unsafe_allow_html=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span> <small style="opacity:0.7">(passe o mouse no <span class="tooltip-icon" style="font-size:9px;width:12px;height:12px;">?</span> para ver explicação)</small></div>', unsafe_allow_html=True)
 
             # Criar tabela HTML com tooltips
             html_table = '<table class="events-table"><thead><tr>'

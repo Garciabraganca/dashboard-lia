@@ -1721,25 +1721,31 @@ with table_cols[1]:
                 "install": "Instalações do app no celular.",
             }
 
-            # Função para criar tooltip HTML com clique (mobile-friendly)
+            # Função para criar tooltip HTML com CSS puro (mobile-friendly via :focus)
             def create_event_with_tooltip(event_name, tooltip_text, idx):
                 tooltip_text_escaped = tooltip_text.replace('"', '&quot;').replace("'", "&#39;").replace('\n', ' ')
                 return f'''<span class="event-tooltip-wrapper">
-                    <span class="event-name" onclick="toggleTooltip('tooltip-{idx}')">{event_name} <span class="tooltip-icon">?</span></span>
-                    <span class="tooltip-popup" id="tooltip-{idx}">{tooltip_text_escaped}</span>
+                    <button class="event-btn" type="button">{event_name} <span class="tooltip-icon">?</span></button>
+                    <span class="tooltip-popup">{tooltip_text_escaped}</span>
                 </span>'''
 
-            # Adicionar CSS e JavaScript para tooltips clicáveis
+            # Adicionar CSS para tooltips (funciona com touch via :focus)
             st.markdown('''
             <style>
             .event-tooltip-wrapper {
                 position: relative;
                 display: inline-block;
             }
-            .event-name {
+            .event-btn {
+                background: none;
+                border: none;
+                padding: 0;
+                font: inherit;
+                color: inherit;
                 cursor: pointer;
+                text-align: left;
             }
-            .event-name:hover {
+            .event-btn:hover {
                 color: #1E88E5;
             }
             .tooltip-icon {
@@ -1755,9 +1761,9 @@ with table_cols[1]:
                 font-weight: 600;
                 margin-left: 4px;
                 vertical-align: middle;
-                cursor: pointer;
             }
-            .tooltip-icon:hover {
+            .event-btn:hover .tooltip-icon,
+            .event-btn:focus .tooltip-icon {
                 background: #1E88E5;
             }
             .tooltip-popup {
@@ -1776,7 +1782,8 @@ with table_cols[1]:
                 margin-top: 4px;
                 line-height: 1.4;
             }
-            .tooltip-popup.active {
+            .event-btn:focus + .tooltip-popup,
+            .event-tooltip-wrapper:hover .tooltip-popup {
                 display: block;
             }
             .events-table, .source-table {
@@ -1801,25 +1808,6 @@ with table_cols[1]:
                 background: rgba(30, 136, 229, 0.05);
             }
             </style>
-            <script>
-            function toggleTooltip(id) {
-                var allTooltips = document.querySelectorAll('.tooltip-popup');
-                allTooltips.forEach(function(t) {
-                    if (t.id !== id) t.classList.remove('active');
-                });
-                var tooltip = document.getElementById(id);
-                if (tooltip) {
-                    tooltip.classList.toggle('active');
-                }
-            }
-            document.addEventListener('click', function(e) {
-                if (!e.target.closest('.event-tooltip-wrapper')) {
-                    document.querySelectorAll('.tooltip-popup').forEach(function(t) {
-                        t.classList.remove('active');
-                    });
-                }
-            });
-            </script>
             ''', unsafe_allow_html=True)
 
             st.markdown('<div class="table-container">', unsafe_allow_html=True)

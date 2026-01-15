@@ -1689,13 +1689,55 @@ st.markdown(ga4_section, unsafe_allow_html=True)
 table_cols = st.columns(2)
 
 with table_cols[0]:
-    # Tabela Origem/Midia
+    # Tabela Origem/Midia (HTML customizado para melhor contraste)
     try:
         source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(source_data) > 0:
+            # CSS inline para garantir estilos da tabela
+            st.markdown('''
+            <style>
+            .source-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+            }
+            .source-table th {
+                background: rgba(30, 136, 229, 0.1);
+                padding: 10px;
+                text-align: left;
+                border-bottom: 2px solid #1E88E5;
+                font-weight: 600;
+                color: #1A1A1A;
+            }
+            .source-table td {
+                padding: 8px 10px;
+                border-bottom: 1px solid rgba(0,0,0,0.08);
+                color: #1A1A1A;
+            }
+            .source-table tr:hover {
+                background: rgba(30, 136, 229, 0.05);
+            }
+            </style>
+            ''', unsafe_allow_html=True)
+
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
-            st.dataframe(source_data, use_container_width=True, hide_index=True)
+
+            # Criar tabela HTML com mesmo padrão da tabela de eventos
+            source_html = '<table class="source-table"><thead><tr>'
+            for col in source_data.columns:
+                source_html += f'<th>{col}</th>'
+            source_html += '</tr></thead><tbody>'
+
+            for _, row in source_data.iterrows():
+                source_html += '<tr>'
+                for col in source_data.columns:
+                    cell_value = row[col]
+                    source_html += f'<td>{cell_value}</td>'
+                source_html += '</tr>'
+            source_html += '</tbody></table>'
+
+            st.markdown(source_html, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")

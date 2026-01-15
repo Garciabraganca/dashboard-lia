@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import base64
+import html
 import os
 import logging
 import textwrap
@@ -839,6 +840,31 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     background: transparent !important;
 }}
 
+.lia-html-table {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}}
+
+.lia-html-table thead th {{
+    text-align: left;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+    color: {LIA["text_dark"]};
+    font-weight: 600;
+}}
+
+.lia-html-table tbody td {{
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(224, 224, 224, 0.6);
+    color: {LIA["text_dark"]};
+}}
+
+.lia-html-table tbody tr:hover {{
+    background: rgba(255, 255, 255, 0.7);
+}}
+
 /* ========== CARD DE ESCOPO ========== */
 .scope-card {{
     background: rgba(255, 255, 255, 0.65);
@@ -1003,6 +1029,12 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
+if "show_integration_settings" not in st.session_state:
+    st.session_state.show_integration_settings = False
+
+if st.button("⚙️ Configurações de integração", key="toggle_integration_settings", use_container_width=True):
+    st.session_state.show_integration_settings = not st.session_state.show_integration_settings
+
 # =============================================================================
 # CAMADA DE CONTEUDO CENTRAL
 # =============================================================================
@@ -1099,7 +1131,13 @@ if has_error:
 # -----------------------------------------------------------------------------
 owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
 insights_text = ". ".join(cycle_status["insights"]) + "."
-status_line = f"{insights_text} {cycle_status['phase']}."
+campaign_objective_map = {
+    "Ciclo 2": "Conversão na landing page",
+    "Ciclo 1": "Reconhecimento de marca",
+    "Todas": "Múltiplos objetivos",
+}
+campaign_objective = campaign_objective_map.get(campanha, "Conversão na landing page")
+status_line = f"{insights_text} Objetivo da campanha: {campaign_objective}. {cycle_status['phase']}."
 
 st.markdown(f'''
 <div class="status-card">
@@ -1111,12 +1149,6 @@ st.markdown(f'''
     </div>
 </div>
 ''', unsafe_allow_html=True)
-
-if "show_integration_settings" not in st.session_state:
-    st.session_state.show_integration_settings = False
-
-if st.button("⚙️ Configurações de integração", key="toggle_integration_settings", use_container_width=True):
-    st.session_state.show_integration_settings = not st.session_state.show_integration_settings
 
 if st.session_state.show_integration_settings:
     # Indicador de fonte de dados e diagnóstico de conexão
@@ -1419,27 +1451,39 @@ st.markdown('<div class="section-title"><div class="section-icon">*</div> Perfor
 if len(creative_data) > 0:
     try:
         best_ctr_idx = creative_data["CTR"].idxmax()
-        best_cpc_idx = creative_data["CPC"].idxmin()
-        best_ctr_name = creative_data.loc[best_ctr_idx, "Criativo"][:22]
-        best_cpc_name = creative_data.loc[best_cpc_idx, "Criativo"][:22]
+        best_ctr_name = str(creative_data.loc[best_ctr_idx, "Criativo"])[:22]
 
         st.markdown(f'''
         <div class="badge-row">
-            <div class="badge badge-orange">Melhor CTR: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}%)</div>
-            <div class="badge badge-green">Menor CPC: {best_cpc_name}... ($ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
+            <div class="badge badge-orange">Criativo campeão: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}% CTR)</div>
         </div>
         ''', unsafe_allow_html=True)
 
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
         st.markdown('<div class="table-header"><span class="table-header-title">Performance por Criativo</span></div>', unsafe_allow_html=True)
 
-        creative_sorted = creative_data.sort_values("Cliques", ascending=False)
+        creative_champion = creative_data.loc[[best_ctr_idx]]
+        creative_tooltips = {
+            "Criativo": "Criativo campeão com melhor CTR.",
+            "Formato": "Formato do anúncio vencedor.",
+            "Investimento": "Valor investido no criativo campeão.",
+            "Impressoes": "Total de impressões do criativo campeão.",
+            "Cliques": "Total de cliques gerados pelo criativo campeão.",
+            "CTR": "Percentual de cliques sobre as impressões.",
+            "CPC": "Custo médio por clique.",
+            "CPM": "Custo médio por mil impressões.",
+        }
+        tooltip_df = pd.DataFrame("", index=creative_champion.index, columns=creative_champion.columns, dtype=str)
+        for column, tooltip in creative_tooltips.items():
+            if column in tooltip_df.columns:
+                tooltip_df[column] = tooltip
+
         st.dataframe(
-            creative_sorted.style.format({
+            creative_champion.style.format({
                 "Investimento": "$ {:.2f}", "Impressoes": "{:,.0f}",
                 "Cliques": "{:,.0f}", "CTR": "{:.2f}%",
                 "CPC": "$ {:.2f}", "CPM": "$ {:.2f}"
-            }),
+            }).set_tooltips(tooltip_df),
             use_container_width=True, hide_index=True
         )
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1661,48 +1705,45 @@ with table_cols[1]:
     try:
         events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(events_data) > 0:
+            event_tooltips = {
+                "page_view": "Total de visualizações da página.",
+                "session_start": "Total de acessos à landing page originados das campanhas.",
+                "first_visit": "Quantidade de pessoas únicas que visitaram a landing page.",
+                "scroll": "Indica que o usuário rolou a página.",
+                "scroll_25": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "scroll_50": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "scroll_75": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "landing_visit": "Usuários que realmente carregaram e visualizaram a landing page.",
+                "user_engagement": "Percentual de usuários que tiveram alguma interação relevante na página.",
+                "primary_cta_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
+                "cta_baixe_agora_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
+                "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
+                "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
+            }
+            columns = list(events_data.columns)
+            header_html = "".join(f"<th>{html.escape(str(col))}</th>" for col in columns)
+            body_rows = []
+            for _, row in events_data.iterrows():
+                cells = []
+                for col in columns:
+                    value = "" if pd.isna(row[col]) else str(row[col])
+                    tooltip_attr = ""
+                    if col == "Nome do Evento":
+                        tooltip = event_tooltips.get(str(row[col]).strip(), "")
+                        if tooltip:
+                            tooltip_attr = f' title="{html.escape(tooltip)}"'
+                    cells.append(f"<td{tooltip_attr}>{html.escape(value)}</td>")
+                body_rows.append("<tr>" + "".join(cells) + "</tr>")
+            events_table_html = f"""
+            <table class="lia-html-table">
+                <thead><tr>{header_html}</tr></thead>
+                <tbody>{''.join(body_rows)}</tbody>
+            </table>
+            """
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span></div>', unsafe_allow_html=True)
-            st.dataframe(events_data, use_container_width=True, hide_index=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do Google Analytics</span></div>', unsafe_allow_html=True)
+            st.markdown(events_table_html, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown(
-            """📌 Legenda dos Eventos (GA4)
-
-Sessões  
-Total de acessos à landing page originados das campanhas.
-
-Usuários  
-Quantidade de pessoas únicas que visitaram a landing page.
-
-Pageviews  
-Total de visualizações da página.
-
-Engajamento  
-Percentual de usuários que tiveram alguma interação relevante na página.
-
-Tempo médio  
-Tempo médio que o usuário permaneceu na landing page.
-
-landing_visit  
-Usuários que realmente carregaram e visualizaram a landing page.
-
-scroll / scroll_25 / scroll_50 / scroll_75  
-Indicam até onde o usuário rolou a página (nível de leitura).
-
-primary_cta_click  
-Clique no botão principal de ação (ex: “Baixar agora”).
-
-cta_click_store  
-Clique no botão que direciona para a loja do app  
-(App Store ou Google Play).  
-Indica intenção clara de instalação.
-
-install  
-Instalações do app.  
-Evento dependente da integração do SDK dentro do app  
-(Firebase / App Store / Play Store).
-"""
-        )
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")
 

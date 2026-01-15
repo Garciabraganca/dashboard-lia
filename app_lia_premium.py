@@ -255,111 +255,88 @@ class DataProvider:
                         return metrics
 
                 # GA4 conectado mas sem dados para este filtro
-                logger.info(f"GA4 no data for filter '{campaign_filter}' in period '{period}'")
-                result = self._get_mock_ga4_metrics(period)
-                result['_data_source'] = 'no_data'
-                result['_campaign_filter'] = campaign_filter
-                return result
+                return {**self._empty_metrics(), "_data_source": "no_data", "_campaign_filter": campaign_filter}
+
             except Exception as e:
                 logger.error(f"Erro ao obter dados reais do GA4: {e}")
 
         # Fallback para mock
-        result = self._safe_execute(
-            lambda: self._get_mock_ga4_metrics(period),
-            default=self._empty_ga4_metrics()
-        )
-        result['_data_source'] = 'mock'
-        return result
+        metrics = self._get_mock_ga4_metrics()
+        metrics["_data_source"] = "mock"
+        return metrics
 
-    def get_creative_performance(self, period="7d", campaign_filter=None, custom_start=None, custom_end=None):
-        # Tentar dados reais primeiro
+    def get_source_medium(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
+        if self.ga4_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                df = self.ga4_client.get_sessions_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end)
+                if not df.empty:
+                    # Agrupar por source_medium
+                    summary = df.groupby('source_medium').agg({
+                        'sessions': 'sum',
+                        'users': 'sum',
+                        'engagement_rate': 'mean',
+                        'pageviews': 'sum'
+                    }).reset_index()
+                    summary = summary.sort_values('sessions', ascending=False)
+                    summary.columns = ["Origem / Midia", "Sessoes", "Usuarios", "Engajamento", "Pageviews"]
+                    # Formatar engajamento
+                    summary["Engajamento"] = summary["Engajamento"].apply(lambda x: f"{x*100:.1f}%")
+                    return summary
+            except Exception as e:
+                logger.error(f"Erro ao obter source/medium real: {e}")
+
+        return self._get_mock_source_medium()
+
+    def get_events_data(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
+        if self.ga4_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                df = self.ga4_client.get_events_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end, campaign_filter=campaign_filter)
+                if not df.empty:
+                    # Renomear colunas para o dashboard
+                    df = df.rename(columns={
+                        'event_name': 'Nome do Evento',
+                        'event_count': 'Contagem de Eventos',
+                        'total_users': 'Total de Usuarios',
+                        'events_per_user': 'Eventos por Usuario',
+                        'event_value': 'Receita Total'
+                    })
+                    # Formatar colunas com percentuais
+                    df['Contagem de Eventos'] = df.apply(lambda x: f"{x['Contagem de Eventos']:,} ({x['event_count_pct']:.2f}%)".replace(',', '.'), axis=1)
+                    df['Total de Usuarios'] = df.apply(lambda x: f"{x['Total de Usuarios']:,} ({x['users_pct']:.2f}%)".replace(',', '.'), axis=1)
+                    df['Eventos por Usuario'] = df['Eventos por Usuario'].apply(lambda x: f"{x:.2f}".replace('.', ','))
+                    df['Receita Total'] = df['Receita Total'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
+
+                    return df[['Nome do Evento', 'Contagem de Eventos', 'Total de Usuarios', 'Eventos por Usuario', 'Receita Total']]
+            except Exception as e:
+                logger.error(f"Erro ao obter eventos reais: {e}")
+
+        return self._get_mock_events_data()
+
+    def get_creative_data(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
-                
-                # Primeiro tenta com filtro
                 df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=campaign_filter, custom_start=custom_start, custom_end=custom_end)
-                
-                # Se não encontrou com filtro, tenta sem filtro (fallback)
-                if df.empty and campaign_filter:
-                    logger.info(f"Meta Creative: No data found for filter '{campaign_filter}', trying without filter")
-                    df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=None, custom_start=custom_start, custom_end=custom_end)
-
                 if not df.empty:
-                    # Formatar para o dashboard
-                    result = pd.DataFrame({
-                        "Criativo": df['ad_name'] if 'ad_name' in df.columns else [],
-                        "Formato": "Anúncio",  # API não retorna formato diretamente
-                        "Investimento": df['spend'] if 'spend' in df.columns else 0,
-                        "Impressoes": df['impressions'].astype(int) if 'impressions' in df.columns else 0,
-                        "Cliques": df['clicks'].astype(int) if 'clicks' in df.columns else 0,
-                        "CTR": df['ctr'] if 'ctr' in df.columns else 0,
-                        "CPC": df['cpc'] if 'cpc' in df.columns else 0,
-                        "CPM": df['cpm'] if 'cpm' in df.columns else 0,
+                    # Renomear e selecionar colunas
+                    df = df.rename(columns={
+                        'ad_name': 'Criativo',
+                        'spend': 'Investimento',
+                        'impressions': 'Impressoes',
+                        'clicks': 'Cliques',
+                        'ctr': 'CTR',
+                        'cpc': 'CPC',
+                        'cpm': 'CPM'
                     })
-                    return result
+                    # Adicionar coluna de formato (Meta API não retorna diretamente de forma simples, vamos inferir ou deixar fixo)
+                    df['Formato'] = df['Criativo'].apply(lambda x: "Video" if "video" in x.lower() else "Imagem")
+                    return df[['Criativo', 'Formato', 'Investimento', 'Impressoes', 'Cliques', 'CTR', 'CPC', 'CPM']]
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")
 
-        if self.mode == "mock":
-            return self._safe_execute(
-                lambda: self._get_mock_creative_data(),
-                default=pd.DataFrame()
-            )
-        return pd.DataFrame()
-
-    def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
-        return self._safe_execute(
-            lambda: self._get_mock_daily_trends(period, custom_start, custom_end),
-            default=pd.DataFrame({"Data": [], "Cliques": [], "CTR": [], "CPC": []})
-        )
-
-    def get_source_medium(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
-        # Tentar dados reais primeiro
-        if self.ga4_client and self.mode != "mock":
-            try:
-                api_period = self._period_to_api_format(period)
-                source_data = self.ga4_client.get_source_medium_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end, campaign_filter=campaign_filter)
-                if not source_data.empty:
-                    return source_data
-            except Exception as e:
-                logger.error(f"Erro ao obter source/medium do GA4: {e}")
-
-        # Fallback para mock
-        return self._safe_execute(
-            lambda: self._get_mock_source_medium(),
-            default=pd.DataFrame()
-        )
-
-    def get_events_data(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
-        """Obtém dados de eventos do GA4"""
-        # Tentar dados reais primeiro
-        if self.ga4_client and self.mode != "mock":
-            try:
-                api_period = self._period_to_api_format(period)
-                events_data = self.ga4_client.get_events_data(date_range=api_period, custom_start=custom_start, custom_end=custom_end, campaign_filter=campaign_filter)
-                if not events_data.empty:
-                    # Formatar para exibição na tabela
-                    formatted_df = pd.DataFrame({
-                        'Nome do Evento': events_data['event_name'],
-                        'Contagem de Eventos': events_data.apply(
-                            lambda row: f"{row['event_count']:,} ({row['event_count_pct']:.2f}%)", axis=1
-                        ),
-                        'Total de Usuarios': events_data.apply(
-                            lambda row: f"{row['total_users']:,} ({row['users_pct']:.2f}%)", axis=1
-                        ),
-                        'Eventos por Usuario': events_data['events_per_user'].apply(lambda x: f"{x:.2f}"),
-                        'Receita Total': events_data['event_value'].apply(lambda x: f"R$ {x:,.2f}")
-                    })
-                    return formatted_df
-            except Exception as e:
-                logger.error(f"Erro ao obter eventos do GA4: {e}")
-
-        # Fallback para mock
-        return self._safe_execute(
-            lambda: self._get_mock_events_data(),
-            default=pd.DataFrame()
-        )
+        return self._get_mock_creative_data()
 
     def _empty_meta_metrics(self):
         return {
@@ -370,34 +347,27 @@ class DataProvider:
             "delta_cpc": 0, "delta_cpm": 0,
         }
 
-    def _empty_ga4_metrics(self):
+    def _empty_metrics(self):
         return {
-            "sessoes": 0, "usuarios": 0, "pageviews": 0,
-            "taxa_engajamento": 0, "tempo_medio": "0m 0s",
-            "delta_sessoes": 0, "delta_usuarios": 0,
-            "delta_pageviews": 0, "delta_engajamento": 0,
+            'sessoes': 0, 'usuarios': 0, 'pageviews': 0,
+            'taxa_engajamento': 0, 'tempo_medio': "0m 0s",
+            'delta_sessoes': 0, 'delta_usuarios': 0, 'delta_pageviews': 0, 'delta_engajamento': 0
         }
 
     def _get_mock_meta_metrics(self, period, level):
-        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2, "30d": 4.3, "custom": 1}.get(period, 1)
-        base = {
-            "investimento": 850.00, "impressoes": 125000, "alcance": 89000,
-            "frequencia": 1.40, "cliques_link": 3200, "ctr_link": 2.56,
-            "cpc_link": 0.27, "cpm": 6.80,
-            "delta_investimento": 12.5, "delta_impressoes": 18.3,
-            "delta_alcance": 15.2, "delta_frequencia": 0.05,
-            "delta_cliques": 22.1, "delta_ctr": 0.3,
-            "delta_cpc": -8.5, "delta_cpm": -5.2,
-        }
-        return {k: v * multiplier if isinstance(v, (int, float)) and not k.startswith("delta") else v
-                for k, v in base.items()}
-
-    def _get_mock_ga4_metrics(self, period):
-        multiplier = {"today": 0.14, "yesterday": 0.14, "7d": 1, "14d": 2, "30d": 4.3, "custom": 1}.get(period, 1)
         return {
-            "sessoes": int(2850 * multiplier), "usuarios": int(2340 * multiplier),
-            "pageviews": int(4200 * multiplier), "taxa_engajamento": 68.5,
-            "tempo_medio": "1m 42s", "delta_sessoes": 15.8, "delta_usuarios": 12.3,
+            "investimento": 1250.50, "impressoes": 85400, "alcance": 42100, "frequencia": 2.03,
+            "cliques_link": 2450, "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
+            "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
+            "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
+            "delta_cpc": -8.2, "delta_cpm": 2.3,
+        }
+
+    def _get_mock_ga4_metrics(self):
+        return {
+            "sessoes": 3240, "usuarios": 2850, "pageviews": 6120,
+            "taxa_engajamento": 68.5, "tempo_medio": "1m 42s",
+            "delta_sessoes": 15.2, "delta_usuarios": 12.4,
             "delta_pageviews": 18.9, "delta_engajamento": 3.2,
         }
 
@@ -598,144 +568,115 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border-radius: 12px;
     background: rgba(255,255,255,0.85);
     backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    padding: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 12px 24px rgba(0,0,0,0.12);
-}}
-
-.lia-brand-name {{
-    font-size: 22px;
-    font-weight: 700;
-    color: {LIA["text_dark"]};
-}}
-
-.lia-brand-tagline {{
-    font-size: 13px;
-    color: {LIA["text_secondary"]};
-}}
-
-.lia-cycle-badge {{
-    padding: 8px 16px;
-    background: rgba(255,255,255,0.75);
-    border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 12px;
-    font-size: 13px;
-    font-weight: 600;
-    color: {LIA["text_dark"]};
-}}
-
-/* ========== TITULOS DE SECAO ========== */
-.section-title {{
-    font-size: 16px;
-    font-weight: 700;
-    color: {LIA["text_dark"]};
-    margin: 0 0 14px 0;
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+}}
+
+.lia-logo img {{
+    width: 32px;
+    height: 32px;
+}}
+
+.lia-title-group {{
+    display: flex;
+    flex-direction: column;
+}}
+
+.lia-main-title {{
+    font-size: 20px;
+    font-weight: 800;
+    color: {LIA["text_dark"]};
+    letter-spacing: -0.5px;
+    margin: 0;
+    line-height: 1.2;
+}}
+
+.lia-subtitle {{
+    font-size: 12px;
+    color: {LIA["text_secondary"]};
+    font-weight: 500;
+    margin: 0;
+}}
+
+/* ========== STATUS CARD ========== */
+.status-card {{
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 16px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+}}
+
+.status-owl {{
+    width: 28px;
+    height: 28px;
+}}
+
+.status-text {{
+    font-size: 13px;
+    color: {LIA["text_dark"]};
+    font-weight: 500;
+}}
+
+/* ========== KPI GRID & CARDS ========== */
+.section-title {{
+    font-size: 15px;
+    font-weight: 700;
+    color: {LIA["text_dark"]};
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }}
 
 .section-icon {{
     width: 24px;
     height: 24px;
     background: {LIA["primary"]};
+    color: white;
     border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
     font-size: 12px;
-    font-weight: bold;
+    font-weight: 800;
 }}
 
-/* ========== STATUS DO CICLO (COM CORUJA) ========== */
-.status-card {{
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border-radius: 20px;
-    padding: 24px;
-    display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
-    margin-bottom: 4px;
-}}
-
-.status-owl {{
-    width: 48px;
-    height: 48px;
-    flex-shrink: 0;
-}}
-
-.status-title {{
-    font-size: 12px;
-    font-weight: 600;
-    color: {LIA["text_muted"]};
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 6px;
-}}
-
-.status-text {{
-    font-size: 14px;
-    color: {LIA["text_dark"]};
-    line-height: 1.5;
-    margin-bottom: 10px;
-}}
-
-.status-badge {{
-    display: inline-block;
-    padding: 6px 12px;
-    background: {LIA["primary"]};
-    color: white;
-    border-radius: 16px;
-    font-size: 11px;
-    font-weight: 600;
-}}
-
-/* ========== KPIs EM CARDS GLASS ========== */
 .kpi-grid {{
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    margin-bottom: 8px;
-}}
-
-.ga4-grid {{
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
 }}
 
 .kpi-card {{
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
-    padding: 20px 22px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    transition: transform 0.2s ease;
+}}
+
+.kpi-card:hover {{
+    transform: translateY(-2px);
+    background: white;
 }}
 
 .kpi-top {{
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    gap: 8px;
+    margin-bottom: 8px;
 }}
 
 .kpi-icon {{
-    width: 28px;
-    height: 28px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, {LIA["primary"]}, {LIA["secondary"]});
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 14px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+    font-size: 16px;
 }}
 
 .kpi-label {{
@@ -747,53 +688,39 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 }}
 
 .kpi-value {{
-    font-size: 26px;
+    font-size: 18px;
     font-weight: 800;
-    color: #000000;
-    margin-bottom: 6px;
+    color: {LIA["text_dark"]};
+    margin-bottom: 4px;
 }}
 
 .kpi-delta {{
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 2px;
 }}
 
-.kpi-delta.positive {{ color: {LIA["success"]}; }}
-.kpi-delta.negative {{ color: {LIA["error"]}; }}
-.kpi-delta.neutral {{ color: {LIA["text_secondary"]}; }}
-
-/* Override Streamlit metrics para funcionar em cards brancos */
-[data-testid="stMetricValue"] {{
-    color: {LIA["text_dark"]} !important;
-    font-size: 24px !important;
-    font-weight: 700 !important;
-}}
-
-[data-testid="stMetricLabel"] {{
-    color: {LIA["text_muted"]} !important;
-    font-size: 11px !important;
-    text-transform: uppercase !important;
-}}
-
-[data-testid="stMetricDelta"] {{
-    font-size: 12px !important;
-}}
-
-[data-testid="stMetricDelta"] svg {{ display: none !important; }}
+.delta-up {{ color: {LIA["success"]}; }}
+.delta-down {{ color: {LIA["error"]}; }}
+.delta-neutral {{ color: {LIA["text_muted"]}; }}
 
 /* ========== BADGES ========== */
 .badge-row {{
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
+    gap: 8px;
+    margin-bottom: 16px;
 }}
 
 .badge {{
     padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
+    border-radius: 100px;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }}
 
 .badge-orange {{
@@ -1056,35 +983,23 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border-top: none;
     margin-top: 8px;
 }}
-
-.footer a {{
-    color: {LIA["primary"]};
-    text-decoration: none;
-}}
-
-/* Responsivo */
-@media (max-width: 768px) {{
-    .kpi-grid {{ grid-template-columns: repeat(2, 1fr); }}
-    .lia-header {{ flex-direction: column; gap: 12px; text-align: center; }}
-}}
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# HEADER (sobre gradiente - texto branco OK)
+# BARRA SUPERIOR (HEADER)
 # =============================================================================
-logo_img = f'<img src="data:image/png;base64,{logo_base64}" class="lia-logo" alt="LIA">' if logo_base64 else '<div class="lia-logo"></div>'
+logo_img = f'<img src="data:image/png;base64,{logo_base64}">' if logo_base64 else '🦉'
 
 st.markdown(f'''
 <div class="lia-header">
     <div class="lia-header-left">
-        {logo_img}
-        <div>
-            <div class="lia-brand-name">LIA Dashboard - Ciclo 2</div>
-            <div class="lia-brand-tagline">Performance de midia e conversoes na landing</div>
+        <div class="lia-logo">{logo_img}</div>
+        <div class="lia-title-group">
+            <h1 class="lia-main-title">LIA Dashboard</h1>
+            <p class="lia-subtitle">Inteligência em Performance</p>
         </div>
     </div>
-    <div class="lia-cycle-badge">Ciclo 2 - Conversao</div>
 </div>
 ''', unsafe_allow_html=True)
 
@@ -1095,42 +1010,68 @@ if st.button("⚙️ Configurações de integração", key="toggle_integration_s
     st.session_state.show_integration_settings = not st.session_state.show_integration_settings
 
 # =============================================================================
-# CAMADA DE CONTEUDO CENTRAL
+# FILTROS E CONTROLES
 # =============================================================================
 st.markdown('<div class="content-layer">', unsafe_allow_html=True)
 
-# -----------------------------------------------------------------------------
-# FILTROS
-# -----------------------------------------------------------------------------
-st.markdown('<div class="filter-card">', unsafe_allow_html=True)
-filter_cols = st.columns([1.5, 1, 1, 1.5])
+filter_cols = st.columns([2, 2, 1])
+
 with filter_cols[0]:
-    periodo = st.selectbox("Periodo", ["Hoje", "Ontem", "Ultimos 7 dias", "Ultimos 14 dias", "Ultimos 30 dias", "Personalizado"], index=2, key="periodo")
+    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
+    campanha = st.selectbox(
+        "Campanha",
+        ["Ciclo 2", "Ciclo 1", "Todas"],
+        index=0
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
+
 with filter_cols[1]:
-    fonte = st.selectbox("Fonte", ["Meta", "GA4", "Ambos"], index=0, key="fonte")
-with filter_cols[2]:
-    nivel = st.selectbox("Nivel", ["Campanha", "Conjunto", "Criativo"], index=0, key="nivel")
-with filter_cols[3]:
-    campanha = st.selectbox("Campanha", ["Ciclo 2", "Ciclo 1", "Todas"], index=0, key="campanha")
+    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
+    periodos = {
+        "Hoje": "today",
+        "Ontem": "yesterday",
+        "Últimos 7 dias": "7d",
+        "Últimos 14 dias": "14d",
+        "Últimos 30 dias": "30d",
+        "Personalizado": "custom"
+    }
+    selected_label = st.selectbox("Período", list(periodos.keys()), index=2)
+    selected_period = periodos[selected_label]
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Campos de data personalizada
-custom_start_date = None
-custom_end_date = None
-if periodo == "Personalizado":
-    date_cols = st.columns(2)
-    with date_cols[0]:
-        custom_start_date = st.date_input("Data Inicio", value=datetime.now() - timedelta(days=7), key="custom_start")
-    with date_cols[1]:
-        custom_end_date = st.date_input("Data Fim", value=datetime.now(), key="custom_end")
+# Datas personalizadas (se selecionado)
+custom_start_str, custom_end_str = None, None
+if selected_period == "custom":
+    with filter_cols[2]:
+        st.markdown('<div class="filter-card">', unsafe_allow_html=True)
+        d = st.date_input("Intervalo", [datetime.now() - timedelta(days=7), datetime.now()])
+        if len(d) == 2:
+            custom_start_str = d[0].strftime("%Y-%m-%d")
+            custom_end_str = d[1].strftime("%Y-%m-%d")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown('</div>', unsafe_allow_html=True)
+# Mapear filtro de campanha para as APIs
+campaign_filter = None if campanha == "Todas" else campanha
 
-period_map = {"Hoje": "today", "Ontem": "yesterday", "Ultimos 7 dias": "7d", "Ultimos 14 dias": "14d", "Ultimos 30 dias": "30d", "Personalizado": "custom"}
-selected_period = period_map.get(periodo, "7d")
+# =============================================================================
+# COLETA DE DADOS
+# =============================================================================
+with st.spinner("Sincronizando dados..."):
+    # Meta Ads
+    meta_data = data_provider.get_meta_metrics(
+        period=selected_period,
+        campaign_filter=campaign_filter,
+        custom_start=custom_start_str,
+        custom_end=custom_end_str
+    )
 
-# Converter datas para string se personalizado
-custom_start_str = custom_start_date.strftime("%Y-%m-%d") if custom_start_date else None
-custom_end_str = custom_end_date.strftime("%Y-%m-%d") if custom_end_date else None
+    # GA4
+    ga4_data = data_provider.get_ga4_metrics(
+        period=selected_period,
+        campaign_filter=campaign_filter,
+        custom_start=custom_start_str,
+        custom_end=custom_end_str
+    )
 
 # Mapear nome da campanha para filtro de UTM
 # Os UTMs reais usam "ciclo1" e "ciclo2" (sem espaço), ex: lia_ciclo2_conversao
@@ -1197,19 +1138,6 @@ try:
         custom_end=custom_end_str,
     )
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
-    has_error = data_provider.error_state
-except Exception as e:
-    logger.error(f"Erro ao carregar dados: {e}")
-    has_error = True
-    meta_data = data_provider._empty_meta_metrics()
-    ga4_data = data_provider._empty_ga4_metrics()
-    creative_data = pd.DataFrame()
-    trends_data = pd.DataFrame({"Data": [], "Cliques": [], "CTR": [], "CPC": []})
-    cycle_status = {"insights": ["Processando..."], "phase": "Carregando", "is_learning": True}
-
-# Se houver erro, mostrar card amigavel
-if has_error:
-    render_error_card()
 
 # -----------------------------------------------------------------------------
 # STATUS DO CICLO (COM CORUJA)
@@ -1230,260 +1158,41 @@ status_line = f"{insights_text} Objetivo da campanha: {campaign_objective}. {cyc
 st.markdown(f'''
 <div class="status-card">
     {owl_img}
-    <div style="flex:1;">
-        <div class="status-title">Status do Ciclo 2</div>
-        <div class="status-text">{status_line}</div>
-        <div class="status-badge">{cycle_status["phase"]}</div>
-    </div>
+    <div class="status-text">{status_line}</div>
 </div>
 ''', unsafe_allow_html=True)
 
 if st.session_state.show_integration_settings:
     # Indicador de fonte de dados e diagnóstico de conexão
     data_source = meta_data.get("_data_source", "unknown")
-    if data_source == "mock":
-        st.warning("⚠️ Usando dados de demonstração. Verifique as credenciais META_ACCESS_TOKEN no Streamlit Secrets.")
-    elif data_source == "real":
-        filter_applied = meta_data.get("_filter_applied")
-        if filter_applied:
-            st.success(f"✅ Conectado à API Meta Ads - dados reais (filtro: {filter_applied})")
-        else:
-            st.success("✅ Conectado à API Meta Ads - dados reais")
+    if data_source == "real":
+        st.success(f"✅ Conectado ao Meta Ads - Filtro: {meta_data.get('_filter_applied', 'Nenhum')}")
     elif data_source == "real_no_filter":
-        requested_filter = meta_data.get("_requested_filter", "")
-        available_campaigns = meta_data.get("_available_campaigns", [])
-        st.success("✅ Dados reais do Meta - exibindo todas as campanhas disponíveis.")
-        if requested_filter:
-            st.caption(f"Filtro solicitado: '{requested_filter}'.")
-        if available_campaigns:
-            st.markdown("**📋 Campanhas disponíveis no Meta**")
-            for camp in available_campaigns:
-                st.write(f"• {camp}")
-
-    st.divider()
-    st.markdown("### 🔧 Diagnóstico de Conexão Meta Ads")
-    if data_provider.meta_client:
-        connection_status = data_provider.meta_client.verify_connection()
-        if connection_status["connected"]:
-            st.success(f"✅ {connection_status['message']}")
-            info = connection_status["account_info"]
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**ID da Conta:** {info.get('id', 'N/A')}")
-                st.markdown(f"**Nome:** {info.get('name', 'N/A')}")
-                st.markdown(f"**Empresa:** {info.get('business_name', 'N/A')}")
-            with col2:
-                st.markdown(f"**Status:** {info.get('status', 'N/A')}")
-                st.markdown(f"**Moeda:** {info.get('currency', 'N/A')}")
-                st.markdown(f"**Timezone:** {info.get('timezone', 'N/A')}")
-        else:
-            st.success("✅ Conectado à API Meta Ads - dados reais")
-    elif data_source == "real_no_filter":
-        requested_filter = meta_data.get("_requested_filter", "")
-        available_campaigns = meta_data.get("_available_campaigns", [])
-        st.success("✅ Dados reais do Meta - exibindo todas as campanhas disponíveis.")
-        if requested_filter:
-            st.caption(f"Filtro solicitado: '{requested_filter}'.")
-        if available_campaigns:
-            with st.expander("📋 Campanhas disponíveis no Meta"):
-                for camp in available_campaigns:
-                    st.write(f"• {camp}")
-
-    # Expander com diagnóstico detalhado da conexão
-    with st.expander("🔧 Diagnóstico de Conexão Meta Ads"):
-        if data_provider.meta_client:
-            connection_status = data_provider.meta_client.verify_connection()
-            if connection_status["connected"]:
-                st.success(f"✅ {connection_status['message']}")
-                info = connection_status["account_info"]
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown(f"**ID da Conta:** {info.get('id', 'N/A')}")
-                    st.markdown(f"**Nome:** {info.get('name', 'N/A')}")
-                    st.markdown(f"**Empresa:** {info.get('business_name', 'N/A')}")
-                with col2:
-                    st.markdown(f"**Status:** {info.get('status', 'N/A')}")
-                    st.markdown(f"**Moeda:** {info.get('currency', 'N/A')}")
-                    st.markdown(f"**Timezone:** {info.get('timezone', 'N/A')}")
-            else:
-                st.error(f"❌ {connection_status['message']}")
-                if connection_status["error_code"]:
-                    st.code(f"Código: {connection_status['error_code']}\nDetalhes: {connection_status['error_details']}")
-        else:
-            st.error("❌ Cliente Meta Ads não inicializado")
-            st.info("Verifique se META_ACCESS_TOKEN está configurado no Streamlit Secrets.")
-
-            # Mostrar diagnóstico detalhado das credenciais Meta
-            st.markdown("**Diagnóstico de credenciais Meta:**")
-            meta_token = Config.get_meta_access_token()
-            meta_account_id_diag = Config.get_meta_ad_account_id()
-
-            if meta_token:
-                st.success(f"✅ META_ACCESS_TOKEN encontrado (comprimento: {len(meta_token)})")
-            else:
-                st.error("❌ META_ACCESS_TOKEN não encontrado")
-                st.markdown("Configure em uma das seguintes formas:")
-                st.code("# Variável de ambiente\nexport META_ACCESS_TOKEN='seu_token_aqui'\n\n# Ou em .streamlit/secrets.toml\nMETA_ACCESS_TOKEN = \"seu_token_aqui\"")
-
-            if meta_account_id_diag:
-                st.success(f"✅ META_AD_ACCOUNT_ID: {meta_account_id_diag}")
-            else:
-                st.error("❌ META_AD_ACCOUNT_ID não encontrado")
-
-    st.divider()
-    st.markdown("### 🔧 Diagnóstico GA4 / UTM Tracking")
-    if data_provider.ga4_client:
-        api_period = data_provider._period_to_api_format(selected_period)
-        diagnosis = data_provider.ga4_client.diagnose_utm_tracking(
-            campaign_filter=campaign_filter,
-            date_range=api_period,
-            custom_start=custom_start_str,
-            custom_end=custom_end_str
-        )
-
-        if diagnosis.get('connected'):
-            st.success(f"✅ GA4 conectado - Período: {diagnosis.get('date_range')}")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown(f"**Total de Sessões (sem filtro):** {diagnosis.get('total_sessions', 0):,}")
-                st.markdown(f"**Filtro usado:** {diagnosis.get('campaign_filter_used') or 'Nenhum'}")
-                st.markdown(f"**Sessões com filtro:** {diagnosis.get('sessions_with_filter', 0):,}")
-
-            with col2:
-                st.markdown(f"**Status:** {diagnosis.get('status')}")
-                if diagnosis.get('filtered_metrics'):
-                    metrics = diagnosis['filtered_metrics']
-                    st.markdown(f"**Sessões filtradas:** {metrics.get('sessoes', 0):,}")
-                    st.markdown(f"**Usuários filtrados:** {metrics.get('usuarios', 0):,}")
-
-                # Mostrar campanhas disponíveis
-                st.markdown("---")
-                st.markdown("**Campanhas (utm_campaign) disponíveis no GA4:**")
-                campaigns = diagnosis.get('available_campaigns', [])
-                if campaigns:
-                    import pandas as pd
-                    campaigns_df = pd.DataFrame(campaigns)
-                    campaigns_df.columns = ['Campanha (utm_campaign)', 'Sessões', 'Usuários']
-                    st.dataframe(campaigns_df, use_container_width=True, hide_index=True)
-
-                    # Verificar se há match com o filtro
-                    if campaign_filter:
-                        matches = diagnosis.get('filter_matches')
-                        if matches:
-                            st.success(f"✅ Encontrado match para '{campaign_filter}': {len(matches)} campanha(s)")
-                        else:
-                            st.warning(f"⚠️ Nenhuma campanha contém '{campaign_filter}'. Verifique o utm_campaign nos anúncios.")
-                            st.info("**Dica:** O filtro busca campanhas que CONTENHAM 'ciclo1' ou 'ciclo2' (sem espaço). Ex: lia_ciclo2_conversao")
-                else:
-                    st.warning("⚠️ Nenhuma campanha com utm_campaign encontrada no período selecionado.")
-                    st.info("**Possíveis causas:**\n"
-                           "1. Os anúncios não têm UTMs configurados\n"
-                           "2. Os UTMs foram adicionados recentemente (GA4 pode levar até 24-48h)\n"
-                           "3. O período selecionado não inclui dados com UTMs")
-        else:
-            st.error(f"❌ Erro na conexão GA4: {diagnosis.get('error', 'Erro desconhecido')}")
+        st.warning(f"⚠️ Meta Ads: Sem dados para '{meta_data.get('_requested_filter')}'. Mostrando total da conta.")
+        if "_available_campaigns" in meta_data:
+            st.info(f"Campanhas encontradas: {', '.join(meta_data['_available_campaigns'])}")
     else:
-        st.error("❌ Cliente GA4 não inicializado")
-        st.info("Verifique se as credenciais GA4 estão configuradas no Streamlit Secrets.")
+        st.info("💡 Usando dados de demonstração. Verifique as credenciais no Streamlit Secrets.")
 
-        # Mostrar diagnóstico detalhado das credenciais
-        st.markdown("**Diagnóstico de credenciais:**")
-        creds = Config.get_ga4_credentials()
-        property_id = Config.get_ga4_property_id()
-
-        if creds:
-            st.success(f"✅ GCP_CREDENTIALS encontrado com {len(creds)} campos")
-            required_keys = ['type', 'project_id', 'private_key', 'client_email']
-            for key in required_keys:
-                if key in creds:
-                    st.write(f"- {key}: ✅")
-                else:
-                    st.write(f"- {key}: ❌")
-        else:
-            st.error("❌ GCP_CREDENTIALS não encontrado")
-
-        if property_id:
-            st.success(f"✅ GA4_PROPERTY_ID encontrado: {property_id}")
-        else:
-            st.error("❌ GA4_PROPERTY_ID não encontrado")
-
-        st.write(f"**GA4_PROPERTY_ID:** {property_id}")
+# =============================================================================
+# CAMADA DE CONTEUDO CENTRAL
+# =============================================================================
 
 # -----------------------------------------------------------------------------
-# AGENTE DE IA - ANALISE INTELIGENTE
-# -----------------------------------------------------------------------------
-st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-st.markdown('''
-<div class="ai-agent-header">
-    <div class="ai-agent-icon">🤖</div>
-    <div>
-        <div class="ai-agent-title">LIA - Assistente de Marketing IA</div>
-        <div class="ai-agent-subtitle">Analise inteligente dos seus dados em tempo real</div>
-    </div>
-</div>
-''', unsafe_allow_html=True)
-
-# Verificar se a chave da API está configurada e o módulo está disponível
-openai_api_key = Config.get_openai_api_key()
-
-if openai_api_key:
-    # Botão para gerar análise
-    if st.button("🔍 Gerar Analise com IA", key="ai_analyze_btn", use_container_width=True):
-        with st.spinner("🤖 LIA está analisando seus dados..."):
-            try:
-                # Inicializar agente
-                ai_agent = AIAgent(api_key=openai_api_key, model="gpt-4o-mini")
-
-                # Obter dados extras para análise
-                source_data_for_ai = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
-                events_data_for_ai = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
-
-                # Gerar análise (passa o ciclo selecionado para ajustar o tom da análise)
-                analysis = ai_agent.analyze(
-                    meta_data=meta_data,
-                    ga4_data=ga4_data,
-                    creative_data=creative_data,
-                    source_data=source_data_for_ai,
-                    events_data=events_data_for_ai,
-                    period=selected_period,
-                    cycle=campanha if campanha in ["Ciclo 1", "Ciclo 2"] else "Ciclo 2"
-                )
-
-                # Salvar no session state para persistir
-                st.session_state['ai_analysis'] = analysis
-                st.session_state['ai_analysis_period'] = periodo
-
-            except Exception as e:
-                logger.error(f"Erro na análise de IA: {e}")
-                st.error(f"❌ Erro ao gerar análise: {str(e)}")
-
-    # Mostrar análise salva
-    if 'ai_analysis' in st.session_state:
-        st.markdown(f'''
-        <div class="ai-agent-content">
-            {st.session_state['ai_analysis']}
-        </div>
-        <p style="font-size:11px;color:#888;margin-top:8px;text-align:right;">
-            Analise gerada para: {st.session_state.get('ai_analysis_period', 'N/A')}
-        </p>
-        ''', unsafe_allow_html=True)
-else:
-    st.info("💡 Configure a chave OPENAI_API_KEY nos Streamlit Secrets para ativar a análise com IA")
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# -----------------------------------------------------------------------------
-# KPIs PRINCIPAIS (em cards brancos)
+# META ADS (KPIs)
 # -----------------------------------------------------------------------------
 def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precision=1):
-    if delta is None:
-        delta_class = "neutral"
-        delta_text = "—"
-    else:
-        is_positive = delta < 0 if invert else delta >= 0
-        delta_class = "positive" if is_positive else "negative"
-        delta_text = f"{delta:+.{precision}f}{suffix}"
+    delta_class = "delta-neutral"
+    delta_text = "stable"
+
+    if delta is not None and delta != 0:
+        is_positive = delta > 0
+        # Se invert=True, positivo é ruim (ex: CPC subindo)
+        is_good = not is_positive if invert else is_positive
+        delta_class = "delta-up" if is_good else "delta-down"
+        icon_delta = "↑" if is_positive else "↓"
+        delta_text = f"{icon_delta} {abs(delta):.{precision}f}{suffix}"
+
     return textwrap.dedent(f"""
     <div class="kpi-card">
         <div class="kpi-top">
@@ -1499,10 +1208,10 @@ kpi_cards = [
     {"icon": "💰", "label": "Investimento", "value": f"$ {meta_data['investimento']:,.2f}", "delta": meta_data['delta_investimento'], "suffix": "%"},
     {"icon": "👀", "label": "Impressoes", "value": f"{meta_data['impressoes']:,.0f}", "delta": meta_data['delta_impressoes'], "suffix": "%"},
     {"icon": "📡", "label": "Alcance", "value": f"{meta_data['alcance']:,.0f}", "delta": meta_data['delta_alcance'], "suffix": "%"},
-    {"icon": "🔁", "label": "Frequência (média de vezes por pessoa)", "value": f"{meta_data['frequencia']:.2f}", "delta": meta_data['delta_frequencia'], "suffix": "", "precision": 2},
+    {"icon": "🔁", "label": "Frequência", "value": f"{meta_data['frequencia']:.2f}", "delta": meta_data['delta_frequencia'], "suffix": "", "precision": 2},
     {"icon": "🖱️", "label": "Cliques Link", "value": f"{meta_data['cliques_link']:,.0f}", "delta": meta_data['delta_cliques'], "suffix": "%"},
-    {"icon": "🎯", "label": "% que clicou no link", "value": f"{meta_data['ctr_link']:.2f}%", "delta": meta_data['delta_ctr'], "suffix": "pp", "precision": 2},
-    {"icon": "💡", "label": "Custo por clique no link", "value": f"$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
+    {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data['ctr_link']:.2f}%", "delta": meta_data['delta_ctr'], "suffix": "pp", "precision": 2},
+    {"icon": "💡", "label": "CPC Link", "value": f"$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
     {"icon": "📊", "label": "CPM", "value": f"$ {meta_data['cpm']:.2f}", "delta": meta_data['delta_cpm'], "suffix": "%", "invert": True},
 ]
 
@@ -1521,7 +1230,7 @@ kpi_cards_html = "\n".join(
 
 kpi_section = textwrap.dedent(f"""
 <div class="glass-card">
-  <div class="section-title"><div class="section-icon">$</div> KPIs Principais</div>
+  <div class="section-title"><div class="section-icon">$</div> KPIs Principais (Meta Ads)</div>
   <div class="kpi-grid">
 {kpi_cards_html}
   </div>
@@ -1710,56 +1419,64 @@ st.markdown('</div>', unsafe_allow_html=True)
 # -----------------------------------------------------------------------------
 # FUNIL DE CONVERSÃO SIMPLES (Impressões -> Cliques -> Loja -> Instalações)
 # -----------------------------------------------------------------------------
-st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
+cols = st.columns([3, 2])
 
-# Buscar eventos GA4 para contar cliques na loja
-events_data_for_funnel = data_provider.get_events_data(
-    period=selected_period,
-    custom_start=custom_start_str,
-    custom_end=custom_end_str,
-    campaign_filter=campaign_filter
-)
-cta_count = 0
-if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
-    cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'cta_baixe_agora_click']
-    if not cta_row.empty:
-        # extrai número "2.050" de "2.050 (33,19%)" ou valor numérico direto
-        try:
-            raw_val = cta_row.iloc[0]['Contagem de Eventos']
-            if isinstance(raw_val, (int, float)):
-                cta_count = int(raw_val)
-            else:
-                raw_str = str(raw_val)
-                # Pega apenas a parte numérica antes do parêntese (se houver)
-                num_part = raw_str.split('(')[0].strip().split()[0] if '(' in raw_str else raw_str.split()[0]
-                # Remove separadores de milhar (ponto no BR, vírgula no US)
-                cta_count = int(num_part.replace('.', '').replace(',', ''))
-        except (ValueError, IndexError, TypeError) as e:
-            logger.warning(f"Erro ao parsear cta_count: {e}, raw_val={raw_val}")
-            cta_count = 0
+with cols[0]:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques e CTR</div>', unsafe_allow_html=True)
+    trends = data_provider._get_mock_daily_trends(selected_period, custom_start_str, custom_end_str)
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=trends["Data"], y=trends["Cliques"], name="Cliques", marker_color=LIA["primary"], opacity=0.8))
+    fig.add_trace(go.Scatter(x=trends["Data"], y=trends["CTR"], name="CTR %", yaxis="y2", line=dict(color=LIA["secondary"], width=3, shape='spline')))
+    fig.update_layout(
+        yaxis2=dict(overlaying="y", side="right", range=[0, trends["CTR"].max() * 1.2]),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=350, margin=dict(l=0, r=0, t=30, b=0),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        hovermode="x unified"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-instalacoes = 0  # placeholder até integrar SDK (Tanaka)
+with cols[1]:
+    st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
 
-# Garantir que todos os valores do funil são inteiros válidos (evita None quebrar o Plotly)
-funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK em implantação)"]
-funnel_values = [
-    int(meta_data.get('impressoes', 0) or 0),
-    int(meta_data.get('cliques_link', 0) or 0),
-    int(cta_count or 0),
-    int(instalacoes or 0)
-]
+    # Buscar dados de eventos para o funil
+    events_data_for_funnel = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
+    cta_count = 0
+    if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
+        cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'cta_baixe_agora_click']
+        if not cta_row.empty:
+            try:
+                raw_val = cta_row.iloc[0]['Contagem de Eventos']
+                if isinstance(raw_val, (int, float)):
+                    cta_count = int(raw_val)
+                else:
+                    raw_str = str(raw_val)
+                    num_part = raw_str.split('(')[0].strip().split()[0] if '(' in raw_str else raw_str.split()[0]
+                    cta_count = int(num_part.replace('.', '').replace(',', ''))
+            except (ValueError, IndexError, TypeError) as e:
+                logger.warning(f"Erro ao parsear cta_count: {e}")
+                cta_count = 0
 
-funnel_df = pd.DataFrame({"Etapa": funnel_labels, "Valor": funnel_values})
-fig_funnel = go.Figure(go.Funnel(y=funnel_df['Etapa'], x=funnel_df['Valor'],
-                                 textposition="inside", textinfo="value+percent initial"))
-fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
-                         paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)")
-st.plotly_chart(fig_funnel, use_container_width=True)
+    instalacoes = 0
+    funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK)"]
+    funnel_values = [
+        int(meta_data.get('impressoes', 0) or 0),
+        int(meta_data.get('cliques_link', 0) or 0),
+        int(cta_count or 0),
+        int(instalacoes or 0)
+    ]
 
-# Legenda explicativa do funil
-st.caption("**Cliques na loja** = evento GA4 `cta_baixe_agora_click` | **Instalações** = aguardando integração SDK")
-st.markdown('</div>', unsafe_allow_html=True)
+    funnel_df = pd.DataFrame({"Etapa": funnel_labels, "Valor": funnel_values})
+    fig_funnel = go.Figure(go.Funnel(y=funnel_df['Etapa'], x=funnel_df['Valor'],
+                                     textposition="inside", textinfo="value+percent initial"))
+    fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
+                             paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)")
+    st.plotly_chart(fig_funnel, use_container_width=True)
+    st.caption("**Cliques na loja** = evento GA4 `cta_baixe_agora_click` | **Instalações** = aguardando integração SDK")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # LANDING PAGE (GA4)
@@ -1820,7 +1537,20 @@ with table_cols[0]:
         if len(source_data) > 0:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
-            st.dataframe(source_data, use_container_width=True, hide_index=True)
+
+            source_html = '<table class="lia-html-table"><thead><tr>'
+            for col in source_data.columns:
+                source_html += f'<th>{col}</th>'
+            source_html += '</tr></thead><tbody>'
+
+            for _, row in source_data.iterrows():
+                source_html += '<tr>'
+                for col in source_data.columns:
+                    source_html += f'<td>{row[col]}</td>'
+                source_html += '</tr>'
+            source_html += '</tbody></table>'
+
+            st.markdown(source_html, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
@@ -1832,7 +1562,7 @@ with table_cols[0]:
         logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")
 
 with table_cols[1]:
-    # Tabela de Eventos do GA4
+    # Tabela de Eventos do GA4 com Tooltips CSS
     try:
         events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(events_data) > 0:

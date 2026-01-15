@@ -1675,13 +1675,16 @@ with table_cols[1]:
                 "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
                 "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
             }
-            tooltip_df = pd.DataFrame("", index=events_data.index, columns=events_data.columns)
+            # Build tooltip lookup for column_config help text
+            column_config = {}
             if "Nome do Evento" in events_data.columns:
-                tooltip_df["Nome do Evento"] = events_data["Nome do Evento"].map(event_tooltips).fillna("")
-            styled_events_data = events_data.style.set_tooltips(tooltip_df)
+                column_config["Nome do Evento"] = st.column_config.TextColumn(
+                    "Nome do Evento",
+                    help="Passe o mouse sobre um evento na legenda acima para ver sua descrição"
+                )
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span></div>', unsafe_allow_html=True)
-            st.dataframe(styled_events_data, use_container_width=True, hide_index=True)
+            st.dataframe(events_data, use_container_width=True, hide_index=True, column_config=column_config)
             st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")

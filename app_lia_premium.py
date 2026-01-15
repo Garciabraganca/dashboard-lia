@@ -792,67 +792,63 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     background: rgba(255, 255, 255, 0.7);
 }}
 
-/* ========== TOOLTIPS CSS PURO (Mobile Friendly) ========== */
 .event-tooltip-wrapper {{
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }}
 
 .event-btn {{
-    background: none;
+    background: transparent;
     border: none;
     padding: 0;
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-    text-align: left;
-    display: flex;
+    font-size: 14px;
+    font-weight: 600;
+    color: {LIA["text_dark"]};
+    cursor: default;
+    display: inline-flex;
     align-items: center;
-    gap: 4px;
-}}
-
-.event-btn:hover {{
-    color: {LIA["primary"]};
+    gap: 6px;
 }}
 
 .tooltip-icon {{
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: {LIA["primary"]};
+    color: #fff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 14px;
-    height: 14px;
-    background: rgba(0,0,0,0.1);
-    color: {LIA["text_secondary"]};
-    border-radius: 50%;
-    font-size: 10px;
-    font-weight: 800;
-}}
-
-.event-btn:hover .tooltip-icon,
-.event-btn:focus .tooltip-icon {{
-    background: {LIA["primary"]};
-    color: white;
+    font-size: 11px;
+    font-weight: 700;
 }}
 
 .tooltip-popup {{
-    display: none;
     position: absolute;
-    z-index: 1000;
-    background: #333;
-    color: white;
-    padding: 8px 12px;
+    left: 0;
+    bottom: calc(100% + 8px);
+    background: rgba(26, 26, 26, 0.92);
+    color: #fff;
+    padding: 8px 10px;
     border-radius: 8px;
     font-size: 12px;
-    width: 200px;
-    bottom: 125%;
-    left: 0;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
     line-height: 1.4;
+    min-width: 160px;
+    max-width: 240px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 10;
 }}
 
-.event-btn:focus + .tooltip-popup,
-.event-tooltip-wrapper:hover .tooltip-popup {{
-    display: block;
+.event-tooltip-wrapper:hover .tooltip-popup,
+.event-tooltip-wrapper:focus-within .tooltip-popup {{
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
 }}
 
 /* ========== CARD DE ESCOPO ========== */
@@ -1007,6 +1003,12 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
+if "show_integration_settings" not in st.session_state:
+    st.session_state.show_integration_settings = False
+
+if st.button("⚙️ Configurações de integração", key="toggle_integration_settings", use_container_width=True):
+    st.session_state.show_integration_settings = not st.session_state.show_integration_settings
+
 # =============================================================================
 # FILTROS E CONTROLES
 # =============================================================================
@@ -1071,13 +1073,41 @@ with st.spinner("Sincronizando dados..."):
         custom_end=custom_end_str
     )
 
-    # Criativos
-    creative_data = data_provider.get_creative_data(
-        period=selected_period,
-        campaign_filter=campaign_filter,
-        custom_start=custom_start_str,
-        custom_end=custom_end_str
-    )
+# Mapear nome da campanha para filtro de UTM
+# Os UTMs reais usam "ciclo1" e "ciclo2" (sem espaço), ex: lia_ciclo2_conversao
+campaign_filter_map = {
+    "Ciclo 2": "ciclo2",
+    "Ciclo 1": "ciclo1",
+    "Todas": None
+}
+campaign_filter = campaign_filter_map.get(campanha, None)
+
+# Ajustar datas automaticamente quando um ciclo é selecionado
+# Isso evita misturar dados de períodos diferentes ao selecionar um ciclo específico
+periodo_travado = False
+if campanha == "Ciclo 2":
+    # Ciclo 2: iniciado em 2025-01-09
+    custom_start_str = "2025-01-09"
+    custom_end_str = datetime.now().strftime("%Y-%m-%d")
+    selected_period = "custom"
+    periodo_travado = True
+elif campanha == "Ciclo 1":
+    # Ciclo 1: 2025-12-22 a 2026-01-08
+    custom_start_str = "2025-12-22"
+    custom_end_str = "2026-01-08"
+    selected_period = "custom"
+    periodo_travado = True
+
+# Feedback visual do período travado pelo ciclo
+if campanha == "Ciclo 2":
+    st.markdown(f'''
+    <div class="scope-card">
+        <span style="font-size:18px;">i</span>
+        <span class="scope-text">Exibindo dados do <strong>Ciclo 2</strong> de {custom_start_str} até hoje.</span>
+    </div>
+    ''', unsafe_allow_html=True)
+elif periodo_travado:
+    st.info(f"📅 Período ajustado automaticamente para **{campanha}**: {custom_start_str} a {custom_end_str}")
 
     # Status do Ciclo
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
@@ -1087,7 +1117,6 @@ with st.spinner("Sincronizando dados..."):
 # =============================================================================
 owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
 insights_text = ". ".join(cycle_status["insights"]) + "."
-
 campaign_objective_map = {
     "Ciclo 2": "Conversão na landing page",
     "Ciclo 1": "Reconhecimento de marca",
@@ -1102,12 +1131,6 @@ st.markdown(f'''
     <div class="status-text">{status_line}</div>
 </div>
 ''', unsafe_allow_html=True)
-
-if "show_integration_settings" not in st.session_state:
-    st.session_state.show_integration_settings = False
-
-if st.button("⚙️ Configurações de integração", key="toggle_integration_settings", use_container_width=True):
-    st.session_state.show_integration_settings = not st.session_state.show_integration_settings
 
 if st.session_state.show_integration_settings:
     # Indicador de fonte de dados e diagnóstico de conexão
@@ -1217,19 +1240,49 @@ if len(creative_data) > 0:
             "CPC": "Custo médio por clique.",
             "CPM": "Custo médio por mil impressões.",
         }
-        tooltip_df = pd.DataFrame("", index=creative_champion.index, columns=creative_champion.columns, dtype=str)
-        for column, tooltip in creative_tooltips.items():
-            if column in tooltip_df.columns:
-                tooltip_df[column] = tooltip
-
-        st.dataframe(
-            creative_champion.style.format({
-                "Investimento": "$ {:.2f}", "Impressoes": "{:,.0f}",
-                "Cliques": "{:,.0f}", "CTR": "{:.2f}%",
-                "CPC": "$ {:.2f}", "CPM": "$ {:.2f}"
-            }).set_tooltips(tooltip_df),
-            use_container_width=True, hide_index=True
-        )
+        creative_formatters = {
+            "Investimento": lambda value: f"$ {value:,.2f}",
+            "Impressoes": lambda value: f"{value:,.0f}",
+            "Cliques": lambda value: f"{value:,.0f}",
+            "CTR": lambda value: f"{value:.2f}%",
+            "CPC": lambda value: f"$ {value:,.2f}",
+            "CPM": lambda value: f"$ {value:,.2f}",
+        }
+        columns = list(creative_champion.columns)
+        header_cells = []
+        for col in columns:
+            tooltip = creative_tooltips.get(col)
+            if tooltip:
+                header_cells.append(
+                    f"""
+                    <th>
+                        <div class="event-tooltip-wrapper">
+                            <button class="event-btn" type="button">{html.escape(str(col))} <span class="tooltip-icon">?</span></button>
+                            <span class="tooltip-popup">{html.escape(tooltip)}</span>
+                        </div>
+                    </th>
+                    """
+                )
+            else:
+                header_cells.append(f"<th>{html.escape(str(col))}</th>")
+        body_rows = []
+        for _, row in creative_champion.iterrows():
+            row_cells = []
+            for col in columns:
+                value = row[col]
+                if col in creative_formatters and pd.notna(value):
+                    formatted = creative_formatters[col](value)
+                else:
+                    formatted = "" if pd.isna(value) else str(value)
+                row_cells.append(f"<td>{html.escape(formatted)}</td>")
+            body_rows.append("<tr>" + "".join(row_cells) + "</tr>")
+        creative_table_html = f"""
+        <table class="lia-html-table">
+            <thead><tr>{''.join(header_cells)}</tr></thead>
+            <tbody>{''.join(body_rows)}</tbody>
+        </table>
+        """
+        st.markdown(creative_table_html, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de criativos: {e}")
@@ -1244,7 +1297,97 @@ else:
 st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# TENDÊNCIAS E FUNIL
+# ESCOPO DO CICLO
+# -----------------------------------------------------------------------------
+st.markdown(f'''
+<div class="scope-card">
+    <span style="font-size:18px;">i</span>
+    <span class="scope-text"><strong>Ciclo 2 analisa midia e conversoes na landing page.</strong> Acompanhamento completo do funil de conversao.</span>
+</div>
+''', unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# TENDENCIA TEMPORAL
+# -----------------------------------------------------------------------------
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendencia Temporal</div>', unsafe_allow_html=True)
+
+if len(trends_data) > 0:
+    try:
+        chart_cols = st.columns(3)
+
+        with chart_cols[0]:
+            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+            fig1 = go.Figure()
+            fig1.add_trace(go.Bar(
+                x=trends_data["Data"],
+                y=trends_data["Cliques"],
+                marker_color=LIA["text_dark"],
+                opacity=0.8,
+            ))
+            fig1.update_layout(
+                title=dict(text="Cliques/Dia", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
+                height=220, margin=dict(l=10, r=10, t=40, b=30),
+                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                showlegend=False
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with chart_cols[1]:
+            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+            fig2 = go.Figure()
+            fig2.add_trace(go.Bar(
+                x=trends_data["Data"],
+                y=trends_data["CTR"],
+                marker_color=LIA["text_dark"],
+                opacity=0.8,
+            ))
+            fig2.add_trace(go.Scatter(
+                x=trends_data["Data"], y=trends_data["CTR"],
+                mode="lines+markers", line=dict(color=LIA["secondary"], width=3),
+                marker=dict(size=10, color=LIA["secondary"], line=dict(width=2, color="white")),
+            ))
+            fig2.update_layout(
+                title=dict(text="CTR/Dia (%)", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
+                height=220, margin=dict(l=10, r=10, t=40, b=30),
+                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                showlegend=False
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with chart_cols[2]:
+            st.markdown('<div class="chart-card">', unsafe_allow_html=True)
+            fig3 = go.Figure()
+            fig3.add_trace(go.Scatter(
+                x=trends_data["Data"], y=trends_data["CPC"],
+                mode="lines+markers", line=dict(color=LIA["success"], width=3),
+                marker=dict(size=10, color=LIA["success"], line=dict(width=2, color="white")),
+                fill="tozeroy", fillcolor="rgba(22,163,74,0.25)"
+            ))
+            fig3.update_layout(
+                title=dict(text="CPC/Dia ($)", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
+                height=220, margin=dict(l=10, r=10, t=40, b=30),
+                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
+                showlegend=False
+            )
+            st.plotly_chart(fig3, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Erro ao renderizar graficos: {e}")
+        render_error_card("Graficos indisponiveis", "Estamos processando os dados de tendencia.")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# -----------------------------------------------------------------------------
+# FUNIL DE CONVERSÃO SIMPLES (Impressões -> Cliques -> Loja -> Instalações)
 # -----------------------------------------------------------------------------
 cols = st.columns([3, 2])
 
@@ -1359,6 +1502,8 @@ with table_cols[0]:
     # Tabela Origem/Midia
     try:
         source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
+        if len(source_data) > 0 and "Origem / Midia" in source_data.columns:
+            source_data = source_data[source_data["Origem / Midia"].str.contains("paid", case=False, na=False)]
         if len(source_data) > 0:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
@@ -1377,6 +1522,12 @@ with table_cols[0]:
 
             st.markdown(source_html, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'''
+            <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:20px;text-align:center;border:1px dashed rgba(255,255,255,0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+                <p style="color:{LIA["text_muted"]};margin:0;">Nenhuma origem de tráfego paga encontrada no período.</p>
+            </div>
+            ''', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")
 
@@ -1400,32 +1551,20 @@ with table_cols[1]:
                 "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
                 "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
             }
-
             columns = list(events_data.columns)
             header_html = "".join(f"<th>{html.escape(str(col))}</th>" for col in columns)
             body_rows = []
-            for idx, row in events_data.iterrows():
+            for _, row in events_data.iterrows():
                 cells = []
                 for col in columns:
                     value = "" if pd.isna(row[col]) else str(row[col])
+                    tooltip_attr = ""
                     if col == "Nome do Evento":
-                        event_name = str(row[col]).strip()
-                        tooltip = event_tooltips.get(event_name, "")
+                        tooltip = event_tooltips.get(str(row[col]).strip(), "")
                         if tooltip:
-                            tooltip_escaped = html.escape(tooltip)
-                            cell_content = f'''
-                            <div class="event-tooltip-wrapper">
-                                <button class="event-btn" type="button">{html.escape(event_name)} <span class="tooltip-icon">?</span></button>
-                                <span class="tooltip-popup">{tooltip_escaped}</span>
-                            </div>
-                            '''
-                            cells.append(f"<td>{cell_content}</td>")
-                        else:
-                            cells.append(f"<td>{html.escape(value)}</td>")
-                    else:
-                        cells.append(f"<td>{html.escape(value)}</td>")
+                            tooltip_attr = f' title="{html.escape(tooltip)}"'
+                    cells.append(f"<td{tooltip_attr}>{html.escape(value)}</td>")
                 body_rows.append("<tr>" + "".join(cells) + "</tr>")
-
             events_table_html = f"""
             <table class="lia-html-table">
                 <thead><tr>{header_html}</tr></thead>

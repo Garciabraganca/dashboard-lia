@@ -1109,7 +1109,15 @@ if campanha == "Ciclo 2":
 elif periodo_travado:
     st.info(f"📅 Período ajustado automaticamente para **{campanha}**: {custom_start_str} a {custom_end_str}")
 
-    # Status do Ciclo
+# -----------------------------------------------------------------------------
+# CARREGAR DADOS (com tratamento de erro)
+# -----------------------------------------------------------------------------
+cycle_status = {"insights": ["Processando..."], "phase": "Carregando", "is_learning": True}
+try:
+    meta_data = data_provider.get_meta_metrics(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
+    ga4_data = data_provider.get_ga4_metrics(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
+    creative_data = data_provider.get_creative_performance(period=selected_period, campaign_filter=campaign_filter, custom_start=custom_start_str, custom_end=custom_end_str)
+    trends_data = data_provider.get_daily_trends(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str)
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
 
 # =============================================================================

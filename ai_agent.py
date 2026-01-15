@@ -4,8 +4,7 @@ Usa requests diretamente para evitar problemas de proxy no Streamlit Cloud
 """
 
 import logging
-from typing import Dict, Any, Optional
-import json
+from typing import Dict, Any
 import requests
 
 logger = logging.getLogger(__name__)

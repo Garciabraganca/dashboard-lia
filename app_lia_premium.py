@@ -1662,29 +1662,82 @@ with table_cols[1]:
         events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(events_data) > 0:
             event_tooltips = {
-                "page_view": "Total de visualizações da página.",
-                "session_start": "Total de acessos à landing page originados das campanhas.",
-                "first_visit": "Quantidade de pessoas únicas que visitaram a landing page.",
-                "scroll": "Indica que o usuário rolou a página.",
-                "scroll_25": "Indica até onde o usuário rolou a página (nível de leitura).",
-                "scroll_50": "Indica até onde o usuário rolou a página (nível de leitura).",
-                "scroll_75": "Indica até onde o usuário rolou a página (nível de leitura).",
-                "landing_visit": "Usuários que realmente carregaram e visualizaram a landing page.",
-                "user_engagement": "Percentual de usuários que tiveram alguma interação relevante na página.",
-                "primary_cta_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
-                "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
-                "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
+                "page_view": "Visualizações da página. Cada vez que alguém abre a página conta aqui.",
+                "session_start": "Acessos à página vindos das campanhas de anúncio.",
+                "first_visit": "Visitantes novos - pessoas que nunca tinham entrado antes.",
+                "scroll": "Usuário rolou a página pra baixo (leu algo).",
+                "scroll_25": "Usuário leu até 25% da página.",
+                "scroll_50": "Usuário leu até metade da página.",
+                "scroll_75": "Usuário leu até 75% da página (quase tudo).",
+                "landing_visit": "Visitas reais - pessoas que carregaram a página completamente.",
+                "user_engagement": "Usuários que interagiram com a página (clicaram, rolaram, etc).",
+                "primary_cta_click": "Cliques no botão principal (ex: 'Baixar agora').",
+                "cta_click_store": "Cliques para ir à loja do app (App Store ou Google Play).",
+                "cta_baixe_agora_click": "Cliques no botão 'Baixe Agora'.",
+                "store_click": "Cliques para ir à loja de apps.",
+                "click": "Cliques gerais na página.",
+                "install": "Instalações do app no celular.",
             }
-            # Build tooltip lookup for column_config help text
-            column_config = {}
-            if "Nome do Evento" in events_data.columns:
-                column_config["Nome do Evento"] = st.column_config.TextColumn(
-                    "Nome do Evento",
-                    help="Passe o mouse sobre um evento na legenda acima para ver sua descrição"
-                )
+
+            # Função para criar tooltip HTML
+            def create_event_with_tooltip(event_name, tooltip_text):
+                tooltip_text_escaped = tooltip_text.replace('"', '&quot;').replace("'", "&#39;")
+                return f'<span class="event-tooltip" title="{tooltip_text_escaped}">{event_name} ℹ️</span>'
+
+            # Adicionar CSS para tooltips
+            st.markdown('''
+            <style>
+            .event-tooltip {
+                cursor: help;
+                border-bottom: 1px dotted #666;
+            }
+            .event-tooltip:hover {
+                color: #1E88E5;
+            }
+            .events-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 14px;
+            }
+            .events-table th {
+                background: rgba(30, 136, 229, 0.1);
+                padding: 10px;
+                text-align: left;
+                border-bottom: 2px solid #1E88E5;
+                font-weight: 600;
+            }
+            .events-table td {
+                padding: 8px 10px;
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+            }
+            .events-table tr:hover {
+                background: rgba(30, 136, 229, 0.05);
+            }
+            </style>
+            ''', unsafe_allow_html=True)
+
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span></div>', unsafe_allow_html=True)
-            st.dataframe(events_data, use_container_width=True, hide_index=True, column_config=column_config)
+            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span> <small style="opacity:0.7">(passe o mouse no ℹ️ para ver explicação)</small></div>', unsafe_allow_html=True)
+
+            # Criar tabela HTML com tooltips
+            html_table = '<table class="events-table"><thead><tr>'
+            for col in events_data.columns:
+                html_table += f'<th>{col}</th>'
+            html_table += '</tr></thead><tbody>'
+
+            for _, row in events_data.iterrows():
+                html_table += '<tr>'
+                for col in events_data.columns:
+                    cell_value = row[col]
+                    if col == "Nome do Evento":
+                        tooltip = event_tooltips.get(str(cell_value), "Evento do Google Analytics")
+                        html_table += f'<td>{create_event_with_tooltip(cell_value, tooltip)}</td>'
+                    else:
+                        html_table += f'<td>{cell_value}</td>'
+                html_table += '</tr>'
+            html_table += '</tbody></table>'
+
+            st.markdown(html_table, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")

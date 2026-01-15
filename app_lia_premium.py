@@ -1721,18 +1721,25 @@ with table_cols[1]:
                 "install": "Instalações do app no celular.",
             }
 
-            # Função para criar tooltip HTML com ícone de interrogação minimalista
-            def create_event_with_tooltip(event_name, tooltip_text):
-                tooltip_text_escaped = tooltip_text.replace('"', '&quot;').replace("'", "&#39;")
-                return f'<span class="event-tooltip" title="{tooltip_text_escaped}">{event_name} <span class="tooltip-icon">?</span></span>'
+            # Função para criar tooltip HTML com clique (mobile-friendly)
+            def create_event_with_tooltip(event_name, tooltip_text, idx):
+                tooltip_text_escaped = tooltip_text.replace('"', '&quot;').replace("'", "&#39;").replace('\n', ' ')
+                return f'''<span class="event-tooltip-wrapper">
+                    <span class="event-name" onclick="toggleTooltip('tooltip-{idx}')">{event_name} <span class="tooltip-icon">?</span></span>
+                    <span class="tooltip-popup" id="tooltip-{idx}">{tooltip_text_escaped}</span>
+                </span>'''
 
-            # Adicionar CSS para tooltips e tabelas
+            # Adicionar CSS e JavaScript para tooltips clicáveis
             st.markdown('''
             <style>
-            .event-tooltip {
-                cursor: help;
+            .event-tooltip-wrapper {
+                position: relative;
+                display: inline-block;
             }
-            .event-tooltip:hover {
+            .event-name {
+                cursor: pointer;
+            }
+            .event-name:hover {
                 color: #1E88E5;
             }
             .tooltip-icon {
@@ -1748,10 +1755,29 @@ with table_cols[1]:
                 font-weight: 600;
                 margin-left: 4px;
                 vertical-align: middle;
-                cursor: help;
+                cursor: pointer;
             }
             .tooltip-icon:hover {
                 background: #1E88E5;
+            }
+            .tooltip-popup {
+                display: none;
+                position: absolute;
+                left: 0;
+                top: 100%;
+                background: #1A1A1A;
+                color: white;
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-size: 12px;
+                width: 220px;
+                z-index: 1000;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                margin-top: 4px;
+                line-height: 1.4;
+            }
+            .tooltip-popup.active {
+                display: block;
             }
             .events-table, .source-table {
                 width: 100%;
@@ -1775,24 +1801,46 @@ with table_cols[1]:
                 background: rgba(30, 136, 229, 0.05);
             }
             </style>
+            <script>
+            function toggleTooltip(id) {
+                var allTooltips = document.querySelectorAll('.tooltip-popup');
+                allTooltips.forEach(function(t) {
+                    if (t.id !== id) t.classList.remove('active');
+                });
+                var tooltip = document.getElementById(id);
+                if (tooltip) {
+                    tooltip.classList.toggle('active');
+                }
+            }
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.event-tooltip-wrapper')) {
+                    document.querySelectorAll('.tooltip-popup').forEach(function(t) {
+                        t.classList.remove('active');
+                    });
+                }
+            });
+            </script>
             ''', unsafe_allow_html=True)
 
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span> <small style="opacity:0.7">(passe o mouse no <span class="tooltip-icon" style="font-size:9px;width:12px;height:12px;">?</span> para ver explicação)</small></div>', unsafe_allow_html=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span> <small style="opacity:0.7">(toque no <span class="tooltip-icon" style="font-size:9px;width:12px;height:12px;">?</span> para ver explicação)</small></div>', unsafe_allow_html=True)
 
-            # Criar tabela HTML com tooltips
+            # Criar tabela HTML com tooltips (excluindo Receita Total)
+            cols_to_show = [c for c in events_data.columns if c != "Receita Total"]
             html_table = '<table class="events-table"><thead><tr>'
-            for col in events_data.columns:
+            for col in cols_to_show:
                 html_table += f'<th>{col}</th>'
             html_table += '</tr></thead><tbody>'
 
+            tooltip_idx = 0
             for _, row in events_data.iterrows():
                 html_table += '<tr>'
-                for col in events_data.columns:
+                for col in cols_to_show:
                     cell_value = row[col]
                     if col == "Nome do Evento":
                         tooltip = event_tooltips.get(str(cell_value), "Evento do Google Analytics")
-                        html_table += f'<td>{create_event_with_tooltip(cell_value, tooltip)}</td>'
+                        html_table += f'<td>{create_event_with_tooltip(cell_value, tooltip, tooltip_idx)}</td>'
+                        tooltip_idx += 1
                     else:
                         html_table += f'<td>{cell_value}</td>'
                 html_table += '</tr>'

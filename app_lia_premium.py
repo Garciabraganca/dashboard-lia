@@ -1138,13 +1138,22 @@ try:
         custom_end=custom_end_str,
     )
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
+except Exception as e:
+    import streamlit as st
+    st.error(f"Erro ao carregar dados do módulo Premium: {e}")
+    meta_data = {}
+    ga4_data = {}
+    creative_data = {}
+    trends_data = {}
 
 # -----------------------------------------------------------------------------
 # STATUS DO CICLO (COM CORUJA)
 # -----------------------------------------------------------------------------
 try:
     owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
-except Exception:
+except Exception as e:
+    import streamlit as st
+    st.error(f"Erro interno no módulo Premium: {e}")
     owl_img = ''
 insights_text = ". ".join(cycle_status["insights"]) + "."
 campaign_objective_map = {
@@ -1205,14 +1214,14 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
     """).strip()
 
 kpi_cards = [
-    {"icon": "💰", "label": "Investimento", "value": f"$ {meta_data['investimento']:,.2f}", "delta": meta_data['delta_investimento'], "suffix": "%"},
-    {"icon": "👀", "label": "Impressoes", "value": f"{meta_data['impressoes']:,.0f}", "delta": meta_data['delta_impressoes'], "suffix": "%"},
-    {"icon": "📡", "label": "Alcance", "value": f"{meta_data['alcance']:,.0f}", "delta": meta_data['delta_alcance'], "suffix": "%"},
-    {"icon": "🔁", "label": "Frequência", "value": f"{meta_data['frequencia']:.2f}", "delta": meta_data['delta_frequencia'], "suffix": "", "precision": 2},
-    {"icon": "🖱️", "label": "Cliques Link", "value": f"{meta_data['cliques_link']:,.0f}", "delta": meta_data['delta_cliques'], "suffix": "%"},
-    {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data['ctr_link']:.2f}%", "delta": meta_data['delta_ctr'], "suffix": "pp", "precision": 2},
-    {"icon": "💡", "label": "CPC Link", "value": f"$ {meta_data['cpc_link']:.2f}", "delta": meta_data['delta_cpc'], "suffix": "%", "invert": True},
-    {"icon": "📊", "label": "CPM", "value": f"$ {meta_data['cpm']:.2f}", "delta": meta_data['delta_cpm'], "suffix": "%", "invert": True},
+    {"icon": "💰", "label": "Investimento", "value": f"$ {meta_data.get('investimento', 0):,.2f}", "delta": meta_data.get('delta_investimento', 0), "suffix": "%"},
+    {"icon": "👀", "label": "Impressoes", "value": f"{meta_data.get('impressoes', 0):,.0f}", "delta": meta_data.get('delta_impressoes', 0), "suffix": "%"},
+    {"icon": "📡", "label": "Alcance", "value": f"{meta_data.get('alcance', 0):,.0f}", "delta": meta_data.get('delta_alcance', 0), "suffix": "%"},
+    {"icon": "🔁", "label": "Frequência", "value": f"{meta_data.get('frequencia', 0):.2f}", "delta": meta_data.get('delta_frequencia', 0), "suffix": "", "precision": 2},
+    {"icon": "🖱️", "label": "Cliques Link", "value": f"{meta_data.get('cliques_link', 0):,.0f}", "delta": meta_data.get('delta_cliques', 0), "suffix": "%"},
+    {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
+    {"icon": "💡", "label": "CPC Link", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
+    {"icon": "📊", "label": "CPM", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
 ]
 
 kpi_cards_html = "\n".join(

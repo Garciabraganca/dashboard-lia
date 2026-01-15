@@ -14,7 +14,7 @@ from google.analytics.data_v1beta.types import (
 from google.oauth2 import service_account
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)

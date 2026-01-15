@@ -84,7 +84,7 @@ class MetaAdsIntegration:
                 status_name = account_status_map.get(status_code, f"UNKNOWN ({status_code})")
 
                 result["connected"] = True
-                result["message"] = f"Conexão estabelecida com sucesso"
+                result["message"] = "Conexão estabelecida com sucesso"
                 result["account_info"] = {
                     "id": data.get("id", "").replace("act_", ""),
                     "name": data.get("name", "N/A"),

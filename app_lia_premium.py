@@ -13,8 +13,8 @@ from config import Config
 from ga_integration import GA4Integration
 from meta_integration import MetaAdsIntegration
 
-# Importar AIAgent
-from ai_agent import AIAgent
+# Importar AIAgent (disponível para uso futuro)
+# from ai_agent import AIAgent
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -1338,7 +1338,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # -----------------------------------------------------------------------------
 # ESCOPO DO CICLO
 # -----------------------------------------------------------------------------
-st.markdown(f'''
+st.markdown('''
 <div class="scope-card">
     <span style="font-size:18px;">i</span>
     <span class="scope-text"><strong>Ciclo 2 analisa midia e conversoes na landing page.</strong> Acompanhamento completo do funil de conversao.</span>
@@ -1620,7 +1620,7 @@ with table_cols[1]:
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
-st.markdown(f'''
+st.markdown('''
 <div class="footer glass-card">
     Dashboard Ciclo 2 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real
 </div>

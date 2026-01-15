@@ -1661,48 +1661,28 @@ with table_cols[1]:
     try:
         events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(events_data) > 0:
+            event_tooltips = {
+                "page_view": "Total de visualizações da página.",
+                "session_start": "Total de acessos à landing page originados das campanhas.",
+                "first_visit": "Quantidade de pessoas únicas que visitaram a landing page.",
+                "scroll": "Indica que o usuário rolou a página.",
+                "scroll_25": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "scroll_50": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "scroll_75": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "landing_visit": "Usuários que realmente carregaram e visualizaram a landing page.",
+                "user_engagement": "Percentual de usuários que tiveram alguma interação relevante na página.",
+                "primary_cta_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
+                "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
+                "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
+            }
+            tooltip_df = pd.DataFrame("", index=events_data.index, columns=events_data.columns)
+            if "Nome do Evento" in events_data.columns:
+                tooltip_df["Nome do Evento"] = events_data["Nome do Evento"].map(event_tooltips).fillna("")
+            styled_events_data = events_data.style.set_tooltips(tooltip_df)
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
             st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span></div>', unsafe_allow_html=True)
-            st.dataframe(events_data, use_container_width=True, hide_index=True)
+            st.dataframe(styled_events_data, use_container_width=True, hide_index=True)
             st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown(
-            """📌 Legenda dos Eventos (GA4)
-
-Sessões  
-Total de acessos à landing page originados das campanhas.
-
-Usuários  
-Quantidade de pessoas únicas que visitaram a landing page.
-
-Pageviews  
-Total de visualizações da página.
-
-Engajamento  
-Percentual de usuários que tiveram alguma interação relevante na página.
-
-Tempo médio  
-Tempo médio que o usuário permaneceu na landing page.
-
-landing_visit  
-Usuários que realmente carregaram e visualizaram a landing page.
-
-scroll / scroll_25 / scroll_50 / scroll_75  
-Indicam até onde o usuário rolou a página (nível de leitura).
-
-primary_cta_click  
-Clique no botão principal de ação (ex: “Baixar agora”).
-
-cta_click_store  
-Clique no botão que direciona para a loja do app  
-(App Store ou Google Play).  
-Indica intenção clara de instalação.
-
-install  
-Instalações do app.  
-Evento dependente da integração do SDK dentro do app  
-(Firebase / App Store / Play Store).
-"""
-        )
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")
 

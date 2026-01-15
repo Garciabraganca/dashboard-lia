@@ -1665,6 +1665,44 @@ with table_cols[1]:
             st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span></div>', unsafe_allow_html=True)
             st.dataframe(events_data, use_container_width=True, hide_index=True)
             st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            """📌 Legenda dos Eventos (GA4)
+
+Sessões  
+Total de acessos à landing page originados das campanhas.
+
+Usuários  
+Quantidade de pessoas únicas que visitaram a landing page.
+
+Pageviews  
+Total de visualizações da página.
+
+Engajamento  
+Percentual de usuários que tiveram alguma interação relevante na página.
+
+Tempo médio  
+Tempo médio que o usuário permaneceu na landing page.
+
+landing_visit  
+Usuários que realmente carregaram e visualizaram a landing page.
+
+scroll / scroll_25 / scroll_50 / scroll_75  
+Indicam até onde o usuário rolou a página (nível de leitura).
+
+primary_cta_click  
+Clique no botão principal de ação (ex: “Baixar agora”).
+
+cta_click_store  
+Clique no botão que direciona para a loja do app  
+(App Store ou Google Play).  
+Indica intenção clara de instalação.
+
+install  
+Instalações do app.  
+Evento dependente da integração do SDK dentro do app  
+(Firebase / App Store / Play Store).
+"""
+        )
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")
 

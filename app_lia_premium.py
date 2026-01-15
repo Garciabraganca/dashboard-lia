@@ -1138,13 +1138,22 @@ try:
         custom_end=custom_end_str,
     )
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
+except Exception as e:
+    import streamlit as st
+    st.error(f"Erro ao carregar dados do módulo Premium: {e}")
+    meta_data = {}
+    ga4_data = {}
+    creative_data = {}
+    trends_data = {}
 
 # -----------------------------------------------------------------------------
 # STATUS DO CICLO (COM CORUJA)
 # -----------------------------------------------------------------------------
 try:
     owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
-except Exception:
+except Exception as e:
+    import streamlit as st
+    st.error(f"Erro interno no módulo Premium: {e}")
     owl_img = ''
 insights_text = ". ".join(cycle_status["insights"]) + "."
 campaign_objective_map = {

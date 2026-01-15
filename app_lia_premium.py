@@ -1418,17 +1418,22 @@ st.markdown('<div class="section-title"><div class="section-icon">*</div> Perfor
 
 if len(creative_data) > 0:
     try:
-        best_ctr_idx = creative_data["CTR"].idxmax()
-        best_cpc_idx = creative_data["CPC"].idxmin()
-        best_ctr_name = creative_data.loc[best_ctr_idx, "Criativo"][:22]
-        best_cpc_name = creative_data.loc[best_cpc_idx, "Criativo"][:22]
+        # Verificar se há dados válidos para CTR e CPC
+        valid_ctr = creative_data["CTR"].dropna()
+        valid_cpc = creative_data["CPC"].dropna()
 
-        st.markdown(f'''
-        <div class="badge-row">
-            <div class="badge badge-orange">Melhor CTR: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}%)</div>
-            <div class="badge badge-green">Menor CPC: {best_cpc_name}... ($ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
-        </div>
-        ''', unsafe_allow_html=True)
+        if len(valid_ctr) > 0 and len(valid_cpc) > 0:
+            best_ctr_idx = valid_ctr.idxmax()
+            best_cpc_idx = valid_cpc.idxmin()
+            best_ctr_name = creative_data.loc[best_ctr_idx, "Criativo"][:22]
+            best_cpc_name = creative_data.loc[best_cpc_idx, "Criativo"][:22]
+
+            st.markdown(f'''
+            <div class="badge-row">
+                <div class="badge badge-orange">Melhor CTR: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}%)</div>
+                <div class="badge badge-green">Menor CPC: {best_cpc_name}... ($ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
+            </div>
+            ''', unsafe_allow_html=True)
 
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
         st.markdown('<div class="table-header"><span class="table-header-title">Performance por Criativo</span></div>', unsafe_allow_html=True)
@@ -1721,31 +1726,32 @@ with table_cols[1]:
                 "install": "Instalações do app no celular.",
             }
 
-            # Função para criar tooltip HTML com CSS puro (mobile-friendly via :focus)
+            # Função para criar tooltip HTML usando details/summary (funciona no mobile)
             def create_event_with_tooltip(event_name, tooltip_text, idx):
                 tooltip_text_escaped = tooltip_text.replace('"', '&quot;').replace("'", "&#39;").replace('\n', ' ')
-                return f'''<span class="event-tooltip-wrapper">
-                    <button class="event-btn" type="button">{event_name} <span class="tooltip-icon">?</span></button>
-                    <span class="tooltip-popup">{tooltip_text_escaped}</span>
-                </span>'''
+                return f'''<details class="event-details">
+                    <summary class="event-summary">{event_name} <span class="tooltip-icon">?</span></summary>
+                    <div class="tooltip-content">{tooltip_text_escaped}</div>
+                </details>'''
 
-            # Adicionar CSS para tooltips (funciona com touch via :focus)
+            # Adicionar CSS para tooltips usando details/summary
             st.markdown('''
             <style>
-            .event-tooltip-wrapper {
-                position: relative;
-                display: inline-block;
+            .event-details {
+                display: inline;
             }
-            .event-btn {
-                background: none;
-                border: none;
-                padding: 0;
-                font: inherit;
-                color: inherit;
+            .event-summary {
+                display: inline;
                 cursor: pointer;
-                text-align: left;
+                list-style: none;
             }
-            .event-btn:hover {
+            .event-summary::-webkit-details-marker {
+                display: none;
+            }
+            .event-summary::marker {
+                display: none;
+            }
+            .event-summary:hover {
                 color: #1E88E5;
             }
             .tooltip-icon {
@@ -1762,29 +1768,19 @@ with table_cols[1]:
                 margin-left: 4px;
                 vertical-align: middle;
             }
-            .event-btn:hover .tooltip-icon,
-            .event-btn:focus .tooltip-icon {
+            .event-details[open] .tooltip-icon,
+            .event-summary:hover .tooltip-icon {
                 background: #1E88E5;
             }
-            .tooltip-popup {
-                display: none;
-                position: absolute;
-                left: 0;
-                top: 100%;
+            .tooltip-content {
                 background: #1A1A1A;
                 color: white;
                 padding: 8px 12px;
                 border-radius: 8px;
                 font-size: 12px;
-                width: 220px;
-                z-index: 1000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                 margin-top: 4px;
                 line-height: 1.4;
-            }
-            .event-btn:focus + .tooltip-popup,
-            .event-tooltip-wrapper:hover .tooltip-popup {
-                display: block;
+                max-width: 250px;
             }
             .events-table, .source-table {
                 width: 100%;

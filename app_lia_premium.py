@@ -1139,10 +1139,13 @@ try:
     )
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
 
-# =============================================================================
-# CARD DE STATUS (INSIGHTS RÁPIDOS)
-# =============================================================================
-owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
+# -----------------------------------------------------------------------------
+# STATUS DO CICLO (COM CORUJA)
+# -----------------------------------------------------------------------------
+try:
+    owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
+except Exception:
+    owl_img = ''
 insights_text = ". ".join(cycle_status["insights"]) + "."
 campaign_objective_map = {
     "Ciclo 2": "Conversão na landing page",

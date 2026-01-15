@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import base64
+import html
 import os
 import logging
 import textwrap
@@ -839,6 +840,31 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     background: transparent !important;
 }}
 
+.lia-html-table {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}}
+
+.lia-html-table thead th {{
+    text-align: left;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+    color: {LIA["text_dark"]};
+    font-weight: 600;
+}}
+
+.lia-html-table tbody td {{
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(224, 224, 224, 0.6);
+    color: {LIA["text_dark"]};
+}}
+
+.lia-html-table tbody tr:hover {{
+    background: rgba(255, 255, 255, 0.7);
+}}
+
 /* ========== CARD DE ESCOPO ========== */
 .scope-card {{
     background: rgba(255, 255, 255, 0.65);
@@ -1003,6 +1029,12 @@ st.markdown(f'''
 </div>
 ''', unsafe_allow_html=True)
 
+if "show_integration_settings" not in st.session_state:
+    st.session_state.show_integration_settings = False
+
+if st.button("⚙️ Configurações de integração", key="toggle_integration_settings", use_container_width=True):
+    st.session_state.show_integration_settings = not st.session_state.show_integration_settings
+
 # =============================================================================
 # CAMADA DE CONTEUDO CENTRAL
 # =============================================================================
@@ -1099,7 +1131,13 @@ if has_error:
 # -----------------------------------------------------------------------------
 owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
 insights_text = ". ".join(cycle_status["insights"]) + "."
-status_line = f"{insights_text} {cycle_status['phase']}."
+campaign_objective_map = {
+    "Ciclo 2": "Conversão na landing page",
+    "Ciclo 1": "Reconhecimento de marca",
+    "Todas": "Múltiplos objetivos",
+}
+campaign_objective = campaign_objective_map.get(campanha, "Conversão na landing page")
+status_line = f"{insights_text} Objetivo da campanha: {campaign_objective}. {cycle_status['phase']}."
 
 st.markdown(f'''
 <div class="status-card">
@@ -1111,12 +1149,6 @@ st.markdown(f'''
     </div>
 </div>
 ''', unsafe_allow_html=True)
-
-if "show_integration_settings" not in st.session_state:
-    st.session_state.show_integration_settings = False
-
-if st.button("⚙️ Configurações de integração", key="toggle_integration_settings", use_container_width=True):
-    st.session_state.show_integration_settings = not st.session_state.show_integration_settings
 
 if st.session_state.show_integration_settings:
     # Indicador de fonte de dados e diagnóstico de conexão
@@ -1419,27 +1451,39 @@ st.markdown('<div class="section-title"><div class="section-icon">*</div> Perfor
 if len(creative_data) > 0:
     try:
         best_ctr_idx = creative_data["CTR"].idxmax()
-        best_cpc_idx = creative_data["CPC"].idxmin()
-        best_ctr_name = creative_data.loc[best_ctr_idx, "Criativo"][:22]
-        best_cpc_name = creative_data.loc[best_cpc_idx, "Criativo"][:22]
+        best_ctr_name = str(creative_data.loc[best_ctr_idx, "Criativo"])[:22]
 
         st.markdown(f'''
         <div class="badge-row">
-            <div class="badge badge-orange">Melhor CTR: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}%)</div>
-            <div class="badge badge-green">Menor CPC: {best_cpc_name}... ($ {creative_data.loc[best_cpc_idx, "CPC"]:.2f})</div>
+            <div class="badge badge-orange">Criativo campeão: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}% CTR)</div>
         </div>
         ''', unsafe_allow_html=True)
 
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
         st.markdown('<div class="table-header"><span class="table-header-title">Performance por Criativo</span></div>', unsafe_allow_html=True)
 
-        creative_sorted = creative_data.sort_values("Cliques", ascending=False)
+        creative_champion = creative_data.loc[[best_ctr_idx]]
+        creative_tooltips = {
+            "Criativo": "Criativo campeão com melhor CTR.",
+            "Formato": "Formato do anúncio vencedor.",
+            "Investimento": "Valor investido no criativo campeão.",
+            "Impressoes": "Total de impressões do criativo campeão.",
+            "Cliques": "Total de cliques gerados pelo criativo campeão.",
+            "CTR": "Percentual de cliques sobre as impressões.",
+            "CPC": "Custo médio por clique.",
+            "CPM": "Custo médio por mil impressões.",
+        }
+        tooltip_df = pd.DataFrame("", index=creative_champion.index, columns=creative_champion.columns, dtype=str)
+        for column, tooltip in creative_tooltips.items():
+            if column in tooltip_df.columns:
+                tooltip_df[column] = tooltip
+
         st.dataframe(
-            creative_sorted.style.format({
+            creative_champion.style.format({
                 "Investimento": "$ {:.2f}", "Impressoes": "{:,.0f}",
                 "Cliques": "{:,.0f}", "CTR": "{:.2f}%",
                 "CPC": "$ {:.2f}", "CPM": "$ {:.2f}"
-            }),
+            }).set_tooltips(tooltip_df),
             use_container_width=True, hide_index=True
         )
         st.markdown('</div>', unsafe_allow_html=True)
@@ -1704,137 +1748,43 @@ with table_cols[1]:
         events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
         if len(events_data) > 0:
             event_tooltips = {
-                "page_view": "Visualizações da página. Cada vez que alguém abre a página conta aqui.",
-                "session_start": "Acessos à página vindos das campanhas de anúncio.",
-                "first_visit": "Visitantes novos - pessoas que nunca tinham entrado antes.",
-                "scroll": "Usuário rolou a página pra baixo (leu algo).",
-                "scroll_25": "Usuário leu até 25% da página.",
-                "scroll_50": "Usuário leu até metade da página.",
-                "scroll_75": "Usuário leu até 75% da página (quase tudo).",
-                "landing_visit": "Visitas reais - pessoas que carregaram a página completamente.",
-                "user_engagement": "Usuários que interagiram com a página (clicaram, rolaram, etc).",
-                "primary_cta_click": "Cliques no botão principal (ex: 'Baixar agora').",
-                "cta_click_store": "Cliques para ir à loja do app (App Store ou Google Play).",
-                "cta_baixe_agora_click": "Cliques no botão 'Baixe Agora'.",
-                "store_click": "Cliques para ir à loja de apps.",
-                "click": "Cliques gerais na página.",
-                "install": "Instalações do app no celular.",
+                "page_view": "Total de visualizações da página.",
+                "session_start": "Total de acessos à landing page originados das campanhas.",
+                "first_visit": "Quantidade de pessoas únicas que visitaram a landing page.",
+                "scroll": "Indica que o usuário rolou a página.",
+                "scroll_25": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "scroll_50": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "scroll_75": "Indica até onde o usuário rolou a página (nível de leitura).",
+                "landing_visit": "Usuários que realmente carregaram e visualizaram a landing page.",
+                "user_engagement": "Percentual de usuários que tiveram alguma interação relevante na página.",
+                "primary_cta_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
+                "cta_baixe_agora_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
+                "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
+                "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
             }
-
-            # Função para criar tooltip HTML com CSS puro (mobile-friendly via :focus)
-            def create_event_with_tooltip(event_name, tooltip_text, idx):
-                tooltip_text_escaped = tooltip_text.replace('"', '&quot;').replace("'", "&#39;").replace('\n', ' ')
-                return f'''<span class="event-tooltip-wrapper">
-                    <button class="event-btn" type="button">{event_name} <span class="tooltip-icon">?</span></button>
-                    <span class="tooltip-popup">{tooltip_text_escaped}</span>
-                </span>'''
-
-            # Adicionar CSS para tooltips (funciona com touch via :focus)
-            st.markdown('''
-            <style>
-            .event-tooltip-wrapper {
-                position: relative;
-                display: inline-block;
-            }
-            .event-btn {
-                background: none;
-                border: none;
-                padding: 0;
-                font: inherit;
-                color: inherit;
-                cursor: pointer;
-                text-align: left;
-            }
-            .event-btn:hover {
-                color: #1E88E5;
-            }
-            .tooltip-icon {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 14px;
-                height: 14px;
-                background: #888;
-                color: white;
-                border-radius: 50%;
-                font-size: 10px;
-                font-weight: 600;
-                margin-left: 4px;
-                vertical-align: middle;
-            }
-            .event-btn:hover .tooltip-icon,
-            .event-btn:focus .tooltip-icon {
-                background: #1E88E5;
-            }
-            .tooltip-popup {
-                display: none;
-                position: absolute;
-                left: 0;
-                top: 100%;
-                background: #1A1A1A;
-                color: white;
-                padding: 8px 12px;
-                border-radius: 8px;
-                font-size: 12px;
-                width: 220px;
-                z-index: 1000;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                margin-top: 4px;
-                line-height: 1.4;
-            }
-            .event-btn:focus + .tooltip-popup,
-            .event-tooltip-wrapper:hover .tooltip-popup {
-                display: block;
-            }
-            .events-table, .source-table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 14px;
-            }
-            .events-table th, .source-table th {
-                background: rgba(30, 136, 229, 0.1);
-                padding: 10px;
-                text-align: left;
-                border-bottom: 2px solid #1E88E5;
-                font-weight: 600;
-                color: #1A1A1A;
-            }
-            .events-table td, .source-table td {
-                padding: 8px 10px;
-                border-bottom: 1px solid rgba(0,0,0,0.08);
-                color: #1A1A1A;
-            }
-            .events-table tr:hover, .source-table tr:hover {
-                background: rgba(30, 136, 229, 0.05);
-            }
-            </style>
-            ''', unsafe_allow_html=True)
-
-            st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do GA4</span> <small style="opacity:0.7">(toque no <span class="tooltip-icon" style="font-size:9px;width:12px;height:12px;">?</span> para ver explicação)</small></div>', unsafe_allow_html=True)
-
-            # Criar tabela HTML com tooltips (excluindo Receita Total)
-            cols_to_show = [c for c in events_data.columns if c != "Receita Total"]
-            html_table = '<table class="events-table"><thead><tr>'
-            for col in cols_to_show:
-                html_table += f'<th>{col}</th>'
-            html_table += '</tr></thead><tbody>'
-
-            tooltip_idx = 0
+            columns = list(events_data.columns)
+            header_html = "".join(f"<th>{html.escape(str(col))}</th>" for col in columns)
+            body_rows = []
             for _, row in events_data.iterrows():
-                html_table += '<tr>'
-                for col in cols_to_show:
-                    cell_value = row[col]
+                cells = []
+                for col in columns:
+                    value = "" if pd.isna(row[col]) else str(row[col])
+                    tooltip_attr = ""
                     if col == "Nome do Evento":
-                        tooltip = event_tooltips.get(str(cell_value), "Evento do Google Analytics")
-                        html_table += f'<td>{create_event_with_tooltip(cell_value, tooltip, tooltip_idx)}</td>'
-                        tooltip_idx += 1
-                    else:
-                        html_table += f'<td>{cell_value}</td>'
-                html_table += '</tr>'
-            html_table += '</tbody></table>'
-
-            st.markdown(html_table, unsafe_allow_html=True)
+                        tooltip = event_tooltips.get(str(row[col]).strip(), "")
+                        if tooltip:
+                            tooltip_attr = f' title="{html.escape(tooltip)}"'
+                    cells.append(f"<td{tooltip_attr}>{html.escape(value)}</td>")
+                body_rows.append("<tr>" + "".join(cells) + "</tr>")
+            events_table_html = f"""
+            <table class="lia-html-table">
+                <thead><tr>{header_html}</tr></thead>
+                <tbody>{''.join(body_rows)}</tbody>
+            </table>
+            """
+            st.markdown('<div class="table-container">', unsafe_allow_html=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do Google Analytics</span></div>', unsafe_allow_html=True)
+            st.markdown(events_table_html, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")

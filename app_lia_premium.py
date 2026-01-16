@@ -1285,16 +1285,6 @@ if len(creative_data) > 0:
         st.markdown('<div class="table-header"><span class="table-header-title">Performance por Criativo</span></div>', unsafe_allow_html=True)
 
         creative_champion = creative_data.loc[[best_ctr_idx]]
-        creative_tooltips = {
-            "Criativo": "Criativo campeão com melhor CTR.",
-            "Formato": "Formato do anúncio vencedor.",
-            "Investimento": "Valor investido no criativo campeão.",
-            "Impressoes": "Total de impressões do criativo campeão.",
-            "Cliques": "Total de cliques gerados pelo criativo campeão.",
-            "CTR": "Percentual de cliques sobre as impressões.",
-            "CPC": "Custo médio por clique.",
-            "CPM": "Custo médio por mil impressões.",
-        }
         creative_formatters = {
             "Investimento": lambda value: f"$ {value:,.2f}",
             "Impressoes": lambda value: f"{value:,.0f}",
@@ -1304,22 +1294,7 @@ if len(creative_data) > 0:
             "CPM": lambda value: f"$ {value:,.2f}",
         }
         columns = list(creative_champion.columns)
-        header_cells = []
-        for col in columns:
-            tooltip = creative_tooltips.get(col)
-            if tooltip:
-                header_cells.append(
-                    f"""
-                    <th>
-                        <div class="event-tooltip-wrapper">
-                            <button class="event-btn" type="button">{html.escape(str(col))} <span class="tooltip-icon">?</span></button>
-                            <span class="tooltip-popup">{html.escape(tooltip)}</span>
-                        </div>
-                    </th>
-                    """
-                )
-            else:
-                header_cells.append(f"<th>{html.escape(str(col))}</th>")
+        header_cells = "".join(f"<th>{html.escape(str(col))}</th>" for col in columns)
         body_rows = []
         for _, row in creative_champion.iterrows():
             row_cells = []
@@ -1331,12 +1306,7 @@ if len(creative_data) > 0:
                     formatted = "" if pd.isna(value) else str(value)
                 row_cells.append(f"<td>{html.escape(formatted)}</td>")
             body_rows.append("<tr>" + "".join(row_cells) + "</tr>")
-        creative_table_html = f"""
-        <table class="lia-html-table">
-            <thead><tr>{''.join(header_cells)}</tr></thead>
-            <tbody>{''.join(body_rows)}</tbody>
-        </table>
-        """
+        creative_table_html = f"""<table class="lia-html-table"><thead><tr>{header_cells}</tr></thead><tbody>{''.join(body_rows)}</tbody></table>"""
         st.markdown(creative_table_html, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
@@ -1601,9 +1571,11 @@ with table_cols[1]:
                 "scroll_75": "Indica até onde o usuário rolou a página (nível de leitura).",
                 "landing_visit": "Usuários que realmente carregaram e visualizaram a landing page.",
                 "user_engagement": "Percentual de usuários que tiveram alguma interação relevante na página.",
-                "primary_cta_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
-                "cta_baixe_agora_click": "Clique no botão principal de ação (ex: “Baixar agora”).",
+                "primary_cta_click": "Clique no botão principal de ação (ex: "Baixar agora").",
+                "cta_baixe_agora_click": "Clique no botão principal de ação (ex: "Baixar agora").",
                 "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
+                "click": "Clique genérico em algum elemento da página.",
+                "store_click": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
                 "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
             }
             columns = list(events_data.columns)

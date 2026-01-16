@@ -241,34 +241,44 @@ class MetaAdsIntegration:
             # Definir datas
             start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
 
-            # Buscar insights apenas de campanhas ATIVAS
+            # Buscar insights de todas as campanhas
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
                 "fields": ",".join(fields),
                 "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
                 "time_increment": "1",
                 "level": "campaign",
+                "limit": "500",
                 "access_token": self.access_token
             }
 
-            response = requests.get(url, params=params)
+            all_insights = []
 
-            # Log detalhado para debug
-            if response.status_code != 200:
-                error_data = response.json() if response.text else {}
-                error_msg = error_data.get('error', {}).get('message', 'Unknown error')
-                error_code = error_data.get('error', {}).get('code', 'N/A')
-                print(f"Meta API Error {response.status_code}: Code={error_code}, Message={error_msg}")
-                print(f"URL: {url}")
-                print(f"Ad Account: {self.ad_account_id}")
+            while url:
+                response = requests.get(url, params=params if all_insights == [] else None)
 
-            response.raise_for_status()
+                # Log detalhado para debug
+                if response.status_code != 200:
+                    error_data = response.json() if response.text else {}
+                    error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+                    error_code = error_data.get('error', {}).get('code', 'N/A')
+                    print(f"Meta API Error {response.status_code}: Code={error_code}, Message={error_msg}")
+                    print(f"URL: {url}")
+                    print(f"Ad Account: {self.ad_account_id}")
+                    break
 
-            data = response.json()
-            insights = data.get("data", [])
+                response.raise_for_status()
+
+                data = response.json()
+                insights = data.get("data", [])
+                all_insights.extend(insights)
+
+                # Verificar se há mais páginas
+                url = data.get("paging", {}).get("next")
+                params = None  # Próximas requisições usam a URL completa
 
             # Converter para DataFrame
-            df = pd.DataFrame(insights)
+            df = pd.DataFrame(all_insights)
 
             # Filtrar por nome da campanha se especificado
             if campaign_name_filter and not df.empty and 'campaign_name' in df.columns:

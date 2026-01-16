@@ -1123,8 +1123,8 @@ ga4_campaign_filter = utm_filter_map.get(campanha, None)
 # Isso evita misturar dados de períodos diferentes ao selecionar um ciclo específico
 periodo_travado = False
 if campanha == "Ciclo 2":
-    # Ciclo 2: iniciado em 2025-01-09
-    custom_start_str = "2025-01-09"
+    # Ciclo 2: iniciado em 2026-01-09
+    custom_start_str = "2026-01-09"
     custom_end_str = datetime.now().strftime("%Y-%m-%d")
     selected_period = "custom"
     periodo_travado = True

@@ -299,16 +299,14 @@ class DataProvider:
                         'event_name': 'Nome do Evento',
                         'event_count': 'Contagem de Eventos',
                         'total_users': 'Total de Usuarios',
-                        'events_per_user': 'Eventos por Usuario',
-                        'event_value': 'Receita Total'
+                        'events_per_user': 'Eventos por Usuario'
                     })
                     # Formatar colunas com percentuais
                     df['Contagem de Eventos'] = df.apply(lambda x: f"{x['Contagem de Eventos']:,} ({x['event_count_pct']:.2f}%)".replace(',', '.'), axis=1)
                     df['Total de Usuarios'] = df.apply(lambda x: f"{x['Total de Usuarios']:,} ({x['users_pct']:.2f}%)".replace(',', '.'), axis=1)
                     df['Eventos por Usuario'] = df['Eventos por Usuario'].apply(lambda x: f"{x:.2f}".replace('.', ','))
-                    df['Receita Total'] = df['Receita Total'].apply(lambda x: f"R$ {x:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'))
 
-                    return df[['Nome do Evento', 'Contagem de Eventos', 'Total de Usuarios', 'Eventos por Usuario', 'Receita Total']]
+                    return df[['Nome do Evento', 'Contagem de Eventos', 'Total de Usuarios', 'Eventos por Usuario']]
             except Exception as e:
                 logger.error(f"Erro ao obter eventos reais: {e}")
 
@@ -499,8 +497,7 @@ class DataProvider:
                 "1.968 (100%)", "1.968 (100%)", "1.958 (99,49%)", "68 (3,46%)",
                 "38 (1,93%)", "14 (0,71%)", "3 (0,15%)"
             ],
-            "Eventos por Usuario": ["1,04", "1,01", "1,00", "1,15", "2,05", "1,21", "1,00"],
-            "Receita Total": ["R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00", "R$ 0,00"]
+            "Eventos por Usuario": ["1,04", "1,01", "1,00", "1,15", "2,05", "1,21", "1,00"]
         })
 
     def get_cycle_status(self, period, meta_data, creative_data):

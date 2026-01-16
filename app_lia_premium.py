@@ -338,6 +338,11 @@ class DataProvider:
 
         return self._get_mock_creative_data()
 
+    def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
+        """Retorna dados de tendência diária (cliques, CTR, CPC)"""
+        # Por enquanto usa dados mock - futura implementação pode buscar dados reais
+        return self._get_mock_daily_trends(period, custom_start, custom_end)
+
     def _empty_meta_metrics(self):
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
@@ -1126,7 +1131,7 @@ try:
         custom_end=custom_end_str,
         campaign_filter=campaign_filter,
     )
-    creative_data = data_provider.get_creative_performance(
+    creative_data = data_provider.get_creative_data(
         period=selected_period,
         campaign_filter=campaign_filter,
         custom_start=custom_start_str,

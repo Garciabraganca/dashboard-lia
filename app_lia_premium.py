@@ -1116,32 +1116,14 @@ utm_filter_map = {
 }
 ga4_campaign_filter = utm_filter_map.get(campanha, None)
 
-# Ajustar datas automaticamente quando um ciclo é selecionado
-# Isso evita misturar dados de períodos diferentes ao selecionar um ciclo específico
-periodo_travado = False
-if campanha == "Ciclo 2":
-    # Ciclo 2: iniciado em 2026-01-09
-    custom_start_str = "2026-01-09"
-    custom_end_str = datetime.now().strftime("%Y-%m-%d")
-    selected_period = "custom"
-    periodo_travado = True
-elif campanha == "Ciclo 1":
-    # Ciclo 1: 2025-12-22 a 2026-01-08
-    custom_start_str = "2025-12-22"
-    custom_end_str = "2026-01-08"
-    selected_period = "custom"
-    periodo_travado = True
-
-# Feedback visual do período travado pelo ciclo
-if campanha == "Ciclo 2":
+# Feedback visual do filtro de campanha selecionado
+if campanha != "Todas":
     st.markdown(f'''
     <div class="scope-card">
         <span style="font-size:18px;">i</span>
-        <span class="scope-text">Exibindo dados do <strong>Ciclo 2</strong> de {custom_start_str} até hoje.</span>
+        <span class="scope-text">Filtrando por campanha: <strong>{campanha}</strong></span>
     </div>
     ''', unsafe_allow_html=True)
-elif periodo_travado:
-    st.info(f"Periodo ajustado automaticamente para **{campanha}**: {custom_start_str} a {custom_end_str}")
 
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)

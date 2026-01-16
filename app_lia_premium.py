@@ -1481,8 +1481,8 @@ with cols[0]:
     st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques e CTR</div>', unsafe_allow_html=True)
     if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=trends_data["Data"], y=trends_data["Cliques"], name="Cliques", mode="lines+markers", line=dict(color=LIA["primary"], width=2, shape='spline'), fill="tozeroy", fillcolor="rgba(255,107,107,0.15)"))
-        fig.add_trace(go.Scatter(x=trends_data["Data"], y=trends_data["CTR"], name="CTR %", yaxis="y2", mode="lines+markers", line=dict(color=LIA["secondary"], width=3, shape='spline')))
+        fig.add_trace(go.Scatter(x=trends_data["Data"], y=trends_data["Cliques"], name="Cliques", mode="lines+markers", line=dict(color="#1E40AF", width=3, shape='spline'), marker=dict(size=8, color="#1E40AF"), fill="tozeroy", fillcolor="rgba(30,64,175,0.2)"))
+        fig.add_trace(go.Scatter(x=trends_data["Data"], y=trends_data["CTR"], name="CTR %", yaxis="y2", mode="lines+markers", line=dict(color="#047857", width=3, shape='spline'), marker=dict(size=8, color="#047857")))
         fig.update_layout(
             yaxis2=dict(overlaying="y", side="right", range=[0, trends_data["CTR"].max() * 1.2] if trends_data["CTR"].max() > 0 else [0, 5]),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),

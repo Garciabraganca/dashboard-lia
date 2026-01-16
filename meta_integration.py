@@ -337,6 +337,28 @@ class MetaAdsIntegration:
             if campaign_name_filter and not df.empty and 'campaign_name' in df.columns:
                 df = df[df['campaign_name'].str.contains(campaign_name_filter, case=False, na=False)]
 
+            # Buscar nomes reais dos anúncios (ad_name da API insights pode ser o texto primário)
+            if not df.empty and 'ad_id' in df.columns:
+                try:
+                    ad_ids = df['ad_id'].unique().tolist()
+                    ad_names_map = {}
+                    for ad_id in ad_ids:
+                        ad_url = f"{self.base_url}/{ad_id}"
+                        ad_params = {
+                            "fields": "name",
+                            "access_token": self.access_token
+                        }
+                        ad_response = requests.get(ad_url, params=ad_params)
+                        if ad_response.status_code == 200:
+                            ad_data = ad_response.json()
+                            ad_names_map[ad_id] = ad_data.get('name', df[df['ad_id'] == ad_id]['ad_name'].iloc[0])
+
+                    # Substituir ad_name pelo nome real do anúncio
+                    if ad_names_map:
+                        df['ad_name'] = df['ad_id'].map(ad_names_map)
+                except Exception as e:
+                    print(f"Aviso: Não foi possível buscar nomes reais dos anúncios: {e}")
+
             # Converter valores numéricos
             numeric_fields = ['spend', 'impressions', 'clicks', 'ctr', 'cpc', 'cpm']
             for col in numeric_fields:

@@ -2,6 +2,7 @@
 Integração com Meta Ads API para obter dados de campanhas
 """
 
+import json
 import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
@@ -244,10 +245,9 @@ class MetaAdsIntegration:
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
                 "fields": ",".join(fields),
-                "time_range": f"{{'since':'{start_date_str}','until':'{end_date_str}'}}",
+                "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
                 "time_increment": "1",
                 "level": "campaign",
-                # "filtering": "[{'field':'campaign.effective_status','operator':'IN','value':['ACTIVE']}]",
                 "access_token": self.access_token
             }
 
@@ -319,9 +319,8 @@ class MetaAdsIntegration:
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
                 "fields": ",".join(fields),
-                "time_range": f"{{'since':'{start_date_str}','until':'{end_date_str}'}}",
+                "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
                 "level": "ad",
-                # "filtering": "[{'field':'ad.effective_status','operator':'IN','value':['ACTIVE']}]",
                 "access_token": self.access_token
             }
 

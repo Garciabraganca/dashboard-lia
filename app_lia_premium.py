@@ -318,7 +318,15 @@ class DataProvider:
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
+
+                # Primeiro tenta com filtro de campanha
                 df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=campaign_filter, custom_start=custom_start, custom_end=custom_end)
+
+                # Se não encontrou com filtro, tenta sem filtro
+                if df.empty and campaign_filter:
+                    logger.info(f"Creative: No data with filter '{campaign_filter}', trying without filter")
+                    df = self.meta_client.get_creative_insights(date_range=api_period, campaign_name_filter=None, custom_start=custom_start, custom_end=custom_end)
+
                 if not df.empty:
                     # Renomear e selecionar colunas
                     df = df.rename(columns={
@@ -345,12 +353,25 @@ class DataProvider:
         if self.meta_client and self.mode != "mock":
             try:
                 api_period = self._period_to_api_format(period)
+
+                # Primeiro tenta com filtro de campanha
                 df = self.meta_client.get_ad_insights(
                     date_range=api_period,
                     campaign_name_filter=campaign_filter,
                     custom_start=custom_start,
                     custom_end=custom_end
                 )
+
+                # Se não encontrou com filtro, tenta sem filtro
+                if df.empty and campaign_filter:
+                    logger.info(f"Trends: No data with filter '{campaign_filter}', trying without filter")
+                    df = self.meta_client.get_ad_insights(
+                        date_range=api_period,
+                        campaign_name_filter=None,
+                        custom_start=custom_start,
+                        custom_end=custom_end
+                    )
+
                 if not df.empty and 'date_start' in df.columns:
                     # Agrupar por data para obter totais diários
                     df['Data'] = pd.to_datetime(df['date_start']).dt.strftime('%d/%m')
@@ -1087,7 +1108,8 @@ if selected_period == "custom":
         st.markdown('</div>', unsafe_allow_html=True)
 
 # Mapear filtro de campanha para as APIs
-campaign_filter = None if campanha == "Todas" else campanha
+# Meta usa o nome da campanha como aparece no dropdown (ex: "Ciclo 2" match "LIA | Ciclo 2 | ...")
+meta_campaign_filter = None if campanha == "Todas" else campanha
 
 # =============================================================================
 # COLETA DE DADOS
@@ -1096,7 +1118,7 @@ with st.spinner("Sincronizando dados..."):
     # Meta Ads
     meta_data = data_provider.get_meta_metrics(
         period=selected_period,
-        campaign_filter=campaign_filter,
+        campaign_filter=meta_campaign_filter,
         custom_start=custom_start_str,
         custom_end=custom_end_str
     )
@@ -1104,19 +1126,19 @@ with st.spinner("Sincronizando dados..."):
     # GA4
     ga4_data = data_provider.get_ga4_metrics(
         period=selected_period,
-        campaign_filter=campaign_filter,
+        campaign_filter=meta_campaign_filter,
         custom_start=custom_start_str,
         custom_end=custom_end_str
     )
 
-# Mapear nome da campanha para filtro de UTM
+# Mapear nome da campanha para filtro de UTM (GA4)
 # Os UTMs reais usam "ciclo1" e "ciclo2" (sem espaço), ex: lia_ciclo2_conversao
-campaign_filter_map = {
+utm_filter_map = {
     "Ciclo 2": "ciclo2",
     "Ciclo 1": "ciclo1",
     "Todas": None
 }
-campaign_filter = campaign_filter_map.get(campanha, None)
+ga4_campaign_filter = utm_filter_map.get(campanha, None)
 
 # Ajustar datas automaticamente quando um ciclo é selecionado
 # Isso evita misturar dados de períodos diferentes ao selecionar um ciclo específico
@@ -1152,7 +1174,7 @@ cycle_status = {"insights": ["Processando..."], "phase": "Carregando", "is_learn
 try:
     meta_data = data_provider.get_meta_metrics(
         period=selected_period,
-        campaign_filter=campaign_filter,
+        campaign_filter=meta_campaign_filter,
         custom_start=custom_start_str,
         custom_end=custom_end_str,
     )
@@ -1160,11 +1182,11 @@ try:
         period=selected_period,
         custom_start=custom_start_str,
         custom_end=custom_end_str,
-        campaign_filter=campaign_filter,
+        campaign_filter=ga4_campaign_filter,
     )
     creative_data = data_provider.get_creative_data(
         period=selected_period,
-        campaign_filter=campaign_filter,
+        campaign_filter=meta_campaign_filter,
         custom_start=custom_start_str,
         custom_end=custom_end_str,
     )
@@ -1172,7 +1194,7 @@ try:
         period=selected_period,
         custom_start=custom_start_str,
         custom_end=custom_end_str,
-        campaign_filter=campaign_filter,
+        campaign_filter=meta_campaign_filter,
     )
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
 except Exception as e:
@@ -1483,7 +1505,7 @@ with cols[1]:
     st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
 
     # Buscar dados de eventos para o funil
-    events_data_for_funnel = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
+    events_data_for_funnel = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter)
     cta_count = 0
     if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
         cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'cta_baixe_agora_click']
@@ -1571,7 +1593,7 @@ table_cols = st.columns(2)
 with table_cols[0]:
     # Tabela Origem/Midia
     try:
-        source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
+        source_data = data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter)
         if len(source_data) > 0 and "Origem / Midia" in source_data.columns:
             source_data = source_data[source_data["Origem / Midia"].str.contains("paid", case=False, na=False)]
         if len(source_data) > 0:
@@ -1604,7 +1626,7 @@ with table_cols[0]:
 with table_cols[1]:
     # Tabela de Eventos do GA4 com Tooltips CSS
     try:
-        events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=campaign_filter)
+        events_data = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter)
         if len(events_data) > 0:
             event_tooltips = {
                 "page_view": "Total de visualizações da página.",

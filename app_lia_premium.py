@@ -332,16 +332,47 @@ class DataProvider:
                     })
                     # Adicionar coluna de formato (Meta API não retorna diretamente de forma simples, vamos inferir ou deixar fixo)
                     df['Formato'] = df['Criativo'].apply(lambda x: "Video" if "video" in x.lower() else "Imagem")
-                    return df[['Criativo', 'Formato', 'Investimento', 'Impressoes', 'Cliques', 'CTR', 'CPC', 'CPM']]
+                    df['_is_mock'] = False
+                    return df[['Criativo', 'Formato', 'Investimento', 'Impressoes', 'Cliques', 'CTR', 'CPC', 'CPM', '_is_mock']]
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")
 
-        return self._get_mock_creative_data()
+        # Retorna DataFrame vazio em vez de mock data para não mostrar dados falsos
+        return pd.DataFrame()
 
-    def get_daily_trends(self, period="7d", custom_start=None, custom_end=None):
+    def get_daily_trends(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
         """Retorna dados de tendência diária (cliques, CTR, CPC)"""
-        # Por enquanto usa dados mock - futura implementação pode buscar dados reais
-        return self._get_mock_daily_trends(period, custom_start, custom_end)
+        if self.meta_client and self.mode != "mock":
+            try:
+                api_period = self._period_to_api_format(period)
+                df = self.meta_client.get_ad_insights(
+                    date_range=api_period,
+                    campaign_name_filter=campaign_filter,
+                    custom_start=custom_start,
+                    custom_end=custom_end
+                )
+                if not df.empty and 'date_start' in df.columns:
+                    # Agrupar por data para obter totais diários
+                    df['Data'] = pd.to_datetime(df['date_start']).dt.strftime('%d/%m')
+                    daily = df.groupby('Data', sort=False).agg({
+                        'clicks': 'sum',
+                        'ctr': 'mean',
+                        'cpc': 'mean'
+                    }).reset_index()
+                    daily = daily.rename(columns={
+                        'clicks': 'Cliques',
+                        'ctr': 'CTR',
+                        'cpc': 'CPC'
+                    })
+                    # Ordenar por data
+                    daily['_sort_date'] = pd.to_datetime(daily['Data'], format='%d/%m')
+                    daily = daily.sort_values('_sort_date').drop(columns=['_sort_date'])
+                    return daily
+            except Exception as e:
+                logger.error(f"Erro ao obter tendências reais: {e}")
+
+        # Retorna DataFrame vazio se não há dados reais
+        return pd.DataFrame()
 
     def _empty_meta_metrics(self):
         return {
@@ -1141,6 +1172,7 @@ try:
         period=selected_period,
         custom_start=custom_start_str,
         custom_end=custom_end_str,
+        campaign_filter=campaign_filter,
     )
     cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
 except Exception as e:
@@ -1337,18 +1369,21 @@ st.markdown('''
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendencia Temporal</div>', unsafe_allow_html=True)
 
-if len(trends_data) > 0:
+if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
     try:
         chart_cols = st.columns(3)
 
         with chart_cols[0]:
             st.markdown('<div class="chart-card">', unsafe_allow_html=True)
             fig1 = go.Figure()
-            fig1.add_trace(go.Bar(
+            fig1.add_trace(go.Scatter(
                 x=trends_data["Data"],
                 y=trends_data["Cliques"],
-                marker_color=LIA["text_dark"],
-                opacity=0.8,
+                mode="lines+markers",
+                line=dict(color=LIA["text_dark"], width=2, shape='spline'),
+                marker=dict(size=6, color=LIA["text_dark"]),
+                fill="tozeroy",
+                fillcolor="rgba(51,51,51,0.15)"
             ))
             fig1.update_layout(
                 title=dict(text="Cliques/Dia", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
@@ -1364,16 +1399,14 @@ if len(trends_data) > 0:
         with chart_cols[1]:
             st.markdown('<div class="chart-card">', unsafe_allow_html=True)
             fig2 = go.Figure()
-            fig2.add_trace(go.Bar(
+            fig2.add_trace(go.Scatter(
                 x=trends_data["Data"],
                 y=trends_data["CTR"],
-                marker_color=LIA["text_dark"],
-                opacity=0.8,
-            ))
-            fig2.add_trace(go.Scatter(
-                x=trends_data["Data"], y=trends_data["CTR"],
-                mode="lines+markers", line=dict(color=LIA["secondary"], width=3),
-                marker=dict(size=10, color=LIA["secondary"], line=dict(width=2, color="white")),
+                mode="lines+markers",
+                line=dict(color=LIA["secondary"], width=2, shape='spline'),
+                marker=dict(size=6, color=LIA["secondary"]),
+                fill="tozeroy",
+                fillcolor="rgba(255,107,107,0.15)"
             ))
             fig2.update_layout(
                 title=dict(text="CTR/Dia (%)", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
@@ -1408,6 +1441,12 @@ if len(trends_data) > 0:
     except Exception as e:
         logger.error(f"Erro ao renderizar graficos: {e}")
         render_error_card("Graficos indisponiveis", "Estamos processando os dados de tendencia.")
+else:
+    st.markdown(f'''
+    <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:32px;text-align:center;border:1px dashed rgba(255,255,255,0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+        <p style="color:{LIA["text_muted"]};margin:0;">Sem dados de tendência temporal para o período e campanha selecionados.</p>
+    </div>
+    ''', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1419,18 +1458,24 @@ cols = st.columns([3, 2])
 with cols[0]:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques e CTR</div>', unsafe_allow_html=True)
-    trends = data_provider._get_mock_daily_trends(selected_period, custom_start_str, custom_end_str)
-    fig = go.Figure()
-    fig.add_trace(go.Bar(x=trends["Data"], y=trends["Cliques"], name="Cliques", marker_color=LIA["primary"], opacity=0.8))
-    fig.add_trace(go.Scatter(x=trends["Data"], y=trends["CTR"], name="CTR %", yaxis="y2", line=dict(color=LIA["secondary"], width=3, shape='spline')))
-    fig.update_layout(
-        yaxis2=dict(overlaying="y", side="right", range=[0, trends["CTR"].max() * 1.2]),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        height=350, margin=dict(l=0, r=0, t=30, b=0),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        hovermode="x unified"
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=trends_data["Data"], y=trends_data["Cliques"], name="Cliques", mode="lines+markers", line=dict(color=LIA["primary"], width=2, shape='spline'), fill="tozeroy", fillcolor="rgba(255,107,107,0.15)"))
+        fig.add_trace(go.Scatter(x=trends_data["Data"], y=trends_data["CTR"], name="CTR %", yaxis="y2", mode="lines+markers", line=dict(color=LIA["secondary"], width=3, shape='spline')))
+        fig.update_layout(
+            yaxis2=dict(overlaying="y", side="right", range=[0, trends_data["CTR"].max() * 1.2] if trends_data["CTR"].max() > 0 else [0, 5]),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            height=350, margin=dict(l=0, r=0, t=30, b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            hovermode="x unified"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.markdown(f'''
+        <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:32px;text-align:center;border:1px dashed rgba(255,255,255,0.35);">
+            <p style="color:{LIA["text_muted"]};margin:0;">Sem dados de tendência para o período selecionado.</p>
+        </div>
+        ''', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 with cols[1]:

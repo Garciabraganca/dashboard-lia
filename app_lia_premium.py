@@ -1110,26 +1110,6 @@ if selected_period == "custom":
 # Meta usa o nome da campanha como aparece no dropdown (ex: "Ciclo 2" match "LIA | Ciclo 2 | ...")
 meta_campaign_filter = None if campanha == "Todas" else campanha
 
-# =============================================================================
-# COLETA DE DADOS
-# =============================================================================
-with st.spinner("Sincronizando dados..."):
-    # Meta Ads
-    meta_data = data_provider.get_meta_metrics(
-        period=selected_period,
-        campaign_filter=meta_campaign_filter,
-        custom_start=custom_start_str,
-        custom_end=custom_end_str
-    )
-
-    # GA4
-    ga4_data = data_provider.get_ga4_metrics(
-        period=selected_period,
-        campaign_filter=meta_campaign_filter,
-        custom_start=custom_start_str,
-        custom_end=custom_end_str
-    )
-
 # Mapear nome da campanha para filtro de UTM (GA4)
 # Os UTMs reais usam "ciclo1" e "ciclo2" (sem espaço), ex: lia_ciclo2_conversao
 utm_filter_map = {
@@ -1164,38 +1144,39 @@ if campanha == "Ciclo 2":
     </div>
     ''', unsafe_allow_html=True)
 elif periodo_travado:
-    st.info(f"📅 Período ajustado automaticamente para **{campanha}**: {custom_start_str} a {custom_end_str}")
+    st.info(f"Periodo ajustado automaticamente para **{campanha}**: {custom_start_str} a {custom_end_str}")
 
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)
 # -----------------------------------------------------------------------------
 cycle_status = {"insights": ["Processando..."], "phase": "Carregando", "is_learning": True}
 try:
-    meta_data = data_provider.get_meta_metrics(
-        period=selected_period,
-        campaign_filter=meta_campaign_filter,
-        custom_start=custom_start_str,
-        custom_end=custom_end_str,
-    )
-    ga4_data = data_provider.get_ga4_metrics(
-        period=selected_period,
-        custom_start=custom_start_str,
-        custom_end=custom_end_str,
-        campaign_filter=ga4_campaign_filter,
-    )
-    creative_data = data_provider.get_creative_data(
-        period=selected_period,
-        campaign_filter=meta_campaign_filter,
-        custom_start=custom_start_str,
-        custom_end=custom_end_str,
-    )
-    trends_data = data_provider.get_daily_trends(
-        period=selected_period,
-        custom_start=custom_start_str,
-        custom_end=custom_end_str,
-        campaign_filter=meta_campaign_filter,
-    )
-    cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
+    with st.spinner("Sincronizando dados..."):
+        meta_data = data_provider.get_meta_metrics(
+            period=selected_period,
+            campaign_filter=meta_campaign_filter,
+            custom_start=custom_start_str,
+            custom_end=custom_end_str,
+        )
+        ga4_data = data_provider.get_ga4_metrics(
+            period=selected_period,
+            custom_start=custom_start_str,
+            custom_end=custom_end_str,
+            campaign_filter=ga4_campaign_filter,
+        )
+        creative_data = data_provider.get_creative_data(
+            period=selected_period,
+            campaign_filter=meta_campaign_filter,
+            custom_start=custom_start_str,
+            custom_end=custom_end_str,
+        )
+        trends_data = data_provider.get_daily_trends(
+            period=selected_period,
+            custom_start=custom_start_str,
+            custom_end=custom_end_str,
+            campaign_filter=meta_campaign_filter,
+        )
+        cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
 except Exception as e:
     import streamlit as st
     st.error(f"Erro ao carregar dados do módulo Premium: {e}")

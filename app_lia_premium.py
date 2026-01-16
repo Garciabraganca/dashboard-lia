@@ -339,7 +339,7 @@ class DataProvider:
                         'cpm': 'CPM'
                     })
                     # Adicionar coluna de formato (Meta API não retorna diretamente de forma simples, vamos inferir ou deixar fixo)
-                    df['Formato'] = df['Criativo'].apply(lambda x: "Video" if "video" in x.lower() else "Imagem")
+                    df['Formato'] = df['Criativo'].apply(lambda x: "Video" if "video" in str(x).lower() else "Imagem")
                     return df[['Criativo', 'Formato', 'Investimento', 'Impressoes', 'Cliques', 'CTR', 'CPC', 'CPM']]
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")

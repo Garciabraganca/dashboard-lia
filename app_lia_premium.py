@@ -487,7 +487,7 @@ class DataProvider:
         return pd.DataFrame({
             "Nome do Evento": [
                 "page_view", "session_start", "first_visit", "scroll",
-                "user_engagement", "scroll_50", "cta_baixe_agora_click"
+                "user_engagement", "scroll_50", "primary_cta_click"
             ],
             "Contagem de Eventos": [
                 "2.050 (33,19%)", "1.992 (32,25%)", "1.958 (31,70%)", "78 (1,26%)",
@@ -1467,7 +1467,7 @@ with cols[1]:
     events_data_for_funnel = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter)
     cta_count = 0
     if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
-        cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'cta_baixe_agora_click']
+        cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'primary_cta_click']
         if not cta_row.empty:
             try:
                 raw_val = cta_row.iloc[0]['Contagem de Eventos']
@@ -1496,7 +1496,7 @@ with cols[1]:
     fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
                              paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)")
     st.plotly_chart(fig_funnel, use_container_width=True)
-    st.caption("**Cliques na loja** = evento GA4 `cta_baixe_agora_click` | **Instalações** = aguardando integração SDK")
+    st.caption("**Cliques na loja** = evento GA4 `primary_cta_click` | **Instalações** = aguardando integração SDK")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

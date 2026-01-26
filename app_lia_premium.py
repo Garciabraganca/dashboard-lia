@@ -13,8 +13,8 @@ from config import Config
 from ga_integration import GA4Integration
 from meta_integration import MetaAdsIntegration
 
-# Importar AIAgent (disponível para uso futuro)
-# from ai_agent import AIAgent
+# Importar AIAgent para análise de IA
+from ai_agent import AIAgent
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -1632,6 +1632,91 @@ with table_cols[1]:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")
 
 st.markdown('</div>', unsafe_allow_html=True)
+
+# =============================================================================
+# SEÇÃO DE ANÁLISE COM IA
+# =============================================================================
+st.markdown('<div class="section-title"><div class="section-icon">🤖</div> Análise com IA</div>', unsafe_allow_html=True)
+
+# Verificar se a API key está disponível
+if Config.validate_openai_credentials():
+    # Determinar o ciclo baseado na campanha selecionada
+    cycle = "Ciclo 1" if campanha == "Ciclo 1" else "Ciclo 2"
+
+    # Botão para gerar análise
+    if st.button("🔮 Gerar Análise com IA", key="btn_ai_analysis", use_container_width=True):
+        with st.spinner("Analisando dados com IA..."):
+            try:
+                # Inicializar o agente de IA
+                ai_agent = AIAgent(api_key=Config.get_openai_api_key())
+
+                # Preparar dados para análise
+                analysis_meta_data = {
+                    "investimento": meta_data.get("investimento", 0),
+                    "impressoes": meta_data.get("impressoes", 0),
+                    "alcance": meta_data.get("alcance", 0),
+                    "frequencia": meta_data.get("frequencia", 0),
+                    "cliques_link": meta_data.get("cliques_link", 0),
+                    "ctr_link": meta_data.get("ctr_link", 0),
+                    "cpc_link": meta_data.get("cpc_link", 0),
+                    "cpm": meta_data.get("cpm", 0),
+                    "delta_ctr": meta_data.get("delta_ctr", 0),
+                    "delta_cpc": meta_data.get("delta_cpc", 0),
+                    "delta_cliques": meta_data.get("delta_cliques", 0),
+                }
+
+                analysis_ga4_data = {
+                    "sessoes": ga4_data.get("sessoes", 0),
+                    "usuarios": ga4_data.get("usuarios", 0),
+                    "pageviews": ga4_data.get("pageviews", 0),
+                    "taxa_engajamento": ga4_data.get("taxa_engajamento", 0),
+                    "tempo_medio": ga4_data.get("tempo_medio", "N/A"),
+                }
+
+                # Gerar análise
+                analysis = ai_agent.analyze(
+                    meta_data=analysis_meta_data,
+                    ga4_data=analysis_ga4_data,
+                    creative_data=creative_data,
+                    source_data=data_provider.get_source_medium(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter),
+                    events_data=data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter),
+                    period=selected_period,
+                    cycle=cycle
+                )
+
+                # Salvar análise no session state
+                st.session_state['ai_analysis'] = analysis
+                st.session_state['ai_analysis_cycle'] = cycle
+
+            except Exception as e:
+                logger.error(f"Erro ao gerar análise de IA: {e}")
+                st.error(f"Erro ao gerar análise: {str(e)}")
+
+    # Exibir análise salva se existir
+    if 'ai_analysis' in st.session_state:
+        analysis_cycle = st.session_state.get('ai_analysis_cycle', 'Ciclo 2')
+        st.markdown(f'''
+        <div class="ai-agent-card">
+            <div class="ai-agent-header">
+                <div class="ai-agent-icon">🦉</div>
+                <div>
+                    <div class="ai-agent-title">LIA - Análise Inteligente</div>
+                    <div class="ai-agent-subtitle">Análise do {analysis_cycle} • Powered by GPT-4</div>
+                </div>
+            </div>
+            <div class="ai-agent-content">
+                {st.session_state['ai_analysis']}
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+else:
+    st.markdown(f'''
+    <div class="glass-card" style="padding: 20px; text-align: center;">
+        <p style="color: {LIA["text_muted"]}; margin: 0;">
+            🔒 Configure a chave da API OpenAI no Streamlit Secrets para habilitar a análise com IA.
+        </p>
+    </div>
+    ''', unsafe_allow_html=True)
 
 # Footer
 st.markdown('''

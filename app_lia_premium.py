@@ -139,6 +139,18 @@ class DataProvider:
 
                 if not insights.empty:
                     result = self._process_meta_insights(insights)
+
+                    # Buscar métricas agregadas para Alcance e Frequência corretos
+                    aggregated = self.meta_client.get_aggregated_insights(
+                        date_range=api_period,
+                        campaign_name_filter=campaign_filter,
+                        custom_start=custom_start,
+                        custom_end=custom_end
+                    )
+                    if aggregated:
+                        result["alcance"] = aggregated.get("reach", result["alcance"])
+                        result["frequencia"] = aggregated.get("frequency", result["frequencia"])
+
                     result["_data_source"] = "real"
                     result["_filter_applied"] = campaign_filter
                     return result
@@ -151,6 +163,18 @@ class DataProvider:
                     if not insights_no_filter.empty:
                         # Há dados mas não com o filtro especificado
                         result = self._process_meta_insights(insights_no_filter)
+
+                        # Buscar métricas agregadas para Alcance e Frequência corretos
+                        aggregated = self.meta_client.get_aggregated_insights(
+                            date_range=api_period,
+                            campaign_name_filter=None,
+                            custom_start=custom_start,
+                            custom_end=custom_end
+                        )
+                        if aggregated:
+                            result["alcance"] = aggregated.get("reach", result["alcance"])
+                            result["frequencia"] = aggregated.get("frequency", result["frequencia"])
+
                         result["_data_source"] = "real_no_filter"
                         result["_filter_applied"] = None
                         result["_requested_filter"] = campaign_filter

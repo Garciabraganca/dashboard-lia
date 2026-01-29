@@ -296,6 +296,73 @@ class MetaAdsIntegration:
             print(f"Erro ao obter insights do Meta: {str(e)}")
             return pd.DataFrame()
 
+    def get_aggregated_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> dict:
+        """
+        Obtém insights AGREGADOS do período (sem breakdown diário).
+        Importante para métricas como Reach que não podem ser somadas diariamente.
+
+        Args:
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            campaign_name_filter: Nome da campanha para filtrar (opcional)
+            custom_start: Data de início personalizada (YYYY-MM-DD)
+            custom_end: Data de fim personalizada (YYYY-MM-DD)
+
+        Returns:
+            Dict com métricas agregadas (reach, frequency, impressions, etc.)
+        """
+        fields = ["impressions", "reach", "frequency", "spend", "clicks", "ctr", "cpc", "cpm"]
+
+        try:
+            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
+
+            # Buscar insights SEM time_increment para obter valores agregados
+            url = f"{self.base_url}/{self.ad_account_id}/insights"
+            params = {
+                "fields": ",".join(fields),
+                "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
+                "level": "account",  # Nível de conta para agregação total
+                "access_token": self.access_token
+            }
+
+            # Se há filtro de campanha, buscar por campanha e agregar
+            if campaign_name_filter:
+                params["level"] = "campaign"
+
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+
+            data = response.json()
+            insights = data.get("data", [])
+
+            if not insights:
+                return {}
+
+            # Se filtro de campanha, filtrar e agregar
+            if campaign_name_filter:
+                filtered = [i for i in insights if campaign_name_filter.lower() in i.get('campaign_name', '').lower()]
+                if not filtered:
+                    return {}
+                # Para alcance com filtro de campanha, usamos o valor da campanha específica
+                # (não podemos somar alcances de campanhas diferentes)
+                insight = filtered[0]  # Pega a primeira campanha que match
+            else:
+                insight = insights[0]
+
+            return {
+                "reach": int(insight.get("reach", 0)),
+                "frequency": float(insight.get("frequency", 0)),
+                "impressions": int(insight.get("impressions", 0)),
+                "spend": float(insight.get("spend", 0)),
+                "clicks": int(insight.get("clicks", 0)),
+                "ctr": float(insight.get("ctr", 0)),
+                "cpc": float(insight.get("cpc", 0)),
+                "cpm": float(insight.get("cpm", 0)),
+            }
+
+        except Exception as e:
+            print(f"Erro ao obter insights agregados do Meta: {str(e)}")
+            return {}
+
     def get_creative_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """
         Obtém insights por criativo/anúncio do Meta

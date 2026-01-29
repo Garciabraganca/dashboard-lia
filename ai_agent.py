@@ -66,6 +66,31 @@ Formato da resposta:
 - Destaque as conquistas e resultados
 - Tom otimista e celebratório
 """
+        elif cycle == "Todos os Ciclos":
+            # Todos os ciclos: Análise comparativa e consolidada
+            return base_prompt + """CONTEXTO: Visualizando TODOS OS CICLOS - ANÁLISE CONSOLIDADA.
+Esta é uma visão geral que inclui dados de todas as campanhas (Ciclo 1 e Ciclo 2).
+
+DIRETRIZES PARA ANÁLISE CONSOLIDADA:
+- Apresente uma visão geral da performance total
+- Compare métricas entre os diferentes ciclos quando possível
+- Identifique tendências gerais de performance
+- Apresente os NÚMEROS DE FORMA OBJETIVA
+- Destaque a evolução da campanha ao longo do tempo
+- Aponte oportunidades de otimização baseadas em todo o histórico
+
+Análise de Criativos:
+- Identifique padrões de sucesso entre todos os criativos
+- Compare performance entre ciclos
+- Sugira estratégias baseadas no aprendizado acumulado
+
+Formato da resposta:
+- Use emojis para destacar pontos importantes
+- Organize em seções claras
+- Apresente dados consolidados de forma objetiva
+- Destaque a evolução e aprendizados
+- Tom analítico e objetivo
+"""
         else:
             # Ciclo 1: Foco em tráfego e otimização da landing page
             return base_prompt + """CONTEXTO: Estamos no CICLO 1 - FASE DE TRÁFEGO.

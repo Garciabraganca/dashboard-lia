@@ -121,9 +121,9 @@ class DataProvider:
         mapping = {
             "today": "today",
             "yesterday": "yesterday",
-            "7d": "last_7d",
-            "14d": "last_14d",
-            "30d": "last_30d",
+            "last_7d": "last_7d",
+            "last_14d": "last_14d",
+            "last_30d": "last_30d",
             "custom": "custom"
         }
         return mapping.get(period, "last_7d")

@@ -1083,9 +1083,9 @@ with filter_cols[1]:
     periodos = {
         "Hoje": "today",
         "Ontem": "yesterday",
-        "Últimos 7 dias": "7d",
-        "Últimos 14 dias": "14d",
-        "Últimos 30 dias": "30d",
+        "Últimos 7 dias": "last_7d",
+        "Últimos 14 dias": "last_14d",
+        "Últimos 30 dias": "last_30d",
         "Personalizado": "custom"
     }
     selected_label = st.selectbox("Período", list(periodos.keys()), index=2)
@@ -1117,7 +1117,14 @@ utm_filter_map = {
 ga4_campaign_filter = utm_filter_map.get(campanha, None)
 
 # Feedback visual do filtro de campanha selecionado
-if campanha != "Todas":
+if campanha == "Todas":
+    st.markdown('''
+    <div class="scope-card">
+        <span style="font-size:18px;">i</span>
+        <span class="scope-text">Exibindo dados de: <strong>Todos os ciclos</strong></span>
+    </div>
+    ''', unsafe_allow_html=True)
+else:
     st.markdown(f'''
     <div class="scope-card">
         <span style="font-size:18px;">i</span>
@@ -1641,7 +1648,7 @@ st.markdown('<div class="section-title"><div class="section-icon">🤖</div> An�
 # Verificar se a API key está disponível
 if Config.validate_openai_credentials():
     # Determinar o ciclo baseado na campanha selecionada
-    cycle = "Ciclo 1" if campanha == "Ciclo 1" else "Ciclo 2"
+    cycle = campanha if campanha in ["Ciclo 1", "Ciclo 2"] else "Todos os Ciclos"
 
     # Botão para gerar análise
     if st.button("🔮 Gerar Análise com IA", key="btn_ai_analysis", use_container_width=True):

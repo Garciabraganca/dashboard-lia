@@ -72,25 +72,41 @@ class GA4Integration:
 
         Returns:
             Tupla com (start_date_str, end_date_str)
+
+        Nota: Os períodos "last_Xd" incluem o dia de hoje.
+        - "last_7d" = hoje e os 6 dias anteriores (7 dias no total)
+        - "last_14d" = hoje e os 13 dias anteriores (14 dias no total)
+        - "last_30d" = hoje e os 29 dias anteriores (30 dias no total)
         """
         if date_range == "custom" and custom_start and custom_end:
             return custom_start, custom_end
 
-        end_date = datetime.now()
+        today = datetime.now().date()
 
         if date_range == "last_7d":
-            start_date = end_date - timedelta(days=7)
+            # Últimos 7 dias incluindo hoje: hoje - 6 dias até hoje
+            start_date = today - timedelta(days=6)
+            end_date = today
         elif date_range == "last_14d":
-            start_date = end_date - timedelta(days=14)
+            # Últimos 14 dias incluindo hoje: hoje - 13 dias até hoje
+            start_date = today - timedelta(days=13)
+            end_date = today
         elif date_range == "last_30d":
-            start_date = end_date - timedelta(days=30)
+            # Últimos 30 dias incluindo hoje: hoje - 29 dias até hoje
+            start_date = today - timedelta(days=29)
+            end_date = today
         elif date_range == "today":
-            start_date = end_date.replace(hour=0, minute=0, second=0)
+            start_date = today
+            end_date = today
         elif date_range == "yesterday":
-            start_date = (end_date - timedelta(days=1)).replace(hour=0, minute=0, second=0)
-            end_date = end_date.replace(hour=0, minute=0, second=0)
+            # Ontem: apenas o dia de ontem
+            yesterday = today - timedelta(days=1)
+            start_date = yesterday
+            end_date = yesterday
         else:
-            start_date = end_date - timedelta(days=7)
+            # Default: últimos 7 dias
+            start_date = today - timedelta(days=6)
+            end_date = today
 
         return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 

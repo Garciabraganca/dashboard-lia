@@ -207,29 +207,43 @@ class DataProvider:
             val = df[col].sum()
             return 0 if (pd.isna(val) or math.isnan(val)) else val
 
-        def safe_mean(col):
-            """Média segura que trata NaN"""
-            if col not in df.columns:
-                return 0
-            val = df[col].mean()
-            return 0 if (pd.isna(val) or math.isnan(val)) else val
-
         def safe_int(val):
             """Conversão segura para int"""
             if pd.isna(val) or (isinstance(val, float) and math.isnan(val)):
                 return 0
             return int(val)
 
+        def safe_div(numerator, denominator):
+            """Divisão segura que retorna 0 se divisor for 0"""
+            if denominator == 0:
+                return 0
+            return numerator / denominator
+
         try:
+            # Agregar métricas básicas
+            total_spend = safe_sum('spend')
+            total_impressions = safe_int(safe_sum('impressions'))
+            total_clicks = safe_int(safe_sum('clicks'))
+
+            # Calcular métricas derivadas corretamente a partir dos totais
+            # CTR = (clicks / impressions) * 100
+            ctr = safe_div(total_clicks, total_impressions) * 100
+            # CPC = spend / clicks
+            cpc = safe_div(total_spend, total_clicks)
+            # CPM = (spend / impressions) * 1000
+            cpm = safe_div(total_spend, total_impressions) * 1000
+
+            # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
+            # pois não podem ser somados (são métricas de usuários únicos)
             return {
-                "investimento": safe_sum('spend'),
-                "impressoes": safe_int(safe_sum('impressions')),
-                "alcance": safe_int(safe_sum('reach')),
-                "frequencia": safe_mean('frequency'),
-                "cliques_link": safe_int(safe_sum('clicks')),
-                "ctr_link": safe_mean('ctr'),
-                "cpc_link": safe_mean('cpc'),
-                "cpm": safe_mean('cpm'),
+                "investimento": total_spend,
+                "impressoes": total_impressions,
+                "alcance": safe_int(safe_sum('reach')),  # Será sobrescrito por aggregated
+                "frequencia": 0,  # Será sobrescrito por aggregated
+                "cliques_link": total_clicks,
+                "ctr_link": round(ctr, 2),
+                "cpc_link": round(cpc, 2),
+                "cpm": round(cpm, 2),
                 "delta_investimento": 0,
                 "delta_impressoes": 0,
                 "delta_alcance": 0,
@@ -396,19 +410,24 @@ class DataProvider:
                 if not df.empty and 'date_start' in df.columns:
                     # Agrupar por data para obter totais diários
                     df['Data'] = pd.to_datetime(df['date_start']).dt.strftime('%d/%m')
-                    daily = df.groupby('Data', sort=False).agg({
+                    df['_sort_key'] = pd.to_datetime(df['date_start'])
+
+                    # Agregar corretamente: CTR e CPC são métricas derivadas
+                    # CTR = clicks / impressions * 100
+                    # CPC = spend / clicks
+                    daily = df.groupby(['Data', '_sort_key'], sort=False).agg({
                         'clicks': 'sum',
-                        'ctr': 'mean',
-                        'cpc': 'mean'
+                        'impressions': 'sum',
+                        'spend': 'sum'
                     }).reset_index()
-                    daily = daily.rename(columns={
-                        'clicks': 'Cliques',
-                        'ctr': 'CTR',
-                        'cpc': 'CPC'
-                    })
-                    # Ordenar por data
-                    daily['_sort_date'] = pd.to_datetime(daily['Data'], format='%d/%m')
-                    daily = daily.sort_values('_sort_date').drop(columns=['_sort_date'])
+
+                    # Calcular métricas derivadas corretamente
+                    daily['Cliques'] = daily['clicks']
+                    daily['CTR'] = (daily['clicks'] / daily['impressions'] * 100).fillna(0)
+                    daily['CPC'] = (daily['spend'] / daily['clicks']).fillna(0)
+
+                    # Ordenar por data cronologicamente
+                    daily = daily.sort_values('_sort_key').drop(columns=['_sort_key', 'clicks', 'impressions', 'spend'])
                     return daily
             except Exception as e:
                 logger.error(f"Erro ao obter tendências reais: {e}")
@@ -476,7 +495,8 @@ class DataProvider:
             days = (end_date - start_date).days + 1
             dates = [(start_date + timedelta(days=i)).strftime("%d/%m") for i in range(days)]
         else:
-            days = {"today": 1, "yesterday": 1, "7d": 7, "14d": 14, "30d": 30}.get(period, 7)
+            # Mapeamento correto dos períodos do dashboard
+            days = {"today": 1, "yesterday": 1, "last_7d": 7, "last_14d": 14, "last_30d": 30}.get(period, 7)
             dates = [(datetime.now() - timedelta(days=i)).strftime("%d/%m") for i in range(days-1, -1, -1)]
 
         # Gerar dados mock para o número correto de dias

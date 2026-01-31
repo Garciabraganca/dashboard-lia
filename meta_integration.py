@@ -142,24 +142,41 @@ class MetaAdsIntegration:
 
         Returns:
             Tupla com (start_date_str, end_date_str)
+
+        Nota: Os períodos "last_Xd" incluem o dia de hoje.
+        - "last_7d" = hoje e os 6 dias anteriores (7 dias no total)
+        - "last_14d" = hoje e os 13 dias anteriores (14 dias no total)
+        - "last_30d" = hoje e os 29 dias anteriores (30 dias no total)
         """
         if date_range == "custom" and custom_start and custom_end:
             return custom_start, custom_end
 
-        end_date = datetime.now()
+        today = datetime.now().date()
+
         if date_range == "last_7d":
-            start_date = end_date - timedelta(days=7)
+            # Últimos 7 dias incluindo hoje: hoje - 6 dias até hoje
+            start_date = today - timedelta(days=6)
+            end_date = today
         elif date_range == "last_14d":
-            start_date = end_date - timedelta(days=14)
+            # Últimos 14 dias incluindo hoje: hoje - 13 dias até hoje
+            start_date = today - timedelta(days=13)
+            end_date = today
         elif date_range == "last_30d":
-            start_date = end_date - timedelta(days=30)
+            # Últimos 30 dias incluindo hoje: hoje - 29 dias até hoje
+            start_date = today - timedelta(days=29)
+            end_date = today
         elif date_range == "today":
-            start_date = end_date.replace(hour=0, minute=0, second=0)
+            start_date = today
+            end_date = today
         elif date_range == "yesterday":
-            start_date = (end_date - timedelta(days=1)).replace(hour=0, minute=0, second=0)
-            end_date = end_date.replace(hour=0, minute=0, second=0)
+            # Ontem: apenas o dia de ontem
+            yesterday = today - timedelta(days=1)
+            start_date = yesterday
+            end_date = yesterday
         else:
-            start_date = end_date - timedelta(days=7)
+            # Default: últimos 7 dias
+            start_date = today - timedelta(days=6)
+            end_date = today
 
         return start_date.strftime("%Y-%m-%d"), end_date.strftime("%Y-%m-%d")
 
@@ -342,9 +359,36 @@ class MetaAdsIntegration:
                 filtered = [i for i in insights if campaign_name_filter.lower() in i.get('campaign_name', '').lower()]
                 if not filtered:
                     return {}
-                # Para alcance com filtro de campanha, usamos o valor da campanha específica
-                # (não podemos somar alcances de campanhas diferentes)
-                insight = filtered[0]  # Pega a primeira campanha que match
+
+                # Se há múltiplas campanhas que match, agregar os dados
+                if len(filtered) > 1:
+                    # Somar métricas que podem ser somadas
+                    total_impressions = sum(int(i.get("impressions", 0)) for i in filtered)
+                    total_spend = sum(float(i.get("spend", 0)) for i in filtered)
+                    total_clicks = sum(int(i.get("clicks", 0)) for i in filtered)
+
+                    # Para reach: não podemos somar, usar o maior valor como estimativa
+                    # (representa o alcance máximo, assumindo sobreposição de público)
+                    max_reach = max(int(i.get("reach", 0)) for i in filtered)
+
+                    # Calcular métricas derivadas
+                    frequency = total_impressions / max_reach if max_reach > 0 else 0
+                    ctr = (total_clicks / total_impressions * 100) if total_impressions > 0 else 0
+                    cpc = total_spend / total_clicks if total_clicks > 0 else 0
+                    cpm = (total_spend / total_impressions * 1000) if total_impressions > 0 else 0
+
+                    return {
+                        "reach": max_reach,
+                        "frequency": round(frequency, 2),
+                        "impressions": total_impressions,
+                        "spend": round(total_spend, 2),
+                        "clicks": total_clicks,
+                        "ctr": round(ctr, 2),
+                        "cpc": round(cpc, 2),
+                        "cpm": round(cpm, 2),
+                    }
+                else:
+                    insight = filtered[0]
             else:
                 insight = insights[0]
 

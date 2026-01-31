@@ -1433,7 +1433,8 @@ if len(creative_data) > 0:
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
         st.markdown('<div class="table-header"><span class="table-header-title">Performance por Criativo</span></div>', unsafe_allow_html=True)
 
-        creative_champion = creative_data.loc[[best_ctr_idx]]
+        # Mostrar todos os criativos, ordenados por CTR (campeão primeiro)
+        creative_display = creative_data.sort_values('CTR', ascending=False)
         creative_formatters = {
             "Investimento": lambda value: f"$ {value:,.2f}",
             "Impressoes": lambda value: f"{value:,.0f}",
@@ -1442,10 +1443,10 @@ if len(creative_data) > 0:
             "CPC": lambda value: f"$ {value:,.2f}",
             "CPM": lambda value: f"$ {value:,.2f}",
         }
-        columns = list(creative_champion.columns)
+        columns = list(creative_display.columns)
         header_cells = "".join(f"<th>{html.escape(str(col))}</th>" for col in columns)
         body_rows = []
-        for _, row in creative_champion.iterrows():
+        for _, row in creative_display.iterrows():
             row_cells = []
             for col in columns:
                 value = row[col]

@@ -251,6 +251,7 @@ class MetaAdsIntegration:
                 "ctr",
                 "cpc",
                 "cpm",
+                "actions",
                 "date_start"
             ]
 

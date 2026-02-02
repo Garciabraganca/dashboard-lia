@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import base64
+import json
 import html
 import os
 import logging
@@ -219,6 +220,38 @@ class DataProvider:
                 return 0
             return numerator / denominator
 
+        def sum_actions(action_types):
+            """Soma ações do Meta Ads que correspondem aos tipos informados."""
+            if 'actions' not in df.columns:
+                return 0
+
+            total = 0
+            for actions in df['actions'].dropna():
+                parsed_actions = []
+                if isinstance(actions, str):
+                    try:
+                        parsed_actions = json.loads(actions)
+                    except json.JSONDecodeError:
+                        continue
+                elif isinstance(actions, dict):
+                    parsed_actions = [actions]
+                elif isinstance(actions, list):
+                    parsed_actions = actions
+                else:
+                    continue
+
+                for action in parsed_actions:
+                    if not isinstance(action, dict):
+                        continue
+                    action_type = action.get('action_type')
+                    if action_type in action_types:
+                        try:
+                            total += float(action.get('value', 0))
+                        except (TypeError, ValueError):
+                            continue
+
+            return int(total)
+
         try:
             # Agregar métricas básicas
             total_spend = safe_sum('spend')
@@ -235,12 +268,20 @@ class DataProvider:
 
             # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
             # pois não podem ser somados (são métricas de usuários únicos)
+            sdk_install_actions = {
+                "app_install",
+                "mobile_app_install",
+                "omni_app_install",
+                "app_install_event",
+                "mobile_app_install_event",
+            }
             return {
                 "investimento": total_spend,
                 "impressoes": total_impressions,
                 "alcance": safe_int(safe_sum('reach')),  # Será sobrescrito por aggregated
                 "frequencia": 0,  # Será sobrescrito por aggregated
                 "cliques_link": total_clicks,
+                "instalacoes_sdk": sum_actions(sdk_install_actions),
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
                 "cpm": round(cpm, 2),
@@ -438,7 +479,7 @@ class DataProvider:
     def _empty_meta_metrics(self):
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
-            "cliques_link": 0, "ctr_link": 0, "cpc_link": 0, "cpm": 0,
+            "cliques_link": 0, "instalacoes_sdk": 0, "ctr_link": 0, "cpc_link": 0, "cpm": 0,
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
             "delta_cpc": 0, "delta_cpm": 0,
@@ -454,7 +495,7 @@ class DataProvider:
     def _get_mock_meta_metrics(self, period, level):
         return {
             "investimento": 1250.50, "impressoes": 85400, "alcance": 42100, "frequencia": 2.03,
-            "cliques_link": 2450, "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
+            "cliques_link": 2450, "instalacoes_sdk": 320, "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
             "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
             "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
             "delta_cpc": -8.2, "delta_cpm": 2.3,
@@ -1618,8 +1659,8 @@ with cols[1]:
                 logger.warning(f"Erro ao parsear cta_count: {e}")
                 cta_count = 0
 
-    instalacoes = 0
-    funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK)"]
+    instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
+    funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK Meta)"]
     funnel_values = [
         int(meta_data.get('impressoes', 0) or 0),
         int(meta_data.get('cliques_link', 0) or 0),
@@ -1633,7 +1674,7 @@ with cols[1]:
     fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
                              paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)")
     st.plotly_chart(fig_funnel, use_container_width=True)
-    st.caption("**Cliques na loja** = evento GA4 `primary_cta_click` | **Instalações** = aguardando integração SDK")
+    st.caption("**Cliques na loja** = evento GA4 `primary_cta_click` | **Instalações** = eventos do SDK da Meta")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

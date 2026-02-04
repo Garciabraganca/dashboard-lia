@@ -729,7 +729,13 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== HEADER (glass escuro com glow) ========== */
 .lia-header {{
-    background: {LIA["bg_card"]};
+    background: linear-gradient(
+        120deg,
+        rgba(255, 210, 180, 0.35) 0%,
+        rgba(255, 170, 120, 0.35) 35%,
+        rgba(255, 150, 110, 0.28) 70%,
+        rgba(255, 245, 240, 0.4) 100%
+    );
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     border-radius: 20px;

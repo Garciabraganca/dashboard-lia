@@ -51,8 +51,8 @@ LIA = {
     "bg_dark": "#FFFFFF",           # Usado para textos sobre gradientes
     "bg_card": "#FFFFFF",           # Superfície de cartões
     "bg_card_solid": "#FFFFFF",
-    "bg_glass": "rgba(92, 201, 182, 0.08)",
-    "bg_hover": "rgba(92, 201, 182, 0.12)",
+    "bg_glass": "rgba(92, 201, 182, 0.06)",
+    "bg_hover": "rgba(92, 201, 182, 0.1)",
 
     # Texto
     "text_light": "#1A2B49",        # Navy para títulos
@@ -73,7 +73,7 @@ LIA = {
     "border": "rgba(26, 43, 73, 0.12)",
     "border_light": "rgba(26, 43, 73, 0.08)",
     "shadow": "rgba(26, 43, 73, 0.12)",
-    "glow": "rgba(92, 201, 182, 0.35)",
+    "glow": "rgba(92, 201, 182, 0.18)",
 }
 
 # =============================================================================
@@ -644,13 +644,13 @@ data_provider = DataProvider(mode="auto")
 # COMPONENTE: CARD DE ERRO AMIGAVEL
 # =============================================================================
 def render_error_card(title="Estamos ajustando os dados", message="Algumas metricas estao temporariamente indisponiveis. Nossa equipe ja esta verificando."):
-    owl_img = f'<img src="data:image/png;base64,{logo_base64}" style="width:48px;height:48px;margin-bottom:12px;filter:drop-shadow(0 0 10px rgba(92,201,182,0.35));">' if logo_base64 else ''
+    owl_img = f'<img src="data:image/png;base64,{logo_base64}" style="width:48px;height:48px;margin-bottom:12px;filter:drop-shadow(0 0 10px rgba(92,201,182,0.18));">' if logo_base64 else ''
     st.markdown(f'''
-    <div style="background:{LIA["bg_card"]};backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:20px;padding:32px;text-align:center;border:1px solid {LIA["border"]};margin:16px 0;box-shadow:0 16px 32px rgba(92,201,182,0.15), 0 0 24px rgba(122,92,255,0.18);">
+    <div style="background:{LIA["bg_card"]};backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:20px;padding:32px;text-align:center;border:1px solid {LIA["border"]};margin:16px 0;box-shadow:0 12px 24px rgba(92,201,182,0.12), 0 0 16px rgba(122,92,255,0.14);">
         {owl_img}
         <h3 style="color:{LIA["text_light"]};font-size:18px;margin:0 0 8px 0;">{title}</h3>
         <p style="color:{LIA["text_secondary"]};font-size:14px;margin:0 0 16px 0;">{message}</p>
-        <button onclick="window.location.reload()" style="background:linear-gradient(135deg,{LIA["primary"]},{LIA["secondary"]});color:{LIA["bg_dark"]};border:none;padding:10px 24px;border-radius:18px;font-size:14px;cursor:pointer;font-weight:600;box-shadow:0 10px 22px rgba(92,201,182,0.25), 0 0 18px rgba(122,92,255,0.2);">
+        <button onclick="window.location.reload()" style="background:linear-gradient(135deg,{LIA["primary"]},{LIA["secondary"]});color:#FFFFFF;border:none;padding:10px 24px;border-radius:999px;font-size:14px;cursor:pointer;font-weight:600;box-shadow:0 8px 16px rgba(92,201,182,0.18), 0 0 12px rgba(122,92,255,0.14);">
             Recarregar dados
         </button>
     </div>
@@ -680,8 +680,8 @@ html, body, [data-testid="stAppViewContainer"], .stApp {{
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(ellipse at 20% 0%, rgba(92, 201, 182, 0.18) 0%, transparent 55%),
-                radial-gradient(ellipse at 85% 100%, rgba(122, 92, 255, 0.12) 0%, transparent 45%);
+    background: radial-gradient(ellipse at 20% 0%, rgba(92, 201, 182, 0.12) 0%, transparent 55%),
+                radial-gradient(ellipse at 85% 100%, rgba(122, 92, 255, 0.1) 0%, transparent 45%);
     pointer-events: none;
     z-index: 0;
 }}
@@ -706,8 +706,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid {LIA["border"]};
     border-radius: 20px;
-    box-shadow: 0 16px 32px rgba(92, 201, 182, 0.15),
-                0 0 26px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.12),
+                0 0 16px rgba(92, 201, 182, 0.18);
     padding: 24px;
 }}
 
@@ -729,13 +729,17 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     -webkit-backdrop-filter: blur(18px);
     border-radius: 20px;
     padding: 20px 28px;
+    min-height: 84px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border: 1px solid {LIA["border"]};
-    box-shadow: 0 16px 32px rgba(92, 201, 182, 0.15),
-                0 0 24px rgba(122, 92, 255, 0.2);
+    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.12),
+                0 0 16px rgba(122, 92, 255, 0.14);
     margin-bottom: 0;
+    overflow: visible;
+    position: relative;
+    z-index: 2;
 }}
 
 .lia-header-left {{
@@ -753,14 +757,17 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 10px 22px rgba(92, 201, 182, 0.25),
-                0 0 18px rgba(122, 92, 255, 0.2);
+    box-shadow: 0 8px 16px rgba(92, 201, 182, 0.18),
+                0 0 12px rgba(122, 92, 255, 0.14);
+    position: relative;
+    z-index: 3;
 }}
 
 .lia-logo img {{
     width: 32px;
     height: 32px;
-    filter: brightness(0) invert(1);
+    filter: none;
+    mix-blend-mode: normal;
 }}
 
 .lia-title-group {{
@@ -794,14 +801,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     align-items: center;
     gap: 12px;
     border: 1px solid {LIA["border"]};
-    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.18),
-                0 0 18px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 10px 20px rgba(92, 201, 182, 0.12),
+                0 0 12px rgba(92, 201, 182, 0.18);
 }}
 
 .status-owl {{
     width: 28px;
     height: 28px;
-    filter: drop-shadow(0 0 8px rgba(92, 201, 182, 0.35));
+    filter: drop-shadow(0 0 8px rgba(92, 201, 182, 0.18));
 }}
 
 .status-text {{
@@ -834,8 +841,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     justify-content: center;
     font-size: 12px;
     font-weight: 800;
-    box-shadow: 0 6px 14px rgba(92, 201, 182, 0.25),
-                0 0 12px rgba(122, 92, 255, 0.2);
+    box-shadow: 0 6px 12px rgba(92, 201, 182, 0.18),
+                0 0 10px rgba(122, 92, 255, 0.14);
 }}
 
 .kpi-grid {{
@@ -874,8 +881,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border: 1px solid {LIA["border"]};
     transition: transform 0.6s ease, background 0.2s ease, box-shadow 0.2s ease;
     cursor: pointer;
-    box-shadow: 0 12px 26px rgba(92, 201, 182, 0.18),
-                0 0 18px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 10px 20px rgba(92, 201, 182, 0.12),
+                0 0 12px rgba(92, 201, 182, 0.18);
 }}
 
 .kpi-front {{
@@ -898,8 +905,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 .kpi-card:hover .kpi-back {{
     background: {LIA["bg_card"]};
     border-color: {LIA["primary"]};
-    box-shadow: 0 14px 30px rgba(92, 201, 182, 0.2),
-                0 0 22px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.14),
+                0 0 14px rgba(92, 201, 182, 0.18);
 }}
 
 .kpi-top {{
@@ -912,7 +919,7 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 .kpi-icon {{
     font-size: 16px;
-    filter: drop-shadow(0 0 6px rgba(92, 201, 182, 0.35));
+    filter: drop-shadow(0 0 6px rgba(92, 201, 182, 0.18));
 }}
 
 .kpi-label {{
@@ -946,8 +953,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     color: {LIA["text_secondary"]};
 }}
 
-.delta-up {{ color: {LIA["success"]}; text-shadow: 0 0 10px rgba(92, 201, 182, 0.35); }}
-.delta-down {{ color: {LIA["error"]}; text-shadow: 0 0 10px rgba(122, 92, 255, 0.25); }}
+.delta-up {{ color: {LIA["success"]}; text-shadow: 0 0 10px rgba(92, 201, 182, 0.18); }}
+.delta-down {{ color: {LIA["error"]}; text-shadow: 0 0 10px rgba(122, 92, 255, 0.14); }}
 .delta-neutral {{ color: {LIA["text_muted"]}; }}
 
 /* ========== BADGES ========== */
@@ -971,14 +978,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     background: rgba(92, 201, 182, 0.12);
     color: {LIA["primary"]};
     border: 1px solid rgba(92, 201, 182, 0.3);
-    box-shadow: 0 0 10px rgba(92, 201, 182, 0.2);
+    box-shadow: 0 0 6px rgba(92, 201, 182, 0.14);
 }}
 
 .badge-green {{
     background: rgba(92, 201, 182, 0.12);
     color: {LIA["success"]};
     border: 1px solid rgba(92, 201, 182, 0.3);
-    box-shadow: 0 0 10px rgba(92, 201, 182, 0.2);
+    box-shadow: 0 0 6px rgba(92, 201, 182, 0.14);
 }}
 
 /* ========== TABELA COM HEADER GLASS ESCURO ========== */
@@ -989,8 +996,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border-radius: 20px;
     overflow: hidden;
     border: 1px solid {LIA["border"]};
-    box-shadow: 0 16px 32px rgba(92, 201, 182, 0.15),
-                0 0 24px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.12),
+                0 0 16px rgba(92, 201, 182, 0.18);
     margin-bottom: 12px;
 }}
 
@@ -1091,7 +1098,7 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     justify-content: center;
     font-size: 11px;
     font-weight: 700;
-    box-shadow: 0 0 8px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 0 8px rgba(92, 201, 182, 0.18);
 }}
 
 .tooltip-popup {{
@@ -1112,8 +1119,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     transition: opacity 0.2s ease, transform 0.2s ease;
     z-index: 10;
     border: 1px solid {LIA["border"]};
-    box-shadow: 0 12px 26px rgba(92, 201, 182, 0.18),
-                0 0 18px rgba(122, 92, 255, 0.2);
+    box-shadow: 0 10px 20px rgba(92, 201, 182, 0.12),
+                0 0 14px rgba(122, 92, 255, 0.14);
 }}
 
 .event-tooltip-wrapper:hover .tooltip-popup,
@@ -1134,8 +1141,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     align-items: center;
     gap: 12px;
     border: 1px solid {LIA["border"]};
-    box-shadow: 0 14px 30px rgba(92, 201, 182, 0.18),
-                0 0 20px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.12),
+                0 0 14px rgba(92, 201, 182, 0.18);
     margin-bottom: 12px;
 }}
 
@@ -1152,8 +1159,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border-radius: 20px;
     padding: 18px;
     border: 1px solid {LIA["border"]};
-    box-shadow: 0 16px 32px rgba(92, 201, 182, 0.15),
-                0 0 24px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.12),
+                0 0 16px rgba(92, 201, 182, 0.18);
     margin-bottom: 12px;
 }}
 
@@ -1176,8 +1183,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 .trend-toggle [aria-selected="true"] {{
     background: linear-gradient(135deg, {LIA["primary"]} 0%, {LIA["secondary"]} 100%);
     color: {LIA["bg_dark"]};
-    box-shadow: 0 10px 20px rgba(92, 201, 182, 0.25),
-                0 0 16px rgba(122, 92, 255, 0.2);
+    box-shadow: 0 8px 16px rgba(92, 201, 182, 0.14),
+                0 0 12px rgba(122, 92, 255, 0.14);
 }}
 
 .js-plotly-plot .plotly .modebar {{ display: none !important; }}
@@ -1189,8 +1196,7 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid {LIA["border"]};
     border-radius: 20px;
-    box-shadow: 0 16px 32px rgba(92, 201, 182, 0.15),
-                0 0 24px rgba(92, 201, 182, 0.35);
+    box-shadow: 0 8px 16px rgba(92, 201, 182, 0.1);
     padding: 18px 18px 10px 18px;
 }}
 
@@ -1198,13 +1204,13 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     background: #FFFFFF !important;
     border: 1px solid {LIA["border"]} !important;
     border-radius: 18px !important;
-    box-shadow: 0 10px 22px rgba(92, 201, 182, 0.15);
+    box-shadow: none;
     color: {LIA["text_light"]} !important;
 }}
 
 .stSelectbox > div > div:hover {{
     border-color: {LIA["primary"]} !important;
-    box-shadow: 0 0 14px rgba(92, 201, 182, 0.35);
+    box-shadow: none;
 }}
 
 .stSelectbox label {{
@@ -1225,8 +1231,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border-radius: 20px;
     padding: 24px;
     margin-bottom: 16px;
-    box-shadow: 0 16px 32px rgba(92, 201, 182, 0.18),
-                0 0 24px rgba(122, 92, 255, 0.2);
+    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.12),
+                0 0 14px rgba(122, 92, 255, 0.14);
 }}
 
 .ai-agent-header {{
@@ -1245,8 +1251,8 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     align-items: center;
     justify-content: center;
     font-size: 20px;
-    box-shadow: 0 10px 20px rgba(92, 201, 182, 0.25),
-                0 0 18px rgba(122, 92, 255, 0.2);
+    box-shadow: 0 8px 16px rgba(92, 201, 182, 0.18),
+                0 0 12px rgba(122, 92, 255, 0.14);
 }}
 
 .ai-agent-title {{
@@ -1301,20 +1307,39 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 /* ========== STREAMLIT GLOBAL OVERRIDES ========== */
 .stButton > button {{
     background: linear-gradient(135deg, {LIA["primary"]} 0%, {LIA["secondary"]} 100%) !important;
-    color: {LIA["bg_dark"]} !important;
+    color: #FFFFFF !important;
     border: none !important;
-    border-radius: 18px !important;
+    border-radius: 999px !important;
     padding: 10px 20px !important;
     font-weight: 600 !important;
-    box-shadow: 0 10px 22px rgba(92, 201, 182, 0.25),
-                0 0 18px rgba(122, 92, 255, 0.2) !important;
+    box-shadow: 0 8px 16px rgba(92, 201, 182, 0.18),
+                0 0 12px rgba(122, 92, 255, 0.14) !important;
     transition: all 0.3s ease !important;
 }}
 
 .stButton > button:hover {{
     transform: translateY(-2px) !important;
-    box-shadow: 0 12px 26px rgba(92, 201, 182, 0.28),
-                0 0 20px rgba(122, 92, 255, 0.22) !important;
+    box-shadow: 0 10px 20px rgba(92, 201, 182, 0.18),
+                0 0 14px rgba(122, 92, 255, 0.14) !important;
+}}
+
+.stButton > button[kind="secondary"],
+.stButton > button[kind="secondary"]:hover {{
+    background: #FFFFFF !important;
+    color: {LIA["text_light"]} !important;
+    border: 1px solid rgba(92, 201, 182, 0.18) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}}
+
+.stButton > button[kind="tertiary"],
+.stButton > button[kind="tertiary"]:hover {{
+    background: transparent !important;
+    color: {LIA["text_light"]} !important;
+    border: none !important;
+    box-shadow: none !important;
+    text-decoration: underline;
+    text-decoration-color: rgba(92, 201, 182, 0.6);
 }}
 
 /* Date input styling */
@@ -1323,6 +1348,7 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border: 1px solid {LIA["border"]} !important;
     border-radius: 18px !important;
     color: {LIA["text_light"]} !important;
+    box-shadow: none !important;
 }}
 
 .stDateInput label {{
@@ -1346,10 +1372,10 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 /* Alerts */
 .stAlert {{
     background: #FFFFFF !important;
-    border: 1px solid rgba(92, 201, 182, 0.35) !important;
+    border: 1px solid rgba(92, 201, 182, 0.18) !important;
     border-radius: 20px !important;
-    box-shadow: 0 12px 24px rgba(92, 201, 182, 0.18),
-                0 0 18px rgba(122, 92, 255, 0.2) !important;
+    box-shadow: 0 10px 20px rgba(92, 201, 182, 0.12),
+                0 0 12px rgba(122, 92, 255, 0.14) !important;
 }}
 
 .stAlert [data-testid="stAlertContent"] {{
@@ -1392,7 +1418,7 @@ a {{
 
 a:hover {{
     text-decoration: underline;
-    text-shadow: 0 0 10px rgba(92, 201, 182, 0.35);
+    text-shadow: 0 0 10px rgba(92, 201, 182, 0.18);
 }}
 
 /* Loading spinner */

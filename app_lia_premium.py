@@ -667,7 +667,12 @@ st.markdown(f"""
 
 /* Fundo: Ice Gray com glow suave */
 html, body, [data-testid="stAppViewContainer"], .stApp {{
-    background: {LIA["gradient_start"]} !important;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 210, 180, 0.3) 0%,
+        rgba(255, 245, 240, 0.4) 25%,
+        #FFFFFF 60%
+    ) !important;
     min-height: 100vh;
     font-family: 'Inter', -apple-system, sans-serif !important;
 }}

@@ -43,15 +43,15 @@ LIA = {
     "gradient_mid": "#FB7185",
     "gradient_end": "#FECDD3",
     "white": "#FFFFFF",
-    "bg_card": "#FFFFFF",
-    "bg_zebra": "#FAFAFA",
-    "text_dark": "#1A1A1A",
-    "text_secondary": "#555555",
-    "text_muted": "#888888",
+    "bg_card": "#1E1E2D",
+    "bg_zebra": "#242443",
+    "text_dark": "#FEFCFF",
+    "text_secondary": "#C6C6DD",
+    "text_muted": "#9A9AB6",
     "success": "#16A34A",
     "error": "#DC2626",
-    "border": "#E5E5E5",
-    "shadow": "rgba(0,0,0,0.08)",
+    "border": "#2D2D52",
+    "shadow": "rgba(0,0,0,0.35)",
 }
 
 # =============================================================================
@@ -624,7 +624,7 @@ data_provider = DataProvider(mode="auto")
 def render_error_card(title="Estamos ajustando os dados", message="Algumas metricas estao temporariamente indisponiveis. Nossa equipe ja esta verificando."):
     owl_img = f'<img src="data:image/png;base64,{logo_base64}" style="width:48px;height:48px;margin-bottom:12px;">' if logo_base64 else ''
     st.markdown(f'''
-    <div style="background:rgba(255,255,255,0.65);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-radius:20px;padding:32px;text-align:center;border:1px solid rgba(255,255,255,0.35);margin:16px 0;box-shadow:0 20px 40px rgba(0,0,0,0.12);">
+    <div style="background:var(--color-card);border-radius:20px;padding:32px;text-align:center;border:1px solid {LIA["border"]};margin:16px 0;box-shadow:var(--shadow-dark);">
         {owl_img}
         <h3 style="color:{LIA["text_dark"]};font-size:18px;margin:0 0 8px 0;">{title}</h3>
         <p style="color:{LIA["text_secondary"]};font-size:14px;margin:0 0 16px 0;">{message}</p>
@@ -643,11 +643,21 @@ st.markdown(f"""
 
 *, *::before, *::after {{ box-sizing: border-box; }}
 
-/* Fundo: Gradiente LIA (emocional) */
+/* Fundo: estilo dark do dashboard */
+:root {{
+    --color-bg: #28284e;
+    --color-card: #1e1e2d;
+    --color-text: {LIA["text_dark"]};
+    --color-muted: {LIA["text_muted"]};
+    --color-gradient: linear-gradient(45deg, #01ebaf, #00a9cd, #6380ff);
+    --shadow-dark: 7px 7px 29px #191931, -7px -7px 29px #37376b;
+}}
+
 html, body, [data-testid="stAppViewContainer"], .stApp {{
-    background: linear-gradient(135deg, {LIA["gradient_start"]} 0%, {LIA["gradient_mid"]} 50%, {LIA["gradient_end"]} 100%) !important;
+    background: var(--color-bg) !important;
     min-height: 100vh;
     font-family: 'Inter', -apple-system, sans-serif !important;
+    color: var(--color-text);
 }}
 
 [data-testid="stSidebar"], section[data-testid="stSidebar"],
@@ -663,12 +673,10 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== CARTOES GLASSMORPHISM ========== */
 .glass-card {{
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: var(--color-card);
+    border: 1px solid {LIA["border"]};
     border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-dark);
     padding: 24px;
 }}
 
@@ -681,16 +689,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== HEADER (em glass) ========== */
 .lia-header {{
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: var(--color-card);
     border-radius: 20px;
     padding: 20px 28px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    border: 1px solid {LIA["border"]};
+    box-shadow: var(--shadow-dark);
     margin-bottom: 0;
 }}
 
@@ -704,12 +710,11 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     width: 50px;
     height: 50px;
     border-radius: 12px;
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(12px);
+    background: #151521;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.35);
 }}
 
 .lia-logo img {{
@@ -740,14 +745,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== STATUS CARD ========== */
 .status-card {{
-    background: rgba(255, 255, 255, 0.85);
+    background: var(--color-card);
     border-radius: 16px;
     padding: 12px 20px;
     display: flex;
     align-items: center;
     gap: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    border: 1px solid {LIA["border"]};
+    box-shadow: var(--shadow-dark);
 }}
 
 .status-owl {{
@@ -765,7 +770,7 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 .section-title {{
     font-size: 15px;
     font-weight: 700;
-    color: {LIA["text_dark"]};
+    color: var(--color-text);
     margin-bottom: 18px;
     display: flex;
     align-items: center;
@@ -777,7 +782,7 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 .section-icon {{
     width: 24px;
     height: 24px;
-    background: {LIA["primary"]};
+    background: var(--color-gradient);
     color: white;
     border-radius: 6px;
     display: flex;
@@ -794,23 +799,63 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 }}
 
 .kpi-card {{
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 16px;
-    padding: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    transition: transform 0.2s ease;
+    position: relative;
+    perspective: 1000px;
+    height: 150px;
+    display: block;
 }}
 
-.kpi-card:hover {{
-    transform: translateY(-2px);
-    background: white;
+.kpi-card input {{
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}}
+
+.kpi-inner {{
+    position: relative;
+    width: 100%;
+    height: 100%;
+}}
+
+.kpi-front,
+.kpi-back {{
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    background: var(--color-card);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid {LIA["border"]};
+    transition: transform 0.6s ease, background 0.2s ease;
+    cursor: pointer;
+}}
+
+.kpi-front {{
+    transform: rotateY(0deg);
+}}
+
+.kpi-back {{
+    transform: rotateY(180deg);
+}}
+
+.kpi-card input:checked ~ .kpi-inner .kpi-back {{
+    transform: rotateY(0deg);
+}}
+
+.kpi-card input:checked ~ .kpi-inner .kpi-front {{
+    transform: rotateY(-180deg);
+}}
+
+.kpi-card:hover .kpi-front {{
+    background: #23233a;
 }}
 
 .kpi-top {{
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }}
 
 .kpi-icon {{
@@ -823,13 +868,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     color: {LIA["text_secondary"]};
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    margin: 0;
 }}
 
 .kpi-value {{
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 800;
-    color: {LIA["text_dark"]};
-    margin-bottom: 4px;
+    color: var(--color-text);
+    margin-bottom: 6px;
 }}
 
 .kpi-delta {{
@@ -838,6 +884,12 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     display: flex;
     align-items: center;
     gap: 2px;
+}}
+
+.kpi-back p {{
+    margin: 12px 0 0 0;
+    font-size: 12px;
+    color: {LIA["text_secondary"]};
 }}
 
 .delta-up {{ color: {LIA["success"]}; }}
@@ -991,16 +1043,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== CARD DE ESCOPO ========== */
 .scope-card {{
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: var(--color-card);
     border-radius: 20px;
     padding: 16px 20px;
     display: flex;
     align-items: center;
     gap: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    border: 1px solid {LIA["border"]};
+    box-shadow: var(--shadow-dark);
     margin-bottom: 12px;
 }}
 
@@ -1011,34 +1061,51 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== GRAFICOS EM CARDS ========== */
 .chart-card {{
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: var(--color-card);
     border-radius: 20px;
     padding: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    border: 1px solid {LIA["border"]};
+    box-shadow: var(--shadow-dark);
     margin-bottom: 12px;
+}}
+
+.trend-toggle [data-baseweb="tab-list"] {{
+    gap: 8px;
+    background: transparent;
+    border-radius: 12px;
+}}
+
+.trend-toggle [data-baseweb="tab"] {{
+    background: transparent;
+    border-radius: 8px;
+    padding: 6px 14px;
+    color: {LIA["text_secondary"]};
+    font-size: 13px;
+    font-weight: 600;
+}}
+
+.trend-toggle [aria-selected="true"] {{
+    background: {LIA["primary"]};
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(244, 124, 60, 0.25);
 }}
 
 .js-plotly-plot .plotly .modebar {{ display: none !important; }}
 
 /* ========== FILTROS ========== */
 .filter-card {{
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: var(--color-card);
+    border: 1px solid {LIA["border"]};
     border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-dark);
     padding: 18px 18px 10px 18px;
 }}
 
 .stSelectbox > div > div {{
-    background: rgba(255, 255, 255, 0.8) !important;
-    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    background: #23233a !important;
+    border: 1px solid {LIA["border"]} !important;
     border-radius: 12px !important;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-dark);
 }}
 
 .stSelectbox label {{
@@ -1048,14 +1115,12 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 
 /* ========== AGENTE DE IA ========== */
 .ai-agent-card {{
-    background: linear-gradient(135deg, rgba(244,124,60,0.1) 0%, rgba(251,113,133,0.1) 100%);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 2px solid {LIA["primary"]};
+    background: #23233a;
+    border: 2px solid #3b3b6d;
     border-radius: 20px;
     padding: 24px;
     margin-bottom: 16px;
-    box-shadow: 0 20px 40px rgba(244,124,60,0.15);
+    box-shadow: var(--shadow-dark);
 }}
 
 .ai-agent-header {{
@@ -1088,12 +1153,12 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 }}
 
 .ai-agent-content {{
-    background: rgba(255,255,255,0.8);
+    background: #1c1c2b;
     border-radius: 12px;
     padding: 16px;
     font-size: 14px;
     line-height: 1.6;
-    color: {LIA["text_dark"]};
+    color: var(--color-text);
 }}
 
 .ai-agent-content h1, .ai-agent-content h2, .ai-agent-content h3 {{
@@ -1408,15 +1473,35 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
         icon_delta = "↑" if is_positive else "↓"
         delta_text = f"{icon_delta} {abs(delta):.{precision}f}{suffix}"
 
+    card_id = "kpi-" + "".join(
+        char.lower() if char.isalnum() else "-" for char in str(label)
+    ).strip("-")
+
     return textwrap.dedent(f"""
-    <div class="kpi-card">
-        <div class="kpi-top">
-            <div class="kpi-icon">{icon}</div>
-            <div class="kpi-label">{label}</div>
+    <label class="kpi-card" id="{card_id}">
+        <input type="checkbox" />
+        <div class="kpi-inner">
+            <div class="kpi-front">
+                <div class="kpi-top">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="kpi-icon">{icon}</div>
+                        <div class="kpi-label">{label}</div>
+                    </div>
+                    <span style="font-size:16px;color:{LIA["text_muted"]};">⋯</span>
+                </div>
+                <div class="kpi-value">{value}</div>
+                <div class="kpi-delta {delta_class}">{delta_text}</div>
+            </div>
+            <div class="kpi-back">
+                <div class="kpi-top">
+                    <div class="kpi-label">{label}</div>
+                    <span style="font-size:14px;color:{LIA["text_muted"]};">✕</span>
+                </div>
+                <h3 style="margin:0;font-size:18px;color:{LIA["text_dark"]};">{value}</h3>
+                <p>Variação: <span class="{delta_class}">{delta_text}</span></p>
+            </div>
         </div>
-        <div class="kpi-value">{value}</div>
-        <div class="kpi-delta {delta_class}">{delta_text}</div>
-    </div>
+    </label>
     """).strip()
 
 kpi_cards = [
@@ -1505,7 +1590,7 @@ if len(creative_data) > 0:
         render_error_card("Dados de criativos indisponiveis", "Estamos processando as informacoes de criativos.")
 else:
     st.markdown(f'''
-    <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:32px;text-align:center;border:1px dashed rgba(255,255,255,0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+    <div style="background:var(--color-card);border-radius:16px;padding:32px;text-align:center;border:1px dashed #34345a;">
         <p style="color:{LIA["text_muted"]};margin:0;">Nenhum dado de criativo encontrado no periodo selecionado.</p>
     </div>
     ''', unsafe_allow_html=True)
@@ -1530,6 +1615,70 @@ st.markdown('<div class="section-title"><div class="section-icon">~</div> Tenden
 
 if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
     try:
+        st.markdown('<div class="chart-card trend-toggle">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques</div>', unsafe_allow_html=True)
+
+        trend_tabs = st.tabs(["Diário", "Semanal"])
+        trend_daily = trends_data.copy()
+        trend_daily["__date"] = pd.to_datetime(trend_daily["Data"], dayfirst=True, errors="coerce")
+        current_year = datetime.now().year
+        trend_daily["__date"] = trend_daily["__date"].apply(
+            lambda value: value.replace(year=current_year) if pd.notna(value) else value
+        )
+
+        with trend_tabs[0]:
+            fig_daily = go.Figure()
+            fig_daily.add_trace(go.Scatter(
+                x=trend_daily["Data"],
+                y=trend_daily["Cliques"],
+                mode="lines",
+                line=dict(color=LIA["primary"], width=3, shape="spline"),
+                fill="tozeroy",
+                fillcolor="rgba(244,124,60,0.25)"
+            ))
+            fig_daily.update_layout(
+                height=260,
+                margin=dict(l=10, r=10, t=10, b=10),
+                paper_bgcolor="rgba(255,255,255,0)",
+                plot_bgcolor="rgba(255,255,255,0)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_secondary"])),
+                yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)", tickfont=dict(size=11, color=LIA["text_secondary"])),
+                showlegend=False
+            )
+            st.plotly_chart(fig_daily, use_container_width=True)
+
+        with trend_tabs[1]:
+            weekly = trend_daily.dropna(subset=["__date"]).set_index("__date").resample("W-MON")["Cliques"].sum().reset_index()
+            weekly["Label"] = weekly["__date"].dt.strftime("Sem %d/%m")
+            if weekly.empty:
+                st.markdown(f'''
+                <div style="background:var(--color-card);border-radius:16px;padding:24px;text-align:center;border:1px dashed #34345a;">
+                    <p style="color:{LIA["text_muted"]};margin:0;">Sem dados suficientes para consolidar as semanas.</p>
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
+                fig_weekly = go.Figure()
+                fig_weekly.add_trace(go.Scatter(
+                    x=weekly["Label"],
+                    y=weekly["Cliques"],
+                    mode="lines",
+                    line=dict(color=LIA["secondary"], width=3, shape="spline"),
+                    fill="tozeroy",
+                    fillcolor="rgba(251,113,133,0.22)"
+                ))
+                fig_weekly.update_layout(
+                    height=260,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    paper_bgcolor="rgba(255,255,255,0)",
+                    plot_bgcolor="rgba(255,255,255,0)",
+                    xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_secondary"])),
+                    yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)", tickfont=dict(size=11, color=LIA["text_secondary"])),
+                    showlegend=False
+                )
+                st.plotly_chart(fig_weekly, use_container_width=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
         chart_cols = st.columns(3)
 
         with chart_cols[0]:
@@ -1547,7 +1696,7 @@ if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in
             fig1.update_layout(
                 title=dict(text="Cliques/Dia", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
                 height=220, margin=dict(l=10, r=10, t=40, b=30),
-                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 showlegend=False
@@ -1570,7 +1719,7 @@ if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in
             fig2.update_layout(
                 title=dict(text="CTR/Dia (%)", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
                 height=220, margin=dict(l=10, r=10, t=40, b=30),
-                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 showlegend=False
@@ -1590,7 +1739,7 @@ if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in
             fig3.update_layout(
                 title=dict(text="CPC/Dia ($)", font=dict(size=14, color=LIA["text_dark"], family="Inter")),
                 height=220, margin=dict(l=10, r=10, t=40, b=30),
-                paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 yaxis=dict(showgrid=True, gridcolor="#E0E0E0", tickfont=dict(size=11, color=LIA["text_dark"]), showline=True, linecolor="#E0E0E0"),
                 showlegend=False
@@ -1602,7 +1751,7 @@ if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in
         render_error_card("Graficos indisponiveis", "Estamos processando os dados de tendencia.")
 else:
     st.markdown(f'''
-    <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:32px;text-align:center;border:1px dashed rgba(255,255,255,0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+    <div style="background:var(--color-card);border-radius:16px;padding:32px;text-align:center;border:1px dashed #34345a;">
         <p style="color:{LIA["text_muted"]};margin:0;">Sem dados de tendência temporal para o período e campanha selecionados.</p>
     </div>
     ''', unsafe_allow_html=True)
@@ -1631,7 +1780,7 @@ with cols[0]:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.markdown(f'''
-        <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:32px;text-align:center;border:1px dashed rgba(255,255,255,0.35);">
+        <div style="background:var(--color-card);border-radius:16px;padding:32px;text-align:center;border:1px dashed #34345a;">
             <p style="color:{LIA["text_muted"]};margin:0;">Sem dados de tendência para o período selecionado.</p>
         </div>
         ''', unsafe_allow_html=True)
@@ -1672,7 +1821,7 @@ with cols[1]:
     fig_funnel = go.Figure(go.Funnel(y=funnel_df['Etapa'], x=funnel_df['Valor'],
                                      textposition="inside", textinfo="value+percent initial"))
     fig_funnel.update_layout(height=350, margin=dict(l=40, r=40, t=40, b=40),
-                             paper_bgcolor="rgba(255,255,255,0.5)", plot_bgcolor="rgba(255,255,255,0.8)")
+                             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     st.plotly_chart(fig_funnel, use_container_width=True)
     st.caption("**Cliques na loja** = evento GA4 `primary_cta_click` | **Instalações** = eventos do SDK da Meta")
     st.markdown('</div>', unsafe_allow_html=True)
@@ -1753,7 +1902,7 @@ with table_cols[0]:
             st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'''
-            <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:20px;text-align:center;border:1px dashed rgba(255,255,255,0.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+            <div style="background:var(--color-card);border-radius:16px;padding:20px;text-align:center;border:1px dashed #34345a;">
                 <p style="color:{LIA["text_muted"]};margin:0;">Nenhuma origem de tráfego paga encontrada no período.</p>
             </div>
             ''', unsafe_allow_html=True)

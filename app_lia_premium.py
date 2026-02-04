@@ -1359,6 +1359,38 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     text-decoration-color: rgba(92, 201, 182, 0.6);
 }}
 
+.ai-analysis-button .stButton > button {{
+    position: relative;
+    overflow: hidden;
+    justify-content: center;
+    gap: 10px;
+    height: 56px;
+    font-size: 16px !important;
+    letter-spacing: 0.2px;
+    background: {LIA["text_light"]} !important;
+    color: #FFFFFF !important;
+    border-radius: 999px !important;
+    border: none !important;
+    box-shadow: 0 10px 18px rgba(26, 43, 73, 0.18);
+}}
+
+.ai-analysis-button .stButton > button::after {{
+    content: "";
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    bottom: 8px;
+    height: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, {LIA["primary"]}, {LIA["secondary"]});
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}}
+
+.ai-analysis-button .stButton > button:hover::after {{
+    opacity: 1;
+}}
+
 /* Date input styling */
 .stDateInput > div > div {{
     background: #FFFFFF !important;
@@ -1636,6 +1668,7 @@ if Config.validate_openai_credentials():
     cycle = campanha if campanha in ["Ciclo 1", "Ciclo 2"] else "Todos os Ciclos"
 
     # Botão para gerar análise
+    st.markdown('<div class="ai-analysis-button">', unsafe_allow_html=True)
     if st.button("🔮 Gerar Análise com IA", key="btn_ai_analysis", use_container_width=True):
         with st.spinner("Analisando dados com IA..."):
             try:
@@ -1683,6 +1716,7 @@ if Config.validate_openai_credentials():
             except Exception as e:
                 logger.error(f"Erro ao gerar análise de IA: {e}")
                 st.error(f"Erro ao gerar análise: {str(e)}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # Exibir análise salva se existir
     if 'ai_analysis' in st.session_state:

@@ -1021,6 +1021,27 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     margin-bottom: 12px;
 }}
 
+.trend-toggle [data-baseweb="tab-list"] {{
+    gap: 8px;
+    background: transparent;
+    border-radius: 12px;
+}}
+
+.trend-toggle [data-baseweb="tab"] {{
+    background: transparent;
+    border-radius: 8px;
+    padding: 6px 14px;
+    color: {LIA["text_secondary"]};
+    font-size: 13px;
+    font-weight: 600;
+}}
+
+.trend-toggle [aria-selected="true"] {{
+    background: {LIA["primary"]};
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(244, 124, 60, 0.25);
+}}
+
 .js-plotly-plot .plotly .modebar {{ display: none !important; }}
 
 /* ========== FILTROS ========== */
@@ -1530,6 +1551,70 @@ st.markdown('<div class="section-title"><div class="section-icon">~</div> Tenden
 
 if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
     try:
+        st.markdown('<div class="chart-card trend-toggle">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques</div>', unsafe_allow_html=True)
+
+        trend_tabs = st.tabs(["Diário", "Semanal"])
+        trend_daily = trends_data.copy()
+        trend_daily["__date"] = pd.to_datetime(trend_daily["Data"], dayfirst=True, errors="coerce")
+        current_year = datetime.now().year
+        trend_daily["__date"] = trend_daily["__date"].apply(
+            lambda value: value.replace(year=current_year) if pd.notna(value) else value
+        )
+
+        with trend_tabs[0]:
+            fig_daily = go.Figure()
+            fig_daily.add_trace(go.Scatter(
+                x=trend_daily["Data"],
+                y=trend_daily["Cliques"],
+                mode="lines",
+                line=dict(color=LIA["primary"], width=3, shape="spline"),
+                fill="tozeroy",
+                fillcolor="rgba(244,124,60,0.25)"
+            ))
+            fig_daily.update_layout(
+                height=260,
+                margin=dict(l=10, r=10, t=10, b=10),
+                paper_bgcolor="rgba(255,255,255,0)",
+                plot_bgcolor="rgba(255,255,255,0)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_secondary"])),
+                yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)", tickfont=dict(size=11, color=LIA["text_secondary"])),
+                showlegend=False
+            )
+            st.plotly_chart(fig_daily, use_container_width=True)
+
+        with trend_tabs[1]:
+            weekly = trend_daily.dropna(subset=["__date"]).set_index("__date").resample("W-MON")["Cliques"].sum().reset_index()
+            weekly["Label"] = weekly["__date"].dt.strftime("Sem %d/%m")
+            if weekly.empty:
+                st.markdown(f'''
+                <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:24px;text-align:center;border:1px dashed rgba(255,255,255,0.35);">
+                    <p style="color:{LIA["text_muted"]};margin:0;">Sem dados suficientes para consolidar as semanas.</p>
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
+                fig_weekly = go.Figure()
+                fig_weekly.add_trace(go.Scatter(
+                    x=weekly["Label"],
+                    y=weekly["Cliques"],
+                    mode="lines",
+                    line=dict(color=LIA["secondary"], width=3, shape="spline"),
+                    fill="tozeroy",
+                    fillcolor="rgba(251,113,133,0.22)"
+                ))
+                fig_weekly.update_layout(
+                    height=260,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    paper_bgcolor="rgba(255,255,255,0)",
+                    plot_bgcolor="rgba(255,255,255,0)",
+                    xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_secondary"])),
+                    yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)", tickfont=dict(size=11, color=LIA["text_secondary"])),
+                    showlegend=False
+                )
+                st.plotly_chart(fig_weekly, use_container_width=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
         chart_cols = st.columns(3)
 
         with chart_cols[0]:

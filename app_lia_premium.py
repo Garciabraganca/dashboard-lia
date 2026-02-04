@@ -1009,25 +1009,46 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
+    text-align: left;
+}}
+
+.lia-html-table :is(th, td) {{
+    padding: 12px 16px;
+    white-space: nowrap;
+    vertical-align: middle;
 }}
 
 .lia-html-table thead th {{
-    text-align: left;
-    padding: 10px 12px;
-    background: rgba(0, 212, 255, 0.1);
+    background: rgba(0, 212, 255, 0.12);
     border-bottom: 1px solid {LIA["border"]};
     color: {LIA["primary"]};
     font-weight: 600;
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
 }}
 
 .lia-html-table tbody td {{
-    padding: 10px 12px;
     border-bottom: 1px solid rgba(0, 212, 255, 0.1);
     color: {LIA["text_primary"]};
+    opacity: 0.78;
+    transition: opacity 0.3s ease, background 0.3s ease;
 }}
 
-.lia-html-table tbody tr:hover {{
-    background: rgba(0, 212, 255, 0.08);
+.lia-html-table tbody tr:nth-child(odd) {{
+    background: rgba(1, 13, 37, 0.35);
+}}
+
+.lia-html-table tbody tr:hover td {{
+    opacity: 1;
+}}
+
+.lia-html-table tbody tr:last-child td {{
+    border-bottom: 0;
+}}
+
+.lia-html-table tbody td:nth-child(n + 2) {{
+    text-align: right;
+    font-variant-numeric: tabular-nums;
 }}
 
 .event-tooltip-wrapper {{

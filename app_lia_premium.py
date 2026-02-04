@@ -794,23 +794,63 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 }}
 
 .kpi-card {{
+    position: relative;
+    perspective: 1000px;
+    height: 150px;
+    display: block;
+}}
+
+.kpi-card input {{
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}}
+
+.kpi-inner {{
+    position: relative;
+    width: 100%;
+    height: 100%;
+}}
+
+.kpi-front,
+.kpi-back {{
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
     background: rgba(255, 255, 255, 0.8);
     border-radius: 16px;
     padding: 16px;
     border: 1px solid rgba(255, 255, 255, 0.5);
-    transition: transform 0.2s ease;
+    transition: transform 0.6s ease, background 0.2s ease;
+    cursor: pointer;
 }}
 
-.kpi-card:hover {{
-    transform: translateY(-2px);
+.kpi-front {{
+    transform: rotateY(0deg);
+}}
+
+.kpi-back {{
+    transform: rotateY(180deg);
+}}
+
+.kpi-card input:checked ~ .kpi-inner .kpi-back {{
+    transform: rotateY(0deg);
+}}
+
+.kpi-card input:checked ~ .kpi-inner .kpi-front {{
+    transform: rotateY(-180deg);
+}}
+
+.kpi-card:hover .kpi-front {{
     background: white;
 }}
 
 .kpi-top {{
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }}
 
 .kpi-icon {{
@@ -823,13 +863,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     color: {LIA["text_secondary"]};
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    margin: 0;
 }}
 
 .kpi-value {{
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 800;
     color: {LIA["text_dark"]};
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }}
 
 .kpi-delta {{
@@ -838,6 +879,12 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     display: flex;
     align-items: center;
     gap: 2px;
+}}
+
+.kpi-back p {{
+    margin: 12px 0 0 0;
+    font-size: 12px;
+    color: {LIA["text_secondary"]};
 }}
 
 .delta-up {{ color: {LIA["success"]}; }}
@@ -1429,15 +1476,35 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
         icon_delta = "↑" if is_positive else "↓"
         delta_text = f"{icon_delta} {abs(delta):.{precision}f}{suffix}"
 
+    card_id = "kpi-" + "".join(
+        char.lower() if char.isalnum() else "-" for char in str(label)
+    ).strip("-")
+
     return textwrap.dedent(f"""
-    <div class="kpi-card">
-        <div class="kpi-top">
-            <div class="kpi-icon">{icon}</div>
-            <div class="kpi-label">{label}</div>
+    <label class="kpi-card" id="{card_id}">
+        <input type="checkbox" />
+        <div class="kpi-inner">
+            <div class="kpi-front">
+                <div class="kpi-top">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="kpi-icon">{icon}</div>
+                        <div class="kpi-label">{label}</div>
+                    </div>
+                    <span style="font-size:16px;color:{LIA["text_muted"]};">⋯</span>
+                </div>
+                <div class="kpi-value">{value}</div>
+                <div class="kpi-delta {delta_class}">{delta_text}</div>
+            </div>
+            <div class="kpi-back">
+                <div class="kpi-top">
+                    <div class="kpi-label">{label}</div>
+                    <span style="font-size:14px;color:{LIA["text_muted"]};">✕</span>
+                </div>
+                <h3 style="margin:0;font-size:18px;color:{LIA["text_dark"]};">{value}</h3>
+                <p>Variação: <span class="{delta_class}">{delta_text}</span></p>
+            </div>
         </div>
-        <div class="kpi-value">{value}</div>
-        <div class="kpi-delta {delta_class}">{delta_text}</div>
-    </div>
+    </label>
     """).strip()
 
 kpi_cards = [

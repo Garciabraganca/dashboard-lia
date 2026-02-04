@@ -794,23 +794,63 @@ button[kind="header"], [data-testid="collapsedControl"] {{
 }}
 
 .kpi-card {{
+    position: relative;
+    perspective: 1000px;
+    height: 150px;
+    display: block;
+}}
+
+.kpi-card input {{
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}}
+
+.kpi-inner {{
+    position: relative;
+    width: 100%;
+    height: 100%;
+}}
+
+.kpi-front,
+.kpi-back {{
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
     background: rgba(255, 255, 255, 0.8);
     border-radius: 16px;
     padding: 16px;
     border: 1px solid rgba(255, 255, 255, 0.5);
-    transition: transform 0.2s ease;
+    transition: transform 0.6s ease, background 0.2s ease;
+    cursor: pointer;
 }}
 
-.kpi-card:hover {{
-    transform: translateY(-2px);
+.kpi-front {{
+    transform: rotateY(0deg);
+}}
+
+.kpi-back {{
+    transform: rotateY(180deg);
+}}
+
+.kpi-card input:checked ~ .kpi-inner .kpi-back {{
+    transform: rotateY(0deg);
+}}
+
+.kpi-card input:checked ~ .kpi-inner .kpi-front {{
+    transform: rotateY(-180deg);
+}}
+
+.kpi-card:hover .kpi-front {{
     background: white;
 }}
 
 .kpi-top {{
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }}
 
 .kpi-icon {{
@@ -823,13 +863,14 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     color: {LIA["text_secondary"]};
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    margin: 0;
 }}
 
 .kpi-value {{
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 800;
     color: {LIA["text_dark"]};
-    margin-bottom: 4px;
+    margin-bottom: 6px;
 }}
 
 .kpi-delta {{
@@ -838,6 +879,12 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     display: flex;
     align-items: center;
     gap: 2px;
+}}
+
+.kpi-back p {{
+    margin: 12px 0 0 0;
+    font-size: 12px;
+    color: {LIA["text_secondary"]};
 }}
 
 .delta-up {{ color: {LIA["success"]}; }}
@@ -1019,6 +1066,27 @@ button[kind="header"], [data-testid="collapsedControl"] {{
     border: 1px solid rgba(255, 255, 255, 0.35);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12);
     margin-bottom: 12px;
+}}
+
+.trend-toggle [data-baseweb="tab-list"] {{
+    gap: 8px;
+    background: transparent;
+    border-radius: 12px;
+}}
+
+.trend-toggle [data-baseweb="tab"] {{
+    background: transparent;
+    border-radius: 8px;
+    padding: 6px 14px;
+    color: {LIA["text_secondary"]};
+    font-size: 13px;
+    font-weight: 600;
+}}
+
+.trend-toggle [aria-selected="true"] {{
+    background: {LIA["primary"]};
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(244, 124, 60, 0.25);
 }}
 
 .js-plotly-plot .plotly .modebar {{ display: none !important; }}
@@ -1408,15 +1476,35 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
         icon_delta = "↑" if is_positive else "↓"
         delta_text = f"{icon_delta} {abs(delta):.{precision}f}{suffix}"
 
+    card_id = "kpi-" + "".join(
+        char.lower() if char.isalnum() else "-" for char in str(label)
+    ).strip("-")
+
     return textwrap.dedent(f"""
-    <div class="kpi-card">
-        <div class="kpi-top">
-            <div class="kpi-icon">{icon}</div>
-            <div class="kpi-label">{label}</div>
+    <label class="kpi-card" id="{card_id}">
+        <input type="checkbox" />
+        <div class="kpi-inner">
+            <div class="kpi-front">
+                <div class="kpi-top">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="kpi-icon">{icon}</div>
+                        <div class="kpi-label">{label}</div>
+                    </div>
+                    <span style="font-size:16px;color:{LIA["text_muted"]};">⋯</span>
+                </div>
+                <div class="kpi-value">{value}</div>
+                <div class="kpi-delta {delta_class}">{delta_text}</div>
+            </div>
+            <div class="kpi-back">
+                <div class="kpi-top">
+                    <div class="kpi-label">{label}</div>
+                    <span style="font-size:14px;color:{LIA["text_muted"]};">✕</span>
+                </div>
+                <h3 style="margin:0;font-size:18px;color:{LIA["text_dark"]};">{value}</h3>
+                <p>Variação: <span class="{delta_class}">{delta_text}</span></p>
+            </div>
         </div>
-        <div class="kpi-value">{value}</div>
-        <div class="kpi-delta {delta_class}">{delta_text}</div>
-    </div>
+    </label>
     """).strip()
 
 kpi_cards = [
@@ -1530,6 +1618,70 @@ st.markdown('<div class="section-title"><div class="section-icon">~</div> Tenden
 
 if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
     try:
+        st.markdown('<div class="chart-card trend-toggle">', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques</div>', unsafe_allow_html=True)
+
+        trend_tabs = st.tabs(["Diário", "Semanal"])
+        trend_daily = trends_data.copy()
+        trend_daily["__date"] = pd.to_datetime(trend_daily["Data"], dayfirst=True, errors="coerce")
+        current_year = datetime.now().year
+        trend_daily["__date"] = trend_daily["__date"].apply(
+            lambda value: value.replace(year=current_year) if pd.notna(value) else value
+        )
+
+        with trend_tabs[0]:
+            fig_daily = go.Figure()
+            fig_daily.add_trace(go.Scatter(
+                x=trend_daily["Data"],
+                y=trend_daily["Cliques"],
+                mode="lines",
+                line=dict(color=LIA["primary"], width=3, shape="spline"),
+                fill="tozeroy",
+                fillcolor="rgba(244,124,60,0.25)"
+            ))
+            fig_daily.update_layout(
+                height=260,
+                margin=dict(l=10, r=10, t=10, b=10),
+                paper_bgcolor="rgba(255,255,255,0)",
+                plot_bgcolor="rgba(255,255,255,0)",
+                xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_secondary"])),
+                yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)", tickfont=dict(size=11, color=LIA["text_secondary"])),
+                showlegend=False
+            )
+            st.plotly_chart(fig_daily, use_container_width=True)
+
+        with trend_tabs[1]:
+            weekly = trend_daily.dropna(subset=["__date"]).set_index("__date").resample("W-MON")["Cliques"].sum().reset_index()
+            weekly["Label"] = weekly["__date"].dt.strftime("Sem %d/%m")
+            if weekly.empty:
+                st.markdown(f'''
+                <div style="background:rgba(255,255,255,0.6);border-radius:16px;padding:24px;text-align:center;border:1px dashed rgba(255,255,255,0.35);">
+                    <p style="color:{LIA["text_muted"]};margin:0;">Sem dados suficientes para consolidar as semanas.</p>
+                </div>
+                ''', unsafe_allow_html=True)
+            else:
+                fig_weekly = go.Figure()
+                fig_weekly.add_trace(go.Scatter(
+                    x=weekly["Label"],
+                    y=weekly["Cliques"],
+                    mode="lines",
+                    line=dict(color=LIA["secondary"], width=3, shape="spline"),
+                    fill="tozeroy",
+                    fillcolor="rgba(251,113,133,0.22)"
+                ))
+                fig_weekly.update_layout(
+                    height=260,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    paper_bgcolor="rgba(255,255,255,0)",
+                    plot_bgcolor="rgba(255,255,255,0)",
+                    xaxis=dict(showgrid=False, tickfont=dict(size=11, color=LIA["text_secondary"])),
+                    yaxis=dict(showgrid=True, gridcolor="rgba(0,0,0,0.08)", tickfont=dict(size=11, color=LIA["text_secondary"])),
+                    showlegend=False
+                )
+                st.plotly_chart(fig_weekly, use_container_width=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
         chart_cols = st.columns(3)
 
         with chart_cols[0]:

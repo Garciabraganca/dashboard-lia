@@ -297,12 +297,31 @@ class DataProvider:
                 "app_install_event",
                 "mobile_app_install_event",
             }
+            # Store clicks: outbound clicks (clicks leaving Meta to app store)
+            store_click_actions = {"outbound_click"}
+            link_click_actions = {"link_click"}
+            store_clicks = sum_actions(store_click_actions)
+            if store_clicks == 0:
+                store_clicks = sum_actions(link_click_actions)
+                if store_clicks > 0:
+                    logger.warning(
+                        "Meta funnel: 'outbound_click' not found, "
+                        "using 'link_click' as fallback for store clicks"
+                    )
+                else:
+                    logger.warning(
+                        "Meta funnel: no store click actions found "
+                        "(tried outbound_click, link_click). Using total clicks as fallback."
+                    )
+                    store_clicks = total_clicks
+
             return {
                 "investimento": total_spend,
                 "impressoes": total_impressions,
                 "alcance": safe_int(safe_sum('reach')),  # Será sobrescrito por aggregated
                 "frequencia": 0,  # Será sobrescrito por aggregated
                 "cliques_link": total_clicks,
+                "cliques_loja_meta": store_clicks,
                 "instalacoes_sdk": sum_actions(sdk_install_actions),
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
@@ -501,7 +520,8 @@ class DataProvider:
     def _empty_meta_metrics(self):
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
-            "cliques_link": 0, "instalacoes_sdk": 0, "ctr_link": 0, "cpc_link": 0, "cpm": 0,
+            "cliques_link": 0, "cliques_loja_meta": 0, "instalacoes_sdk": 0,
+            "ctr_link": 0, "cpc_link": 0, "cpm": 0,
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
             "delta_cpc": 0, "delta_cpm": 0,
@@ -517,7 +537,8 @@ class DataProvider:
     def _get_mock_meta_metrics(self, period, level):
         return {
             "investimento": 1250.50, "impressoes": 85400, "alcance": 42100, "frequencia": 2.03,
-            "cliques_link": 2450, "instalacoes_sdk": 320, "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
+            "cliques_link": 2450, "cliques_loja_meta": 1820, "instalacoes_sdk": 320,
+            "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
             "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
             "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
             "delta_cpc": -8.2, "delta_cpm": 2.3,
@@ -1803,6 +1824,7 @@ kpi_cards = [
     {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
     {"icon": "💡", "label": "CPC Link", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
     {"icon": "📊", "label": "CPM", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
+    {"icon": "📲", "label": "Instalações SDK", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": "%"},
 ]
 
 kpi_cards_html = "\n".join(
@@ -2082,30 +2104,14 @@ with cols[1]:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
 
-    # Buscar dados de eventos para o funil
-    events_data_for_funnel = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter)
-    cta_count = 0
-    if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
-        cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'primary_cta_click']
-        if not cta_row.empty:
-            try:
-                raw_val = cta_row.iloc[0]['Contagem de Eventos']
-                if isinstance(raw_val, (int, float)):
-                    cta_count = int(raw_val)
-                else:
-                    raw_str = str(raw_val)
-                    num_part = raw_str.split('(')[0].strip().split()[0] if '(' in raw_str else raw_str.split()[0]
-                    cta_count = int(num_part.replace('.', '').replace(',', ''))
-            except (ValueError, IndexError, TypeError) as e:
-                logger.warning(f"Erro ao parsear cta_count: {e}")
-                cta_count = 0
-
+    # Funil 100% Meta: todos os steps vêm do Meta Ads Insights / SDK
+    store_clicks_meta = int(meta_data.get("cliques_loja_meta", 0) or 0)
     instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
     funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK Meta)"]
     funnel_values = [
         int(meta_data.get('impressoes', 0) or 0),
         int(meta_data.get('cliques_link', 0) or 0),
-        int(cta_count or 0),
+        int(store_clicks_meta or 0),
         int(instalacoes or 0)
     ]
 
@@ -2129,7 +2135,7 @@ with cols[1]:
         font=dict(color=LIA["text_light"])
     )
     st.plotly_chart(fig_funnel, use_container_width=True)
-    st.caption("**Cliques na loja** = evento GA4 `primary_cta_click` | **Instalações** = eventos do SDK da Meta")
+    st.caption("Funil 100% Meta Ads · **Cliques na loja** = outbound clicks (Meta Insights) · **Instalações** = SDK Meta")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

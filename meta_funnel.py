@@ -1,0 +1,111 @@
+import json
+import logging
+from typing import Any, Dict, Iterable, List, Tuple
+
+import pandas as pd
+
+logger = logging.getLogger(__name__)
+
+STORE_CLICK_ACTION_TYPES = {
+    "app_store_click",
+    "store_click",
+    "mobile_store_click",
+    "app_install_store_click",
+    "outbound_click",
+}
+
+INSTALL_ACTION_TYPES = {
+    "app_install",
+    "mobile_app_install",
+    "omni_app_install",
+    "app_install_event",
+    "mobile_app_install_event",
+}
+
+
+def _parse_actions_cell(actions: Any) -> List[Dict[str, Any]]:
+    if isinstance(actions, str):
+        try:
+            parsed = json.loads(actions)
+            return parsed if isinstance(parsed, list) else []
+        except json.JSONDecodeError:
+            return []
+    if isinstance(actions, dict):
+        return [actions]
+    if isinstance(actions, list):
+        return [a for a in actions if isinstance(a, dict)]
+    return []
+
+
+def sum_actions_by_types(actions_series: pd.Series, action_types: Iterable[str]) -> Tuple[int, bool]:
+    target_types = set(action_types)
+    total = 0.0
+    found_type = False
+
+    for actions in actions_series.dropna():
+        for action in _parse_actions_cell(actions):
+            action_type = action.get("action_type")
+            if action_type in target_types:
+                found_type = True
+                try:
+                    total += float(action.get("value", 0) or 0)
+                except (TypeError, ValueError):
+                    continue
+
+    return int(total), found_type
+
+
+def _safe_int(value: Any) -> int:
+    try:
+        if pd.isna(value):
+            return 0
+        return int(float(value))
+    except (TypeError, ValueError):
+        return 0
+
+
+def resolve_store_clicks(df: pd.DataFrame) -> Tuple[int, str]:
+    actions = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
+    store_clicks, has_store_action = sum_actions_by_types(actions, STORE_CLICK_ACTION_TYPES)
+    if has_store_action:
+        return store_clicks, "actions"
+
+    if "inline_link_clicks" in df.columns:
+        inline_clicks = _safe_int(pd.to_numeric(df["inline_link_clicks"], errors="coerce").fillna(0).sum())
+        if inline_clicks > 0:
+            logger.warning("Meta funnel fallback: store_click action_type not found, using inline_link_clicks.")
+            return inline_clicks, "inline_link_clicks"
+
+    link_clicks, has_link_click = sum_actions_by_types(actions, {"link_click"})
+    if has_link_click:
+        logger.warning("Meta funnel fallback: store_click action_type not found, using actions.link_click.")
+        return link_clicks, "actions.link_click"
+
+    clicks = _safe_int(pd.to_numeric(df.get("clicks", 0), errors="coerce").fillna(0).sum())
+    logger.warning("Meta funnel fallback: store_click action_type not found, using clicks.")
+    return clicks, "clicks"
+
+
+def resolve_link_clicks(df: pd.DataFrame) -> int:
+    if "inline_link_clicks" in df.columns:
+        inline_clicks = _safe_int(pd.to_numeric(df["inline_link_clicks"], errors="coerce").fillna(0).sum())
+        if inline_clicks > 0:
+            return inline_clicks
+
+    actions = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
+    link_clicks, has_link_click = sum_actions_by_types(actions, {"link_click"})
+    if has_link_click:
+        return link_clicks
+
+    return _safe_int(pd.to_numeric(df.get("clicks", 0), errors="coerce").fillna(0).sum())
+
+
+def build_meta_funnel(meta_data: Dict[str, Any]) -> Tuple[List[str], List[int]]:
+    labels = ["Impressões", "Cliques no link", "Store Clicks (Meta)", "Instalações (SDK Meta)"]
+    values = [
+        _safe_int(meta_data.get("impressoes", 0)),
+        _safe_int(meta_data.get("cliques_link", 0)),
+        _safe_int(meta_data.get("store_clicks_meta", 0)),
+        _safe_int(meta_data.get("instalacoes_sdk", 0)),
+    ]
+    return labels, values

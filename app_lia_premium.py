@@ -16,6 +16,7 @@ from meta_integration import MetaAdsIntegration
 
 # Importar AIAgent para análise de IA
 from ai_agent import AIAgent
+from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -242,37 +243,6 @@ class DataProvider:
                 return 0
             return numerator / denominator
 
-        def sum_actions(action_types):
-            """Soma ações do Meta Ads que correspondem aos tipos informados."""
-            if 'actions' not in df.columns:
-                return 0
-
-            total = 0
-            for actions in df['actions'].dropna():
-                parsed_actions = []
-                if isinstance(actions, str):
-                    try:
-                        parsed_actions = json.loads(actions)
-                    except json.JSONDecodeError:
-                        continue
-                elif isinstance(actions, dict):
-                    parsed_actions = [actions]
-                elif isinstance(actions, list):
-                    parsed_actions = actions
-                else:
-                    continue
-
-                for action in parsed_actions:
-                    if not isinstance(action, dict):
-                        continue
-                    action_type = action.get('action_type')
-                    if action_type in action_types:
-                        try:
-                            total += float(action.get('value', 0))
-                        except (TypeError, ValueError):
-                            continue
-
-            return int(total)
 
         try:
             # Agregar métricas básicas
@@ -290,20 +260,17 @@ class DataProvider:
 
             # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
             # pois não podem ser somados (são métricas de usuários únicos)
-            sdk_install_actions = {
-                "app_install",
-                "mobile_app_install",
-                "omni_app_install",
-                "app_install_event",
-                "mobile_app_install_event",
-            }
+            instalacoes_sdk, _ = sum_actions_by_types(df['actions'] if 'actions' in df.columns else pd.Series(dtype=object), INSTALL_ACTION_TYPES)
+            store_clicks_meta, store_clicks_source = resolve_store_clicks(df)
             return {
                 "investimento": total_spend,
                 "impressoes": total_impressions,
                 "alcance": safe_int(safe_sum('reach')),  # Será sobrescrito por aggregated
                 "frequencia": 0,  # Será sobrescrito por aggregated
-                "cliques_link": total_clicks,
-                "instalacoes_sdk": sum_actions(sdk_install_actions),
+                "cliques_link": resolve_link_clicks(df),
+                "store_clicks_meta": store_clicks_meta,
+                "store_clicks_meta_source": store_clicks_source,
+                "instalacoes_sdk": instalacoes_sdk,
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
                 "cpm": round(cpm, 2),
@@ -501,7 +468,7 @@ class DataProvider:
     def _empty_meta_metrics(self):
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
-            "cliques_link": 0, "instalacoes_sdk": 0, "ctr_link": 0, "cpc_link": 0, "cpm": 0,
+            "cliques_link": 0, "store_clicks_meta": 0, "store_clicks_meta_source": "none", "instalacoes_sdk": 0, "ctr_link": 0, "cpc_link": 0, "cpm": 0,
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
             "delta_cpc": 0, "delta_cpm": 0,
@@ -517,7 +484,7 @@ class DataProvider:
     def _get_mock_meta_metrics(self, period, level):
         return {
             "investimento": 1250.50, "impressoes": 85400, "alcance": 42100, "frequencia": 2.03,
-            "cliques_link": 2450, "instalacoes_sdk": 320, "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
+            "cliques_link": 2450, "store_clicks_meta": 980, "store_clicks_meta_source": "actions", "instalacoes_sdk": 320, "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
             "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
             "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
             "delta_cpc": -8.2, "delta_cpm": 2.3,
@@ -2082,32 +2049,7 @@ with cols[1]:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
 
-    # Buscar dados de eventos para o funil
-    events_data_for_funnel = data_provider.get_events_data(period=selected_period, custom_start=custom_start_str, custom_end=custom_end_str, campaign_filter=ga4_campaign_filter)
-    cta_count = 0
-    if isinstance(events_data_for_funnel, pd.DataFrame) and not events_data_for_funnel.empty:
-        cta_row = events_data_for_funnel[events_data_for_funnel['Nome do Evento'] == 'primary_cta_click']
-        if not cta_row.empty:
-            try:
-                raw_val = cta_row.iloc[0]['Contagem de Eventos']
-                if isinstance(raw_val, (int, float)):
-                    cta_count = int(raw_val)
-                else:
-                    raw_str = str(raw_val)
-                    num_part = raw_str.split('(')[0].strip().split()[0] if '(' in raw_str else raw_str.split()[0]
-                    cta_count = int(num_part.replace('.', '').replace(',', ''))
-            except (ValueError, IndexError, TypeError) as e:
-                logger.warning(f"Erro ao parsear cta_count: {e}")
-                cta_count = 0
-
-    instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
-    funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK Meta)"]
-    funnel_values = [
-        int(meta_data.get('impressoes', 0) or 0),
-        int(meta_data.get('cliques_link', 0) or 0),
-        int(cta_count or 0),
-        int(instalacoes or 0)
-    ]
+    funnel_labels, funnel_values = build_meta_funnel(meta_data)
 
     funnel_df = pd.DataFrame({"Etapa": funnel_labels, "Valor": funnel_values})
     fig_funnel = go.Figure(go.Funnel(
@@ -2129,7 +2071,7 @@ with cols[1]:
         font=dict(color=LIA["text_light"])
     )
     st.plotly_chart(fig_funnel, use_container_width=True)
-    st.caption("**Cliques na loja** = evento GA4 `primary_cta_click` | **Instalações** = eventos do SDK da Meta")
+    st.caption("Funil Meta/SDK: impressões, link clicks, store clicks e instalações vindos do Meta Ads Insights + SDK.")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

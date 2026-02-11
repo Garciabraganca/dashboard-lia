@@ -136,6 +136,7 @@ Formato da resposta:
 - Alcance: {meta_data.get('alcance', 0):,}
 - Frequência: {meta_data.get('frequencia', 0):.2f}
 - Cliques no Link: {meta_data.get('cliques_link', 0):,}
+- Cliques na Loja (Meta): {meta_data.get('cliques_loja_meta', 0):,}
 - CTR (Taxa de Cliques): {meta_data.get('ctr_link', 0):.2f}%
 - CPC (Custo por Clique): $ {meta_data.get('cpc_link', 0):.2f}
 - CPM (Custo por Mil): $ {meta_data.get('cpm', 0):.2f}

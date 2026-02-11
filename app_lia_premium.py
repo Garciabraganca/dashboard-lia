@@ -16,6 +16,7 @@ from meta_integration import MetaAdsIntegration
 
 # Importar AIAgent para análise de IA
 from ai_agent import AIAgent
+from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -242,37 +243,6 @@ class DataProvider:
                 return 0
             return numerator / denominator
 
-        def sum_actions(action_types):
-            """Soma ações do Meta Ads que correspondem aos tipos informados."""
-            if 'actions' not in df.columns:
-                return 0
-
-            total = 0
-            for actions in df['actions'].dropna():
-                parsed_actions = []
-                if isinstance(actions, str):
-                    try:
-                        parsed_actions = json.loads(actions)
-                    except json.JSONDecodeError:
-                        continue
-                elif isinstance(actions, dict):
-                    parsed_actions = [actions]
-                elif isinstance(actions, list):
-                    parsed_actions = actions
-                else:
-                    continue
-
-                for action in parsed_actions:
-                    if not isinstance(action, dict):
-                        continue
-                    action_type = action.get('action_type')
-                    if action_type in action_types:
-                        try:
-                            total += float(action.get('value', 0))
-                        except (TypeError, ValueError):
-                            continue
-
-            return int(total)
 
         try:
             # Agregar métricas básicas

@@ -248,6 +248,7 @@ class MetaAdsIntegration:
                 "reach",
                 "frequency",
                 "clicks",
+                "inline_link_clicks",
                 "ctr",
                 "cpc",
                 "cpm",
@@ -266,6 +267,7 @@ class MetaAdsIntegration:
                 "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
                 "time_increment": "1",
                 "level": "campaign",
+                "action_breakdowns": "action_type",
                 "limit": "500",
                 "access_token": self.access_token
             }
@@ -303,7 +305,7 @@ class MetaAdsIntegration:
                 df = df[df['campaign_name'].str.contains(campaign_name_filter, case=False, na=False)]
 
             # Converter valores numéricos
-            numeric_fields = ['spend', 'impressions', 'reach', 'frequency', 'clicks', 'ctr', 'cpc', 'cpm']
+            numeric_fields = ['spend', 'impressions', 'reach', 'frequency', 'clicks', 'inline_link_clicks', 'ctr', 'cpc', 'cpm']
             for col in numeric_fields:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')

@@ -16,7 +16,7 @@ from meta_integration import MetaAdsIntegration
 
 # Importar AIAgent para análise de IA
 from ai_agent import AIAgent
-from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
+from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -266,11 +266,16 @@ class DataProvider:
                 "omni_app_install",
                 "app_install_event",
                 "mobile_app_install_event",
+                "offsite_conversion.fb_mobile_install",
+                "fb_mobile_install",
+                "offsite_conversion.mobile_app_install",
+                "offsite_conversion.app_install",
             }
             # Store clicks: outbound clicks (clicks leaving Meta to app store)
             store_click_actions = {"outbound_click"}
             link_click_actions = {"link_click"}
             actions_series = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
+            log_all_action_types(actions_series)
             store_clicks, has_store_clicks = sum_actions_by_types(actions_series, store_click_actions)
             if not has_store_clicks:
                 store_clicks, has_link_clicks = sum_actions_by_types(actions_series, link_click_actions)

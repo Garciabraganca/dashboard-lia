@@ -20,6 +20,10 @@ INSTALL_ACTION_TYPES = {
     "omni_app_install",
     "app_install_event",
     "mobile_app_install_event",
+    "offsite_conversion.fb_mobile_install",
+    "fb_mobile_install",
+    "offsite_conversion.mobile_app_install",
+    "offsite_conversion.app_install",
 }
 
 
@@ -35,6 +39,21 @@ def _parse_actions_cell(actions: Any) -> List[Dict[str, Any]]:
     if isinstance(actions, list):
         return [a for a in actions if isinstance(a, dict)]
     return []
+
+
+def log_all_action_types(actions_series: pd.Series) -> None:
+    """Log all unique action types found in the API response for debugging."""
+    all_types: Dict[str, float] = {}
+    for actions in actions_series.dropna():
+        for action in _parse_actions_cell(actions):
+            atype = action.get("action_type", "unknown")
+            try:
+                val = float(action.get("value", 0) or 0)
+            except (TypeError, ValueError):
+                val = 0
+            all_types[atype] = all_types.get(atype, 0) + val
+    if all_types:
+        logger.info("Meta action types found: %s", {k: int(v) for k, v in sorted(all_types.items())})
 
 
 def sum_actions_by_types(actions_series: pd.Series, action_types: Iterable[str]) -> Tuple[int, bool]:

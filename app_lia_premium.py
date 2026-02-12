@@ -292,8 +292,8 @@ class DataProvider:
             return {
                 "investimento": total_spend,
                 "impressoes": total_impressions,
-                "alcance": safe_int(safe_sum('reach')),  # Será sobrescrito por aggregated
-                "frequencia": 0,  # Será sobrescrito por aggregated
+                "alcance": safe_int(safe_sum('reach')),  # Pode ser sobrescrito por aggregated
+                "frequencia": round(safe_div(total_impressions, safe_int(safe_sum('reach'))), 2),
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
                 "instalacoes_sdk": instalacoes_sdk,
@@ -500,6 +500,8 @@ class DataProvider:
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
             "delta_cpc": 0, "delta_cpm": 0,
+            "_data_source": "empty", "_filter_applied": None,
+            "_requested_filter": None, "_available_campaigns": [],
         }
 
     def _empty_metrics(self):
@@ -1601,11 +1603,9 @@ except Exception as e:
     import streamlit as st
     st.error(f"Erro ao carregar dados do módulo Premium: {e}")
     meta_data = {
-        "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
-        "cliques_link": 0, "ctr_link": 0, "cpc_link": 0, "cpm": 0,
-        "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
-        "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
-        "delta_cpc": 0, "delta_cpm": 0, "_data_source": "error"
+        **data_provider._empty_meta_metrics(),
+        "_data_source": "error",
+        "_requested_filter": meta_campaign_filter,
     }
     ga4_data = {
         "sessoes": 0, "usuarios": 0, "pageviews": 0,
@@ -1799,7 +1799,8 @@ kpi_cards = [
     {"icon": "🎯", "label": "Taxa de cliques", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
     {"icon": "💡", "label": "Custo por clique", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
     {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
-    {"icon": "📲", "label": "Instalações atribuídas aos anúncios", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": "%"},
+    {"icon": "📲", "label": "Instalações (SDK)", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": ""},
+    {"icon": "🧭", "label": "Instalações atribuídas (Meta Ads)", "value": f"{meta_data.get('instalacoes_total', 0):,.0f}", "delta": 0, "suffix": ""},
 ]
 
 kpi_cards_html = "\n".join(
@@ -2082,7 +2083,7 @@ with cols[1]:
     # Funil 100% Meta: todos os steps vêm do Meta Ads Insights / SDK
     store_clicks_meta = int(meta_data.get("store_clicks_meta", 0) or 0)
     instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
-    funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app (atribuído aos anúncios)"]
+    funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app (SDK)"]
     funnel_values = [
         int(meta_data.get('impressoes', 0) or 0),
         int(meta_data.get('cliques_link', 0) or 0),

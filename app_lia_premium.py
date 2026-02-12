@@ -260,17 +260,6 @@ class DataProvider:
 
             # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
             # pois não podem ser somados (são métricas de usuários únicos)
-            sdk_install_actions = {
-                "app_install",
-                "mobile_app_install",
-                "omni_app_install",
-                "app_install_event",
-                "mobile_app_install_event",
-                "offsite_conversion.fb_mobile_install",
-                "fb_mobile_install",
-                "offsite_conversion.mobile_app_install",
-                "offsite_conversion.app_install",
-            }
             # Store clicks: outbound clicks (clicks leaving Meta to app store)
             store_click_actions = {"outbound_click"}
             link_click_actions = {"link_click"}
@@ -291,6 +280,15 @@ class DataProvider:
                     )
                     store_clicks = total_clicks
 
+            # SDK install events: check if any install actions were found
+            instalacoes_sdk, tem_eventos_instalacao = sum_actions_by_types(actions_series, INSTALL_ACTION_TYPES)
+            if not tem_eventos_instalacao:
+                logger.warning(
+                    "Meta funnel: no SDK install events found. "
+                    "Check if Meta SDK is implemented and sending install events. "
+                    "Expected types: app_install, mobile_app_install, omni_app_install, etc."
+                )
+            
             return {
                 "investimento": total_spend,
                 "impressoes": total_impressions,
@@ -298,7 +296,7 @@ class DataProvider:
                 "frequencia": 0,  # Será sobrescrito por aggregated
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
-                "instalacoes_sdk": sum_actions_by_types(actions_series, sdk_install_actions)[0],
+                "instalacoes_sdk": instalacoes_sdk,
                 "instalacoes_total": 0,  # Será preenchido por get_total_app_installs se disponível
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
@@ -2114,13 +2112,6 @@ with cols[1]:
     st.plotly_chart(fig_funnel, use_container_width=True)
     st.caption("Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app")
     
-    # Informação importante sobre instalações
-    st.info(
-        "ℹ️ **Sobre as instalações:** Este funil mostra apenas as instalações **atribuídas aos anúncios** "
-        "(rastreadas via Meta Ads Insights). O total de instalações pode ser maior, incluindo instalações "
-        "orgânicas e de outras fontes. Para ver o total completo, é necessário integrar com o Events Manager "
-        "via Conversions API do Meta."
-    )
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

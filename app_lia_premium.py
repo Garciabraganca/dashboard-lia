@@ -270,10 +270,11 @@ class DataProvider:
             # Store clicks: outbound clicks (clicks leaving Meta to app store)
             store_click_actions = {"outbound_click"}
             link_click_actions = {"link_click"}
-            store_clicks = sum_actions(store_click_actions)
-            if store_clicks == 0:
-                store_clicks = sum_actions(link_click_actions)
-                if store_clicks > 0:
+            actions_series = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
+            store_clicks, has_store_clicks = sum_actions_by_types(actions_series, store_click_actions)
+            if not has_store_clicks:
+                store_clicks, has_link_clicks = sum_actions_by_types(actions_series, link_click_actions)
+                if has_link_clicks:
                     logger.warning(
                         "Meta funnel: 'outbound_click' not found, "
                         "using 'link_click' as fallback for store clicks"
@@ -291,8 +292,8 @@ class DataProvider:
                 "alcance": safe_int(safe_sum('reach')),  # Será sobrescrito por aggregated
                 "frequencia": 0,  # Será sobrescrito por aggregated
                 "cliques_link": total_clicks,
-                "cliques_loja_meta": store_clicks,
-                "instalacoes_sdk": sum_actions(sdk_install_actions),
+                "store_clicks_meta": store_clicks,
+                "instalacoes_sdk": sum_actions_by_types(actions_series, sdk_install_actions)[0],
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
                 "cpm": round(cpm, 2),
@@ -490,7 +491,7 @@ class DataProvider:
     def _empty_meta_metrics(self):
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
-            "cliques_link": 0, "cliques_loja_meta": 0, "instalacoes_sdk": 0,
+            "cliques_link": 0, "store_clicks_meta": 0, "instalacoes_sdk": 0,
             "ctr_link": 0, "cpc_link": 0, "cpm": 0,
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
@@ -507,7 +508,7 @@ class DataProvider:
     def _get_mock_meta_metrics(self, period, level):
         return {
             "investimento": 1250.50, "impressoes": 85400, "alcance": 42100, "frequencia": 2.03,
-            "cliques_link": 2450, "cliques_loja_meta": 1820, "instalacoes_sdk": 320,
+            "cliques_link": 2450, "store_clicks_meta": 1820, "instalacoes_sdk": 320,
             "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
             "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
             "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
@@ -2075,7 +2076,7 @@ with cols[1]:
     st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
 
     # Funil 100% Meta: todos os steps vêm do Meta Ads Insights / SDK
-    store_clicks_meta = int(meta_data.get("cliques_loja_meta", 0) or 0)
+    store_clicks_meta = int(meta_data.get("store_clicks_meta", 0) or 0)
     instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
     funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK Meta)"]
     funnel_values = [

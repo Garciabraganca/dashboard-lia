@@ -420,16 +420,16 @@ class DataProvider:
                     # Renomear e selecionar colunas
                     df = df.rename(columns={
                         'ad_name': 'Criativo',
-                        'spend': 'Investimento',
-                        'impressions': 'Impressoes',
+                        'spend': 'Valor gasto',
+                        'impressions': 'Exibições',
                         'clicks': 'Cliques',
-                        'ctr': 'CTR',
-                        'cpc': 'CPC',
-                        'cpm': 'CPM'
+                        'ctr': 'Taxa de cliques',
+                        'cpc': 'Custo por clique',
+                        'cpm': 'Custo por mil'
                     })
                     # Adicionar coluna de formato (Meta API não retorna diretamente de forma simples, vamos inferir ou deixar fixo)
                     df['Formato'] = df['Criativo'].apply(lambda x: "Video" if "video" in str(x).lower() else "Imagem")
-                    return df[['Criativo', 'Formato', 'Investimento', 'Impressoes', 'Cliques', 'CTR', 'CPC', 'CPM']]
+                    return df[['Criativo', 'Formato', 'Valor gasto', 'Exibições', 'Cliques', 'Taxa de cliques', 'Custo por clique', 'Custo por mil']]
             except Exception as e:
                 logger.error(f"Erro ao obter criativos reais: {e}")
 
@@ -531,12 +531,12 @@ class DataProvider:
                 "Static_Promo_Download_v3"
             ],
             "Formato": ["Video 15s", "Imagem", "Carrossel", "Video 30s", "Imagem"],
-            "Investimento": [285.00, 195.00, 165.00, 125.00, 80.00],
-            "Impressoes": [42000, 31000, 26000, 18000, 8000],
+            "Valor gasto": [285.00, 195.00, 165.00, 125.00, 80.00],
+            "Exibições": [42000, 31000, 26000, 18000, 8000],
             "Cliques": [1280, 890, 620, 320, 90],
-            "CTR": [3.05, 2.87, 2.38, 1.78, 1.12],
-            "CPC": [0.22, 0.22, 0.27, 0.39, 0.89],
-            "CPM": [6.79, 6.29, 6.35, 6.94, 10.00],
+            "Taxa de cliques": [3.05, 2.87, 2.38, 1.78, 1.12],
+            "Custo por clique": [0.22, 0.22, 0.27, 0.39, 0.89],
+            "Custo por mil": [6.79, 6.29, 6.35, 6.94, 10.00],
         })
 
     def _get_mock_daily_trends(self, period, custom_start=None, custom_end=None):
@@ -1787,15 +1787,15 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
     """).strip()
 
 kpi_cards = [
-    {"icon": "💰", "label": "Investimento", "value": f"$ {meta_data.get('investimento', 0):,.2f}", "delta": meta_data.get('delta_investimento', 0), "suffix": "%"},
-    {"icon": "👀", "label": "Impressoes", "value": f"{meta_data.get('impressoes', 0):,.0f}", "delta": meta_data.get('delta_impressoes', 0), "suffix": "%"},
-    {"icon": "📡", "label": "Alcance", "value": f"{meta_data.get('alcance', 0):,.0f}", "delta": meta_data.get('delta_alcance', 0), "suffix": "%"},
-    {"icon": "🔁", "label": "Frequência", "value": f"{meta_data.get('frequencia', 0):.2f}", "delta": meta_data.get('delta_frequencia', 0), "suffix": "", "precision": 2},
-    {"icon": "🖱️", "label": "Cliques Link", "value": f"{meta_data.get('cliques_link', 0):,.0f}", "delta": meta_data.get('delta_cliques', 0), "suffix": "%"},
-    {"icon": "🎯", "label": "CTR Link", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
-    {"icon": "💡", "label": "CPC Link", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
-    {"icon": "📊", "label": "CPM", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
-    {"icon": "📲", "label": "Instalações SDK", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": "%"},
+    {"icon": "💰", "label": "Valor investido", "value": f"$ {meta_data.get('investimento', 0):,.2f}", "delta": meta_data.get('delta_investimento', 0), "suffix": "%"},
+    {"icon": "👀", "label": "Vezes que o anúncio apareceu", "value": f"{meta_data.get('impressoes', 0):,.0f}", "delta": meta_data.get('delta_impressoes', 0), "suffix": "%"},
+    {"icon": "📡", "label": "Pessoas alcançadas", "value": f"{meta_data.get('alcance', 0):,.0f}", "delta": meta_data.get('delta_alcance', 0), "suffix": "%"},
+    {"icon": "🔁", "label": "Vezes que cada pessoa viu", "value": f"{meta_data.get('frequencia', 0):.2f}", "delta": meta_data.get('delta_frequencia', 0), "suffix": "", "precision": 2},
+    {"icon": "🖱️", "label": "Cliques no anúncio", "value": f"{meta_data.get('cliques_link', 0):,.0f}", "delta": meta_data.get('delta_cliques', 0), "suffix": "%"},
+    {"icon": "🎯", "label": "Taxa de cliques", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
+    {"icon": "💡", "label": "Custo por clique", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
+    {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
+    {"icon": "📲", "label": "Instalações do app", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": "%"},
 ]
 
 kpi_cards_html = "\n".join(
@@ -1813,7 +1813,7 @@ kpi_cards_html = "\n".join(
 
 kpi_section = textwrap.dedent(f"""
 <div class="glass-card">
-  <div class="section-title"><div class="section-icon">$</div> KPIs Principais (Meta Ads)</div>
+  <div class="section-title"><div class="section-icon">$</div> Resultados dos anúncios (Meta Ads)</div>
   <div class="kpi-grid">
 {kpi_cards_html}
   </div>
@@ -1826,31 +1826,31 @@ st.markdown(kpi_section, unsafe_allow_html=True)
 # PERFORMANCE POR CRIATIVO
 # -----------------------------------------------------------------------------
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-title"><div class="section-icon">*</div> Performance por Criativo</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-icon">*</div> Desempenho por anúncio</div>', unsafe_allow_html=True)
 
 if len(creative_data) > 0:
     try:
-        best_ctr_idx = creative_data["CTR"].idxmax()
+        best_ctr_idx = creative_data["Taxa de cliques"].idxmax()
         best_ctr_name = str(creative_data.loc[best_ctr_idx, "Criativo"])[:22]
 
         st.markdown(f'''
         <div class="badge-row">
-            <div class="badge badge-orange">Criativo campeão: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "CTR"]:.2f}% CTR)</div>
+            <div class="badge badge-orange">Criativo campeão: {best_ctr_name}... ({creative_data.loc[best_ctr_idx, "Taxa de cliques"]:.2f}% taxa de cliques)</div>
         </div>
         ''', unsafe_allow_html=True)
 
         st.markdown('<div class="table-container">', unsafe_allow_html=True)
-        st.markdown('<div class="table-header"><span class="table-header-title">Performance por Criativo</span></div>', unsafe_allow_html=True)
+        st.markdown('<div class="table-header"><span class="table-header-title">Desempenho de cada anúncio</span></div>', unsafe_allow_html=True)
 
         # Mostrar todos os criativos, ordenados por CTR (campeão primeiro)
-        creative_display = creative_data.sort_values('CTR', ascending=False)
+        creative_display = creative_data.sort_values('Taxa de cliques', ascending=False)
         creative_formatters = {
-            "Investimento": lambda value: f"$ {value:,.2f}",
-            "Impressoes": lambda value: f"{value:,.0f}",
+            "Valor gasto": lambda value: f"$ {value:,.2f}",
+            "Exibições": lambda value: f"{value:,.0f}",
             "Cliques": lambda value: f"{value:,.0f}",
-            "CTR": lambda value: f"{value:.2f}%",
-            "CPC": lambda value: f"$ {value:,.2f}",
-            "CPM": lambda value: f"$ {value:,.2f}",
+            "Taxa de cliques": lambda value: f"{value:.2f}%",
+            "Custo por clique": lambda value: f"$ {value:,.2f}",
+            "Custo por mil": lambda value: f"$ {value:,.2f}",
         }
         columns = list(creative_display.columns)
         header_cells = "".join(f"<th>{html.escape(str(col))}</th>" for col in columns)
@@ -1886,7 +1886,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 st.markdown(f'''
 <div class="scope-card">
     <span style="font-size:18px;color:{LIA["primary"]};">i</span>
-    <span class="scope-text"><strong>Ciclo 2 analisa midia e conversoes na landing page.</strong> Acompanhamento completo do funil de conversao.</span>
+    <span class="scope-text"><strong>Estamos acompanhando seus anúncios e o site.</strong> Aqui você vê o caminho completo: do anúncio até a instalação do app.</span>
 </div>
 ''', unsafe_allow_html=True)
 
@@ -1894,12 +1894,12 @@ st.markdown(f'''
 # TENDENCIA TEMPORAL
 # -----------------------------------------------------------------------------
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendencia Temporal</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-icon">~</div> Evolução ao longo do tempo</div>', unsafe_allow_html=True)
 
 if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
     try:
         st.markdown('<div class="chart-card trend-toggle">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title"><div class="section-icon">~</div> Cliques por dia</div>', unsafe_allow_html=True)
 
         trend_tabs = st.tabs(["Diário", "Semanal"])
         trend_daily = trends_data.copy()
@@ -2048,7 +2048,7 @@ cols = st.columns([3, 2])
 
 with cols[0]:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title"><div class="section-icon">~</div> Tendência de Cliques e CTR</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><div class="section-icon">~</div> Cliques e taxa de cliques por dia</div>', unsafe_allow_html=True)
     if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in trends_data.columns:
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=trends_data["Data"], y=trends_data["Cliques"], name="Cliques", mode="lines+markers", line=dict(color=LIA["primary"], width=3, shape='spline'), marker=dict(size=8, color=LIA["primary"]), fill="tozeroy", fillcolor="rgba(92,201,182,0.16)"))
@@ -2073,12 +2073,12 @@ with cols[0]:
 
 with cols[1]:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title"><div class="section-icon">V</div> Funil de Conversão</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title"><div class="section-icon">V</div> Caminho do usuário até a instalação</div>', unsafe_allow_html=True)
 
     # Funil 100% Meta: todos os steps vêm do Meta Ads Insights / SDK
     store_clicks_meta = int(meta_data.get("store_clicks_meta", 0) or 0)
     instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
-    funnel_labels = ["Impressões", "Cliques no link", "Cliques na loja", "Instalações (SDK Meta)"]
+    funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app"]
     funnel_values = [
         int(meta_data.get('impressoes', 0) or 0),
         int(meta_data.get('cliques_link', 0) or 0),
@@ -2106,14 +2106,14 @@ with cols[1]:
         font=dict(color=LIA["text_light"])
     )
     st.plotly_chart(fig_funnel, use_container_width=True)
-    st.caption("Funil 100% Meta Ads · **Cliques na loja** = outbound clicks (Meta Insights) · **Instalações** = SDK Meta")
+    st.caption("Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app")
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
 # LANDING PAGE (GA4)
 # -----------------------------------------------------------------------------
 st.markdown('<div class="glass-card">', unsafe_allow_html=True)
-st.markdown('<div class="section-title"><div class="section-icon">@</div> Landing Page (GA4)</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-title"><div class="section-icon">@</div> Comportamento no site</div>', unsafe_allow_html=True)
 
 # Indicador de fonte de dados GA4
 ga4_source = ga4_data.get("_data_source", "unknown")
@@ -2128,11 +2128,11 @@ elif ga4_source == "mock":
     st.info("💡 Usando dados de demonstracao. Verifique as credenciais GA4 no Streamlit Secrets.")
 
 ga4_cards = [
-    {"icon": "🌐", "label": "Sessoes", "value": f"{ga4_data['sessoes']:,.0f}", "delta": ga4_data['delta_sessoes']},
-    {"icon": "👥", "label": "Usuarios", "value": f"{ga4_data['usuarios']:,.0f}", "delta": ga4_data['delta_usuarios']},
-    {"icon": "📄", "label": "Pageviews", "value": f"{ga4_data['pageviews']:,.0f}", "delta": ga4_data['delta_pageviews']},
-    {"icon": "⚡", "label": "Engajamento", "value": f"{ga4_data['taxa_engajamento']:.1f}%", "delta": ga4_data['delta_engajamento']},
-    {"icon": "⏱️", "label": "Tempo Medio", "value": ga4_data['tempo_medio'], "delta": None, "suffix": ""},
+    {"icon": "🌐", "label": "Visitas ao site", "value": f"{ga4_data['sessoes']:,.0f}", "delta": ga4_data['delta_sessoes']},
+    {"icon": "👥", "label": "Visitantes únicos", "value": f"{ga4_data['usuarios']:,.0f}", "delta": ga4_data['delta_usuarios']},
+    {"icon": "📄", "label": "Páginas visualizadas", "value": f"{ga4_data['pageviews']:,.0f}", "delta": ga4_data['delta_pageviews']},
+    {"icon": "⚡", "label": "Taxa de engajamento", "value": f"{ga4_data['taxa_engajamento']:.1f}%", "delta": ga4_data['delta_engajamento']},
+    {"icon": "⏱️", "label": "Tempo médio no site", "value": ga4_data['tempo_medio'], "delta": None, "suffix": ""},
 ]
 
 ga4_cards_html = "\n".join(
@@ -2167,7 +2167,7 @@ with table_cols[0]:
             source_data = source_data[source_data["Origem / Midia"].str.contains("paid", case=False, na=False)]
         if len(source_data) > 0:
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Origem/Midia (foco em paid social)</span></div>', unsafe_allow_html=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">De onde vieram os visitantes (anúncios pagos)</span></div>', unsafe_allow_html=True)
 
             source_html = '<table class="lia-html-table"><thead><tr>'
             for col in source_data.columns:
@@ -2235,7 +2235,7 @@ with table_cols[1]:
             </table>
             """
             st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos do Google Analytics</span></div>', unsafe_allow_html=True)
+            st.markdown('<div class="table-header"><span class="table-header-title">Ações dos visitantes no site</span></div>', unsafe_allow_html=True)
             st.markdown(events_table_html, unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:

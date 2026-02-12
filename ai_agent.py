@@ -158,7 +158,7 @@ Variações vs período anterior:
         if creative_data is not None and len(creative_data) > 0:
             data_text += "\n## PERFORMANCE DOS CRIATIVOS\n"
             for _, row in creative_data.head(5).iterrows():
-                data_text += f"- {row.get('Criativo', 'N/A')}: CTR {row.get('CTR', 0):.2f}%, CPC $ {row.get('CPC', 0):.2f}\n"
+                data_text += f"- {row.get('Criativo', 'N/A')}: Taxa de cliques {row.get('Taxa de cliques', 0):.2f}%, Custo por clique $ {row.get('Custo por clique', 0):.2f}\n"
 
         # Adicionar dados de origem/mídia se disponível
         if source_data is not None and len(source_data) > 0:

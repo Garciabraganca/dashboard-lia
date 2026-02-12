@@ -500,6 +500,8 @@ class DataProvider:
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
             "delta_cpc": 0, "delta_cpm": 0,
+            "_data_source": "empty", "_filter_applied": None,
+            "_requested_filter": None, "_available_campaigns": [],
         }
 
     def _empty_metrics(self):
@@ -1601,11 +1603,9 @@ except Exception as e:
     import streamlit as st
     st.error(f"Erro ao carregar dados do módulo Premium: {e}")
     meta_data = {
-        "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
-        "cliques_link": 0, "ctr_link": 0, "cpc_link": 0, "cpm": 0,
-        "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
-        "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
-        "delta_cpc": 0, "delta_cpm": 0, "_data_source": "error"
+        **data_provider._empty_meta_metrics(),
+        "_data_source": "error",
+        "_requested_filter": meta_campaign_filter,
     }
     ga4_data = {
         "sessoes": 0, "usuarios": 0, "pageviews": 0,

@@ -299,6 +299,7 @@ class DataProvider:
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
                 "instalacoes_sdk": sum_actions_by_types(actions_series, sdk_install_actions)[0],
+                "instalacoes_total": 0,  # Será preenchido por get_total_app_installs se disponível
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
                 "cpm": round(cpm, 2),
@@ -496,7 +497,7 @@ class DataProvider:
     def _empty_meta_metrics(self):
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
-            "cliques_link": 0, "store_clicks_meta": 0, "instalacoes_sdk": 0,
+            "cliques_link": 0, "store_clicks_meta": 0, "instalacoes_sdk": 0, "instalacoes_total": 0,
             "ctr_link": 0, "cpc_link": 0, "cpm": 0,
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
@@ -513,7 +514,7 @@ class DataProvider:
     def _get_mock_meta_metrics(self, period, level):
         return {
             "investimento": 1250.50, "impressoes": 85400, "alcance": 42100, "frequencia": 2.03,
-            "cliques_link": 2450, "store_clicks_meta": 1820, "instalacoes_sdk": 320,
+            "cliques_link": 2450, "store_clicks_meta": 1820, "instalacoes_sdk": 320, "instalacoes_total": 0,
             "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
             "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
             "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
@@ -1800,7 +1801,7 @@ kpi_cards = [
     {"icon": "🎯", "label": "Taxa de cliques", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
     {"icon": "💡", "label": "Custo por clique", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
     {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
-    {"icon": "📲", "label": "Instalações do app", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": "%"},
+    {"icon": "📲", "label": "Instalações atribuídas aos anúncios", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": "%"},
 ]
 
 kpi_cards_html = "\n".join(
@@ -2083,7 +2084,7 @@ with cols[1]:
     # Funil 100% Meta: todos os steps vêm do Meta Ads Insights / SDK
     store_clicks_meta = int(meta_data.get("store_clicks_meta", 0) or 0)
     instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
-    funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app"]
+    funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app (atribuído aos anúncios)"]
     funnel_values = [
         int(meta_data.get('impressoes', 0) or 0),
         int(meta_data.get('cliques_link', 0) or 0),
@@ -2112,6 +2113,14 @@ with cols[1]:
     )
     st.plotly_chart(fig_funnel, use_container_width=True)
     st.caption("Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app")
+    
+    # Informação importante sobre instalações
+    st.info(
+        "ℹ️ **Sobre as instalações:** Este funil mostra apenas as instalações **atribuídas aos anúncios** "
+        "(rastreadas via Meta Ads Insights). O total de instalações pode ser maior, incluindo instalações "
+        "orgânicas e de outras fontes. Para ver o total completo, é necessário integrar com o Events Manager "
+        "via Conversions API do Meta."
+    )
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

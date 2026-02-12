@@ -120,7 +120,7 @@ def resolve_link_clicks(df: pd.DataFrame) -> int:
 
 
 def build_meta_funnel(meta_data: Dict[str, Any]) -> Tuple[List[str], List[int]]:
-    labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app"]
+    labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app (atribuído aos anúncios)"]
     values = [
         _safe_int(meta_data.get("impressoes", 0)),
         _safe_int(meta_data.get("cliques_link", 0)),

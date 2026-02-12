@@ -498,3 +498,32 @@ class MetaAdsIntegration:
         except Exception as e:
             print(f"Erro ao obter insights de criativos: {str(e)}")
             return pd.DataFrame()
+
+    def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> int:
+        """
+        Obtém o total de instalações do app (incluindo orgânicas e atribuídas).
+        
+        NOTA IMPORTANTE: Esta função atualmente retorna 0 porque requer integração com a 
+        Conversions API ou Events Manager do Meta. A API de Ads Insights só retorna 
+        instalações atribuídas aos anúncios.
+        
+        Para implementar:
+        1. Configure a Conversions API para enviar eventos de instalação
+        2. Armazene esses eventos em um banco de dados
+        3. Conte os eventos de instalação no período especificado
+        
+        Alternativa:
+        - Integrar com a API de App Events (legacy) se ainda disponível
+        - Usar a Graph API para consultar eventos do app dataset
+        
+        Args:
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD)
+            custom_end: Data de fim personalizada (YYYY-MM-DD)
+        
+        Returns:
+            Total de instalações no período (atualmente sempre 0)
+        """
+        # TODO: Implementar integração com Conversions API / Events Manager
+        # Por enquanto retorna 0 pois não há integração implementada
+        return 0

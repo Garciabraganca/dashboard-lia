@@ -280,6 +280,15 @@ class DataProvider:
                     )
                     store_clicks = total_clicks
 
+            # SDK install events: check if any install actions were found
+            instalacoes_sdk, has_install_events = sum_actions_by_types(actions_series, INSTALL_ACTION_TYPES)
+            if not has_install_events:
+                logger.warning(
+                    "Meta funnel: no SDK install events found. "
+                    "Verifique se o Meta SDK está implementado e enviando eventos de instalação. "
+                    "Tipos esperados: app_install, mobile_app_install, omni_app_install, etc."
+                )
+            
             return {
                 "investimento": total_spend,
                 "impressoes": total_impressions,
@@ -287,7 +296,7 @@ class DataProvider:
                 "frequencia": 0,  # Será sobrescrito por aggregated
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
-                "instalacoes_sdk": sum_actions_by_types(actions_series, INSTALL_ACTION_TYPES)[0],
+                "instalacoes_sdk": instalacoes_sdk,
                 "instalacoes_total": 0,  # Será preenchido por get_total_app_installs se disponível
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),

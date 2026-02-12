@@ -44,6 +44,6 @@ def test_meta_funnel_labels_do_not_render_ga4_primary_cta_click():
 
     labels_snapshot = " | ".join(labels)
 
-    assert labels_snapshot == "Impressões | Cliques no link | Store Clicks (Meta) | Instalações (SDK Meta)"
+    assert labels_snapshot == "Viram o anúncio | Clicaram no anúncio | Foram para a loja do app | Instalaram o app"
     assert "primary_cta_click" not in labels_snapshot
     assert values == [3000, 400, 120, 30]

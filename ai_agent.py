@@ -136,7 +136,7 @@ Formato da resposta:
 - Alcance: {meta_data.get('alcance', 0):,}
 - Frequência: {meta_data.get('frequencia', 0):.2f}
 - Cliques no Link: {meta_data.get('cliques_link', 0):,}
-- Cliques na Loja (Meta): {meta_data.get('cliques_loja_meta', 0):,}
+- Cliques na Loja (Meta): {meta_data.get('store_clicks_meta', 0):,}
 - CTR (Taxa de Cliques): {meta_data.get('ctr_link', 0):.2f}%
 - CPC (Custo por Clique): $ {meta_data.get('cpc_link', 0):.2f}
 - CPM (Custo por Mil): $ {meta_data.get('cpm', 0):.2f}
@@ -158,7 +158,7 @@ Variações vs período anterior:
         if creative_data is not None and len(creative_data) > 0:
             data_text += "\n## PERFORMANCE DOS CRIATIVOS\n"
             for _, row in creative_data.head(5).iterrows():
-                data_text += f"- {row.get('Criativo', 'N/A')}: CTR {row.get('CTR', 0):.2f}%, CPC $ {row.get('CPC', 0):.2f}\n"
+                data_text += f"- {row.get('Criativo', 'N/A')}: Taxa de cliques {row.get('Taxa de cliques', 0):.2f}%, Custo por clique $ {row.get('Custo por clique', 0):.2f}\n"
 
         # Adicionar dados de origem/mídia se disponível
         if source_data is not None and len(source_data) > 0:

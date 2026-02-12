@@ -260,6 +260,7 @@ class DataProvider:
 
             # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
             # pois não podem ser somados (são métricas de usuários únicos)
+            # Se aggregated_insights falhar, frequência será 0 (não calculada de reach somado)
             # Store clicks: outbound clicks (clicks leaving Meta to app store)
             store_click_actions = {"outbound_click"}
             link_click_actions = {"link_click"}
@@ -293,7 +294,7 @@ class DataProvider:
                 "investimento": total_spend,
                 "impressoes": total_impressions,
                 "alcance": safe_int(safe_sum('reach')),  # Pode ser sobrescrito por aggregated
-                "frequencia": round(safe_div(total_impressions, safe_int(safe_sum('reach'))), 2),
+                "frequencia": 0,  # Será sobrescrito por aggregated; reach não é aditivo
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
                 "instalacoes_sdk": instalacoes_sdk,

@@ -2114,13 +2114,6 @@ with cols[1]:
     st.plotly_chart(fig_funnel, use_container_width=True)
     st.caption("Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app")
     
-    # Informação importante sobre instalações
-    st.info(
-        "ℹ️ **Sobre as instalações:** Este funil mostra apenas as instalações **atribuídas aos anúncios** "
-        "(rastreadas via Meta Ads Insights). O total de instalações pode ser maior, incluindo instalações "
-        "orgânicas e de outras fontes. Para ver o total completo, é necessário integrar com o Events Manager "
-        "via Conversions API do Meta."
-    )
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

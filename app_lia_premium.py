@@ -16,7 +16,7 @@ from meta_integration import MetaAdsIntegration
 
 # Importar AIAgent para análise de IA
 from ai_agent import AIAgent
-from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
+from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
 # Configurar logging (apenas backend, nunca frontend)
 logging.basicConfig(level=logging.ERROR)
@@ -265,7 +265,7 @@ class DataProvider:
             store_click_actions = {"outbound_click"}
             link_click_actions = {"link_click"}
             actions_series = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
-            log_all_action_types(actions_series)
+            found_action_types = collect_all_action_types(actions_series)
             store_clicks, has_store_clicks = sum_actions_by_types(actions_series, store_click_actions)
             if not has_store_clicks:
                 store_clicks, has_link_clicks = sum_actions_by_types(actions_series, link_click_actions)
@@ -310,6 +310,7 @@ class DataProvider:
                 "delta_ctr": 0,
                 "delta_cpc": 0,
                 "delta_cpm": 0,
+                "_action_types_found": found_action_types,
             }
         except Exception as e:
             logger.error(f"Erro ao processar insights Meta: {e}")
@@ -503,6 +504,7 @@ class DataProvider:
             "delta_cpc": 0, "delta_cpm": 0,
             "_data_source": "empty", "_filter_applied": None,
             "_requested_filter": None, "_available_campaigns": [],
+            "_action_types_found": {},
         }
 
     def _empty_metrics(self):
@@ -1800,9 +1802,12 @@ kpi_cards = [
     {"icon": "🎯", "label": "Taxa de cliques", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
     {"icon": "💡", "label": "Custo por clique", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
     {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
-    {"icon": "📲", "label": "Instalações (SDK)", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": ""},
-    {"icon": "🧭", "label": "Instalações atribuídas (Meta Ads)", "value": f"{meta_data.get('instalacoes_total', 0):,.0f}", "delta": 0, "suffix": ""},
 ]
+
+# Só mostrar KPIs de instalação se houver dados (evita exibir "0" sem contexto)
+_sdk_installs = meta_data.get('instalacoes_sdk', 0) or 0
+if _sdk_installs > 0:
+    kpi_cards.append({"icon": "📲", "label": "Instalações (SDK)", "value": f"{_sdk_installs:,.0f}", "delta": 0, "suffix": ""})
 
 kpi_cards_html = "\n".join(
     build_kpi_card(
@@ -2113,7 +2118,35 @@ with cols[1]:
     )
     st.plotly_chart(fig_funnel, use_container_width=True)
     st.caption("Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app")
-    
+
+    # Diagnóstico: mostrar aviso se instalações SDK = 0
+    if instalacoes == 0 and meta_data.get("_data_source") == "real":
+        action_types = meta_data.get("_action_types_found", {})
+        install_related = {k: v for k, v in action_types.items()
+                          if "install" in k.lower() or "app" in k.lower()}
+        if install_related:
+            types_str = ", ".join(f"{k}: {v}" for k, v in install_related.items())
+            st.info(
+                f"A API retornou eventos de app/install que **não são reconhecidos** "
+                f"pelo dashboard: {types_str}. "
+                f"Entre em contato com o suporte para mapear esses eventos."
+            )
+        else:
+            with st.expander("Por que 'Instalaram o app' mostra 0?"):
+                st.markdown(
+                    "A Meta API **não retornou eventos de instalação** (ex: `app_install`, "
+                    "`mobile_app_install`, `omni_app_install`). Possíveis causas:\n\n"
+                    "1. O **Meta SDK** não está integrado ao app\n"
+                    "2. O SDK está integrado mas **não envia eventos de instalação**\n"
+                    "3. As instalações não estão sendo **atribuídas às campanhas** de anúncio\n\n"
+                    "**Ação recomendada:** Verifique no Meta Events Manager se os eventos "
+                    "`Install` aparecem para o app."
+                )
+            if action_types:
+                with st.expander("Tipos de ação retornados pela Meta API"):
+                    for atype, val in sorted(action_types.items()):
+                        st.text(f"  {atype}: {val:,}")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------

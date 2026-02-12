@@ -41,8 +41,8 @@ def _parse_actions_cell(actions: Any) -> List[Dict[str, Any]]:
     return []
 
 
-def log_all_action_types(actions_series: pd.Series) -> None:
-    """Log all unique action types found in the API response for debugging."""
+def collect_all_action_types(actions_series: pd.Series) -> Dict[str, int]:
+    """Collect all unique action types and their totals from the API response."""
     all_types: Dict[str, float] = {}
     for actions in actions_series.dropna():
         for action in _parse_actions_cell(actions):
@@ -52,8 +52,17 @@ def log_all_action_types(actions_series: pd.Series) -> None:
             except (TypeError, ValueError):
                 val = 0
             all_types[atype] = all_types.get(atype, 0) + val
-    if all_types:
-        logger.info("Meta action types found: %s", {k: int(v) for k, v in sorted(all_types.items())})
+    result = {k: int(v) for k, v in sorted(all_types.items())}
+    if result:
+        logger.warning("Meta action types found: %s", result)
+    else:
+        logger.warning("Meta API returned NO action types in the actions column.")
+    return result
+
+
+def log_all_action_types(actions_series: pd.Series) -> None:
+    """Legacy wrapper – calls collect_all_action_types for backwards compat."""
+    collect_all_action_types(actions_series)
 
 
 def sum_actions_by_types(actions_series: pd.Series, action_types: Iterable[str]) -> Tuple[int, bool]:

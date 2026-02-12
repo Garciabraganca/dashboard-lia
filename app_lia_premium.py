@@ -260,17 +260,6 @@ class DataProvider:
 
             # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
             # pois não podem ser somados (são métricas de usuários únicos)
-            sdk_install_actions = {
-                "app_install",
-                "mobile_app_install",
-                "omni_app_install",
-                "app_install_event",
-                "mobile_app_install_event",
-                "offsite_conversion.fb_mobile_install",
-                "fb_mobile_install",
-                "offsite_conversion.mobile_app_install",
-                "offsite_conversion.app_install",
-            }
             # Store clicks: outbound clicks (clicks leaving Meta to app store)
             store_click_actions = {"outbound_click"}
             link_click_actions = {"link_click"}
@@ -298,7 +287,7 @@ class DataProvider:
                 "frequencia": 0,  # Será sobrescrito por aggregated
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
-                "instalacoes_sdk": sum_actions_by_types(actions_series, sdk_install_actions)[0],
+                "instalacoes_sdk": sum_actions_by_types(actions_series, INSTALL_ACTION_TYPES)[0],
                 "instalacoes_total": 0,  # Será preenchido por get_total_app_installs se disponível
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),

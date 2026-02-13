@@ -6,6 +6,7 @@ Usa requests diretamente para evitar problemas de proxy no Streamlit Cloud
 import logging
 from typing import Dict, Any
 import requests
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,7 @@ class AIAgent:
         self.api_key = api_key
         self.model = model
         self.api_url = "https://api.openai.com/v1/chat/completions"
+        self.client = OpenAI(api_key=api_key)
 
     @staticmethod
     def is_available() -> bool:

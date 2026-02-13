@@ -521,10 +521,16 @@ class MetaAdsIntegration:
         except Exception:
             return []
 
-    def get_sdk_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> dict:
+    def get_sdk_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_name_filter: str = None) -> dict:
         """
         Obtém instalações do app via Meta SDK App Insights endpoint.
         Requer META_APP_ID configurado.
+
+        Args:
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD)
+            custom_end: Data de fim personalizada (YYYY-MM-DD)
+            campaign_name_filter: Nome da campanha para filtrar (opcional)
 
         Returns:
             Dict com chaves: installs (int), source (str), event_types (list)
@@ -537,19 +543,25 @@ class MetaAdsIntegration:
         try:
             start_str, end_str = self._parse_date_range(date_range, custom_start, custom_end)
 
-            # Tentar buscar via ad account insights com action_type filtrado
+            # Buscar via ad account insights com action_type filtrado
+            # Use nível de campanha para permitir filtragem por campanha
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
-                "fields": "actions",
+                "fields": "actions,campaign_name",
                 "time_range": json.dumps({"since": start_str, "until": end_str}),
                 "action_breakdowns": "action_type",
-                "level": "account",
+                "level": "campaign",  # Alterado de "account" para "campaign" para permitir filtragem
                 "access_token": self.access_token,
             }
             response = requests.get(url, params=params)
             response.raise_for_status()
 
             data = response.json().get("data", [])
+            
+            # Aplicar filtro de campanha se fornecido
+            if campaign_name_filter:
+                data = [row for row in data if campaign_name_filter.lower() in row.get("campaign_name", "").lower()]
+            
             install_types = {
                 "app_install", "mobile_app_install", "omni_app_install",
                 "app_install_event", "mobile_app_install_event",
@@ -569,11 +581,12 @@ class MetaAdsIntegration:
 
             if total > 0:
                 result["installs"] = total
-                result["source"] = "ads_insights_account"
+                result["source"] = "ads_insights_campaign" if campaign_name_filter else "ads_insights_account"
                 result["event_types"] = found_types
                 return result
 
             # Fallback: tentar buscar eventos diretos do app
+            # Nota: este endpoint não suporta filtragem por campanha
             url = f"{self.base_url}/{self.app_id}/activities"
             params = {
                 "event_name": "fb_mobile_install",
@@ -594,10 +607,16 @@ class MetaAdsIntegration:
         except Exception:
             return result
 
-    def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> int:
+    def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_name_filter: str = None) -> int:
         """
         Obtém o total de instalações do app.
         Usa get_sdk_installs internamente.
+        
+        Args:
+            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            custom_start: Data de início personalizada (YYYY-MM-DD)
+            custom_end: Data de fim personalizada (YYYY-MM-DD)
+            campaign_name_filter: Nome da campanha para filtrar (opcional)
         """
-        sdk_data = self.get_sdk_installs(date_range, custom_start, custom_end)
+        sdk_data = self.get_sdk_installs(date_range, custom_start, custom_end, campaign_name_filter)
         return sdk_data["installs"]

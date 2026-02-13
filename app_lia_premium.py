@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 if not logger.handlers:
     logging.basicConfig(
         level=logging.INFO,
-        format="%(levelname)s:%(name)s:%(message)s"
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
     )
 
 def _now_sp() -> str:

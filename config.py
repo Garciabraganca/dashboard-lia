@@ -125,6 +125,12 @@ class Config:
                     # Converter AttrDict para dict recursivamente
                     creds_dict = {key: str(value) if key == "private_key" else value
                                   for key, value in dict(gcp_creds).items()}
+                    
+                    # Validar que não há chaves META no dict de credenciais GA4
+                    meta_keys = [k for k in creds_dict.keys() if 'META' in k.upper()]
+                    if meta_keys:
+                        logger.warning(f"META keys found in GA4 credentials (should be separate): {meta_keys}")
+                    
                     logger.info(f"GA4 credentials loaded from Streamlit secrets, keys: {list(creds_dict.keys())}")
                     return creds_dict
                 else:

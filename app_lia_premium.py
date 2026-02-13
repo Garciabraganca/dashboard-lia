@@ -192,13 +192,13 @@ class DataProvider:
                         result["frequencia"] = aggregated.get("frequency", result["frequencia"])
 
                     # Se não encontrou install events nas actions, tentar via SDK endpoint
+                    # NOTA: SDK installs são TOTAIS do período, não específicos de campanha
                     if result.get("instalacoes_sdk", 0) == 0 and self.meta_client.app_id:
                         try:
                             sdk_data = self.meta_client.get_sdk_installs(
                                 date_range=api_period,
                                 custom_start=custom_start,
                                 custom_end=custom_end,
-                                campaign_name_filter=campaign_filter,
                             )
                             if sdk_data["installs"] > 0:
                                 result["instalacoes_sdk"] = sdk_data["installs"]
@@ -232,6 +232,7 @@ class DataProvider:
                             result["frequencia"] = aggregated.get("frequency", result["frequencia"])
 
                         # Se não encontrou install events nas actions, tentar via SDK endpoint
+                        # NOTA: SDK installs são TOTAIS do período, não específicos de campanha
                         if result.get("instalacoes_sdk", 0) == 0 and self.meta_client.app_id:
                             try:
                                 sdk_data = self.meta_client.get_sdk_installs(

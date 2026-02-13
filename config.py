@@ -4,6 +4,7 @@ Suporta tanto variáveis de ambiente quanto Streamlit secrets
 """
 
 import json
+import logging
 import os
 from typing import Dict, Any, Optional
 
@@ -13,6 +14,8 @@ try:
     HAS_STREAMLIT = True
 except ImportError:
     HAS_STREAMLIT = False
+
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -33,9 +36,6 @@ class Config:
     @staticmethod
     def _get_streamlit_secret(key: str, default: Any = None) -> Any:
         """Obtém um secret do Streamlit de forma segura"""
-        import logging
-        logger = logging.getLogger(__name__)
-
         if HAS_STREAMLIT:
             try:
                 # st.secrets usa acesso por chave, não .get()
@@ -54,9 +54,6 @@ class Config:
     @classmethod
     def get_meta_access_token(cls) -> Optional[str]:
         """Obtém o token de acesso do Meta"""
-        import logging
-        logger = logging.getLogger(__name__)
-
         # Primeiro tenta variável de ambiente (refresh a cada chamada)
         env_token = os.getenv("META_ACCESS_TOKEN")
         if env_token:
@@ -90,14 +87,6 @@ class Config:
         return cls._get_streamlit_secret("META_AD_ACCOUNT_ID", cls.META_AD_ACCOUNT_ID)
 
     @classmethod
-    def get_meta_app_id(cls) -> Optional[str]:
-        """Obtém o App ID do Meta (para consultas de eventos do app)"""
-        env_value = os.getenv("META_APP_ID")
-        if env_value:
-            return env_value
-        return cls._get_streamlit_secret("META_APP_ID")
-
-    @classmethod
     def get_ga4_property_id(cls) -> str:
         """Obtém o ID da propriedade GA4"""
         env_value = os.getenv("GA4_PROPERTY_ID")
@@ -118,9 +107,6 @@ class Config:
         Returns:
             Dicionário com credenciais da service account
         """
-        import logging
-        logger = logging.getLogger(__name__)
-
         # Tentar variável de ambiente primeiro
         if cls.GCP_CREDENTIALS_JSON:
             try:

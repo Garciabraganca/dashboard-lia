@@ -18,9 +18,14 @@ from meta_integration import MetaAdsIntegration
 from ai_agent import AIAgent
 from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
-# Configurar logging (apenas backend, nunca frontend)
-logging.basicConfig(level=logging.ERROR)
-logger = logging.getLogger(__name__)
+def _now_sp() -> str:
+    """Return current time as string in America/Sao_Paulo (UTC-3) without pytz."""
+    from datetime import timezone as _tz
+
+    utc_now = datetime.now(_tz.utc)
+    sp_offset = timedelta(hours=-3)
+    sp_now = utc_now + sp_offset
+    return sp_now.strftime("%Y-%m-%d %H:%M:%S")
 
 # =============================================================================
 # CONFIGURACAO DA PAGINA
@@ -291,36 +296,47 @@ class DataProvider:
 
             # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
             # pois não podem ser somados (são métricas de usuários únicos)
-            # Se aggregated_insights falhar, frequência será 0 (não calculada de reach somado)
-            # Store clicks: outbound clicks (clicks leaving Meta to app store)
-            store_click_actions = {"outbound_click"}
-            link_click_actions = {"link_click"}
             actions_series = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
             found_action_types = collect_all_action_types(actions_series)
             store_clicks, has_store_clicks = sum_actions_by_types(actions_series, store_click_actions)
             if not has_store_clicks:
-                store_clicks, has_link_clicks = sum_actions_by_types(actions_series, link_click_actions)
-                if has_link_clicks:
-                    logger.warning(
-                        "Meta funnel: 'outbound_click' not found, "
-                        "using 'link_click' as fallback for store clicks"
-                    )
-                else:
-                    logger.warning(
-                        "Meta funnel: no store click actions found "
-                        "(tried outbound_click, link_click). Using total clicks as fallback."
-                    )
-                    store_clicks = total_clicks
+                # Fallback: try outbound_click specifically
+                store_clicks, has_outbound = sum_actions_by_types(actions_series, {"outbound_click"})
+                if not has_outbound:
+                    # Fallback: try link_click
+                    store_clicks, has_link_clicks = sum_actions_by_types(actions_series, {"link_click"})
+                    if has_link_clicks:
+                        logger.warning(
+                            "Meta funnel: store click actions not found, "
+                            "using 'link_click' as fallback"
+                        )
+                    else:
+                        logger.warning(
+                            "Meta funnel: no store click actions found. "
+                            "Using total clicks as fallback."
+                        )
+                        store_clicks = total_clicks
 
-            # SDK install events: check if any install actions were found
+            # SDK install events: check all known install action types
             instalacoes_sdk, tem_eventos_instalacao = sum_actions_by_types(actions_series, INSTALL_ACTION_TYPES)
             if not tem_eventos_instalacao:
-                logger.warning(
-                    "Meta funnel: no SDK install events found. "
-                    "Check if Meta SDK is implemented and sending install events. "
-                    "Expected types: app_install, mobile_app_install, omni_app_install, etc."
-                )
-            
+                # Try activate_app as secondary signal for installs
+                activate_count, has_activate = sum_actions_by_types(actions_series, ACTIVATE_APP_ACTION_TYPES)
+                if has_activate:
+                    logger.warning(
+                        "Meta funnel: no install events found, but found activate_app events (%d). "
+                        "Using activate_app as proxy for installs.",
+                        activate_count,
+                    )
+                    instalacoes_sdk = activate_count
+                    tem_eventos_instalacao = True
+                else:
+                    logger.warning(
+                        "Meta funnel: no SDK install events found. "
+                        "Action types in response: %s",
+                        list(diagnostics.get("all_action_types", {}).keys()),
+                    )
+
             return {
                 "investimento": total_spend,
                 "impressoes": total_impressions,
@@ -329,7 +345,7 @@ class DataProvider:
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
                 "instalacoes_sdk": instalacoes_sdk,
-                "instalacoes_total": 0,  # Será preenchido por get_total_app_installs se disponível
+                "instalacoes_total": 0,
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
                 "cpm": round(cpm, 2),
@@ -671,6 +687,41 @@ class DataProvider:
 
 # Inicializar provider
 data_provider = DataProvider(mode="auto")
+
+
+# =============================================================================
+# CACHED DATA FETCHERS (TTL = 5 min, keyed by params)
+# =============================================================================
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_meta_cached(period, campaign_filter, custom_start, custom_end):
+    return data_provider.get_meta_metrics(
+        period=period, campaign_filter=campaign_filter,
+        custom_start=custom_start, custom_end=custom_end,
+    )
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_ga4_cached(period, custom_start, custom_end, campaign_filter):
+    return data_provider.get_ga4_metrics(
+        period=period, custom_start=custom_start,
+        custom_end=custom_end, campaign_filter=campaign_filter,
+    )
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_creative_cached(period, campaign_filter, custom_start, custom_end):
+    return data_provider.get_creative_data(
+        period=period, campaign_filter=campaign_filter,
+        custom_start=custom_start, custom_end=custom_end,
+    )
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _fetch_trends_cached(period, campaign_filter, custom_start, custom_end):
+    return data_provider.get_daily_trends(
+        period=period, campaign_filter=campaign_filter,
+        custom_start=custom_start, custom_end=custom_end,
+    )
 
 # =============================================================================
 # COMPONENTE: CARD DE ERRO AMIGAVEL
@@ -1608,30 +1659,10 @@ else:
 cycle_status = {"insights": ["Processando..."], "phase": "Carregando", "is_learning": True}
 try:
     with st.spinner("Sincronizando dados..."):
-        meta_data = data_provider.get_meta_metrics(
-            period=selected_period,
-            campaign_filter=meta_campaign_filter,
-            custom_start=custom_start_str,
-            custom_end=custom_end_str,
-        )
-        ga4_data = data_provider.get_ga4_metrics(
-            period=selected_period,
-            custom_start=custom_start_str,
-            custom_end=custom_end_str,
-            campaign_filter=ga4_campaign_filter,
-        )
-        creative_data = data_provider.get_creative_data(
-            period=selected_period,
-            campaign_filter=meta_campaign_filter,
-            custom_start=custom_start_str,
-            custom_end=custom_end_str,
-        )
-        trends_data = data_provider.get_daily_trends(
-            period=selected_period,
-            custom_start=custom_start_str,
-            custom_end=custom_end_str,
-            campaign_filter=meta_campaign_filter,
-        )
+        meta_data = _fetch_meta_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
+        ga4_data = _fetch_ga4_cached(selected_period, custom_start_str, custom_end_str, ga4_campaign_filter)
+        creative_data = _fetch_creative_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
+        trends_data = _fetch_trends_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
         cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
 except Exception as e:
     import streamlit as st
@@ -1649,6 +1680,112 @@ except Exception as e:
     }
     creative_data = {}
     trends_data = []
+
+# -----------------------------------------------------------------------------
+# REFRESH BUTTON + LAST UPDATED TIMESTAMP
+# -----------------------------------------------------------------------------
+_refresh_cols = st.columns([5, 1, 1])
+with _refresh_cols[1]:
+    if st.button("Atualizar dados", key="btn_refresh_data"):
+        st.cache_data.clear()
+        st.rerun()
+with _refresh_cols[2]:
+    if st.button("Limpar cache", key="btn_clear_cache"):
+        st.cache_data.clear()
+        st.rerun()
+
+_fetch_ts = meta_data.get("_fetch_timestamp")
+if _fetch_ts:
+    st.caption(f"Dados atualizados em: {_fetch_ts[:19].replace('T', ' ')} (SP)")
+else:
+    st.caption(f"Dados carregados em: {_now_sp()} (SP)")
+
+# -----------------------------------------------------------------------------
+# SDK EVENTS HEALTH INDICATOR
+# -----------------------------------------------------------------------------
+_diag = meta_data.get("_sdk_diagnostics", {})
+_data_source = meta_data.get("_data_source", "unknown")
+_sdk_installs = meta_data.get("instalacoes_sdk", 0)
+
+_proxy_installs = 0
+if _data_source in ("real", "real_no_filter"):
+    if _sdk_installs > 0:
+        st.success(f"SDK Events: {_sdk_installs} instalações detectadas no período")
+    elif _diag.get("has_activate_app_events"):
+        _proxy_installs = sum(_diag.get("activate_app_events", {}).values())
+        st.warning(
+            f"SDK Events: nenhum evento de instalação direto, mas {_proxy_installs} eventos "
+            f"activate_app encontrados (usados como proxy para instalações)"
+        )
+    elif _diag.get("total_action_types", 0) > 0:
+        st.warning(
+            f"SDK Events: 0 instalações detectadas. "
+            f"A API retornou {_diag.get('total_action_types', 0)} tipos de ação, "
+            f"mas nenhum é evento de instalação do SDK. "
+            f"Verifique a configuração do Meta SDK no app."
+        )
+    else:
+        st.warning("SDK Events: a API Meta não retornou nenhum tipo de ação (actions vazio)")
+
+# Expandable diagnostics (always available, collapsed by default)
+with st.expander("Diagnóstico de eventos SDK (clique para expandir)"):
+    if _diag and _diag.get("all_action_types"):
+        st.markdown("**All action_types retornados pela API Meta:**")
+        for atype, count in sorted(_diag["all_action_types"].items()):
+            marker = ""
+            if atype in INSTALL_ACTION_TYPES:
+                marker = " **INSTALL**"
+            elif atype in STORE_CLICK_ACTION_TYPES:
+                marker = " **STORE CLICK**"
+            elif atype in ACTIVATE_APP_ACTION_TYPES:
+                marker = " **ACTIVATE APP**"
+            st.markdown(f"- `{atype}`: **{count}**{marker}")
+
+        st.markdown("---")
+        st.markdown("**Install action_types encontrados:**")
+        st.json(_diag.get("install_events", {}))
+        st.markdown("**Activate_app action_types encontrados:**")
+        st.json(_diag.get("activate_app_events", {}))
+        st.markdown("**Store click action_types encontrados:**")
+        st.json(_diag.get("store_click_events", {}))
+        st.markdown("**Contadores:**")
+        st.json({
+            "total_action_types": _diag.get("total_action_types", 0),
+            "install_count": len(_diag.get("install_events", {})),
+            "activate_app_count": len(_diag.get("activate_app_events", {})),
+            "store_click_count": len(_diag.get("store_click_events", {})),
+        })
+
+        if _proxy_installs > 0:
+            st.info(
+                f"Install veio 0, usando proxy por Activate App: "
+                f"**{_proxy_installs}** (sinal secundário)."
+            )
+
+    elif _data_source in ("real", "real_no_filter"):
+        st.warning("Nenhum tipo de ação retornado pela API. Possíveis causas:")
+        st.markdown("""
+1. **Token expirado ou sem permissão** — Verifique no Meta Business Suite
+2. **Campanha sem conversões** — A campanha pode não estar otimizada para instalações
+3. **SDK não inicializado** — Verifique os logs do app (debug build)
+4. **App ID incorreto** — Verifique se o App ID no SDK corresponde ao da conta de anúncios
+5. **Janela de atribuição** — Eventos podem levar até 48h para aparecer na API
+        """)
+    elif _data_source == "mock":
+        st.info("Usando dados de demonstração. Configure as credenciais Meta no Streamlit Secrets.")
+
+    st.markdown("---")
+    st.markdown("**Runbook — Se os eventos sumirem novamente:**")
+    st.markdown("""
+1. Abra o Meta Events Manager → Test Events → confirme recebimento
+2. Clique em **Atualizar dados** ou **Limpar cache** acima
+3. Expanda este diagnóstico e verifique:
+   - Se `all_action_types` vazio → token/permissão expirada
+   - Se action types existem mas sem `install` → SDK não configurado ou evento com nome novo
+   - Se install events aparecem mas valor é 0 → reporte como bug
+4. Se nada funcionar: verifique no Meta Business Suite > Events Manager > Diagnostics
+5. Confirme que o App ID no SDK corresponde à conta de anúncios usada
+    """)
 
 # -----------------------------------------------------------------------------
 # STATUS DO CICLO (COM CORUJA)

@@ -90,6 +90,14 @@ class Config:
         return cls._get_streamlit_secret("META_AD_ACCOUNT_ID", cls.META_AD_ACCOUNT_ID)
 
     @classmethod
+    def get_meta_app_id(cls) -> Optional[str]:
+        """Obtém o App ID do Meta (para consultas de eventos do app)"""
+        env_value = os.getenv("META_APP_ID")
+        if env_value:
+            return env_value
+        return cls._get_streamlit_secret("META_APP_ID")
+
+    @classmethod
     def get_ga4_property_id(cls) -> str:
         """Obtém o ID da propriedade GA4"""
         env_value = os.getenv("GA4_PROPERTY_ID")

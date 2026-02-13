@@ -298,7 +298,8 @@ class DataProvider:
                 "cliques_link": total_clicks,
                 "store_clicks_meta": store_clicks,
                 "instalacoes_sdk": instalacoes_sdk,
-                "instalacoes_total": 0,  # Será preenchido por get_total_app_installs se disponível
+                "instalacoes_total": 0,  # Placeholder para instalações atribuídas (quando houver fonte dedicada)
+                "_instalacoes_ads_disponivel": False,
                 "ctr_link": round(ctr, 2),
                 "cpc_link": round(cpc, 2),
                 "cpm": round(cpm, 2),
@@ -497,6 +498,7 @@ class DataProvider:
         return {
             "investimento": 0, "impressoes": 0, "alcance": 0, "frequencia": 0,
             "cliques_link": 0, "store_clicks_meta": 0, "instalacoes_sdk": 0, "instalacoes_total": 0,
+            "_instalacoes_ads_disponivel": False,
             "ctr_link": 0, "cpc_link": 0, "cpm": 0,
             "delta_investimento": 0, "delta_impressoes": 0, "delta_alcance": 0,
             "delta_frequencia": 0, "delta_cliques": 0, "delta_ctr": 0,
@@ -515,7 +517,8 @@ class DataProvider:
     def _get_mock_meta_metrics(self, period, level):
         return {
             "investimento": 1250.50, "impressoes": 85400, "alcance": 42100, "frequencia": 2.03,
-            "cliques_link": 2450, "store_clicks_meta": 1820, "instalacoes_sdk": 320, "instalacoes_total": 0,
+            "cliques_link": 2450, "store_clicks_meta": 1820, "instalacoes_sdk": 320, "instalacoes_total": 285,
+            "_instalacoes_ads_disponivel": True,
             "ctr_link": 2.87, "cpc_link": 0.51, "cpm": 14.64,
             "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
             "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
@@ -1801,8 +1804,12 @@ kpi_cards = [
     {"icon": "💡", "label": "Custo por clique", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
     {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
     {"icon": "📲", "label": "Instalações (SDK)", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": ""},
-    {"icon": "🧭", "label": "Instalações atribuídas (Meta Ads)", "value": f"{meta_data.get('instalacoes_total', 0):,.0f}", "delta": 0, "suffix": ""},
 ]
+
+if meta_data.get("_instalacoes_ads_disponivel"):
+    kpi_cards.append(
+        {"icon": "🧭", "label": "Instalações atribuídas (Meta Ads)", "value": f"{meta_data.get('instalacoes_total', 0):,.0f}", "delta": 0, "suffix": ""}
+    )
 
 kpi_cards_html = "\n".join(
     build_kpi_card(

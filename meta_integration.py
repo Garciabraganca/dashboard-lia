@@ -561,9 +561,12 @@ class MetaAdsIntegration:
             # Aplicar filtro de campanha se fornecido
             if campaign_name_filter:
                 # Exclude rows without campaign_name and filter by name
-                data = [row for row in data 
-                       if row.get("campaign_name") and 
-                       campaign_name_filter.lower() in row.get("campaign_name", "").lower()]
+                filtered_data = []
+                for row in data:
+                    campaign_name = row.get("campaign_name")
+                    if campaign_name and campaign_name_filter.lower() in campaign_name.lower():
+                        filtered_data.append(row)
+                data = filtered_data
             
             install_types = {
                 "app_install", "mobile_app_install", "omni_app_install",

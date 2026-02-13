@@ -22,11 +22,7 @@ from meta_funnel import ACTIVATE_APP_ACTION_TYPES, INSTALL_ACTION_TYPES, STORE_C
 # CONFIGURACAO DE LOGGING
 # =============================================================================
 logger = logging.getLogger(__name__)
-if not logger.handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(levelname)s:%(name)s:%(message)s"
-    )
+logging.basicConfig(level=logging.INFO)
 
 def _now_sp() -> str:
     """Return current time as string in America/Sao_Paulo (UTC-3) without pytz."""

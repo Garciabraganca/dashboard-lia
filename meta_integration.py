@@ -10,16 +10,18 @@ import pandas as pd
 
 
 class MetaAdsIntegration:
-    def __init__(self, access_token: str, ad_account_id: str):
+    def __init__(self, access_token: str, ad_account_id: str, app_id: str = None):
         """
         Inicializa a integração com Meta Ads API
 
         Args:
             access_token: Token de acesso do Meta
             ad_account_id: ID da conta de anúncios (sem 'act_' prefix)
+            app_id: ID do aplicativo Meta (para consultar eventos do SDK)
         """
         self.access_token = access_token
         self.ad_account_id = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
+        self.app_id = app_id
         self.base_url = "https://graph.facebook.com/v21.0"
 
     def verify_connection(self) -> Dict[str, Any]:
@@ -499,31 +501,103 @@ class MetaAdsIntegration:
             print(f"Erro ao obter insights de criativos: {str(e)}")
             return pd.DataFrame()
 
+    def get_app_event_types(self) -> list:
+        """
+        Lista os tipos de evento disponíveis no app (via Meta SDK).
+        Requer META_APP_ID configurado.
+
+        Returns:
+            Lista de nomes de eventos disponíveis, ou lista vazia se não configurado.
+        """
+        if not self.app_id:
+            return []
+        try:
+            url = f"{self.base_url}/{self.app_id}/app_event_types"
+            params = {"access_token": self.access_token}
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            return [e.get("event_type") or e.get("name", "") for e in data]
+        except Exception:
+            return []
+
+    def get_sdk_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> dict:
+        """
+        Obtém instalações do app via Meta SDK App Insights endpoint.
+        Requer META_APP_ID configurado.
+
+        Returns:
+            Dict com chaves: installs (int), source (str), event_types (list)
+        """
+        result = {"installs": 0, "source": "none", "event_types": []}
+        if not self.app_id:
+            result["source"] = "no_app_id"
+            return result
+
+        try:
+            start_str, end_str = self._parse_date_range(date_range, custom_start, custom_end)
+
+            # Tentar buscar via ad account insights com action_type filtrado
+            url = f"{self.base_url}/{self.ad_account_id}/insights"
+            params = {
+                "fields": "actions",
+                "time_range": json.dumps({"since": start_str, "until": end_str}),
+                "action_breakdowns": "action_type",
+                "level": "account",
+                "access_token": self.access_token,
+            }
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+
+            data = response.json().get("data", [])
+            install_types = {
+                "app_install", "mobile_app_install", "omni_app_install",
+                "app_install_event", "mobile_app_install_event",
+                "offsite_conversion.fb_mobile_install", "fb_mobile_install",
+                "offsite_conversion.mobile_app_install", "offsite_conversion.app_install",
+            }
+
+            total = 0
+            found_types = []
+            for row in data:
+                for action in row.get("actions", []):
+                    atype = action.get("action_type", "")
+                    if atype in install_types:
+                        total += int(float(action.get("value", 0) or 0))
+                        if atype not in found_types:
+                            found_types.append(atype)
+
+            if total > 0:
+                result["installs"] = total
+                result["source"] = "ads_insights_account"
+                result["event_types"] = found_types
+                return result
+
+            # Fallback: tentar buscar eventos diretos do app
+            url = f"{self.base_url}/{self.app_id}/activities"
+            params = {
+                "event_name": "fb_mobile_install",
+                "since": start_str,
+                "until": end_str,
+                "access_token": self.access_token,
+            }
+            response = requests.get(url, params=params)
+            if response.status_code == 200:
+                events = response.json().get("data", [])
+                if events:
+                    result["installs"] = len(events)
+                    result["source"] = "app_activities"
+                    result["event_types"] = ["fb_mobile_install"]
+
+            return result
+
+        except Exception:
+            return result
+
     def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> int:
         """
-        Obtém o total de instalações do app (incluindo orgânicas e atribuídas).
-        
-        NOTA IMPORTANTE: Esta função atualmente retorna 0 porque requer integração com a 
-        Conversions API ou Events Manager do Meta. A API de Ads Insights só retorna 
-        instalações atribuídas aos anúncios.
-        
-        Para implementar:
-        1. Configure a Conversions API para enviar eventos de instalação
-        2. Armazene esses eventos em um banco de dados
-        3. Conte os eventos de instalação no período especificado
-        
-        Alternativa:
-        - Integrar com a API de App Events (legacy) se ainda disponível
-        - Usar a Graph API para consultar eventos do app dataset
-        
-        Args:
-            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
-            custom_start: Data de início personalizada (YYYY-MM-DD)
-            custom_end: Data de fim personalizada (YYYY-MM-DD)
-        
-        Returns:
-            Total de instalações no período (atualmente sempre 0)
+        Obtém o total de instalações do app.
+        Usa get_sdk_installs internamente.
         """
-        # TODO: Implementar integração com Conversions API / Events Manager
-        # Por enquanto retorna 0 pois não há integração implementada
-        return 0
+        sdk_data = self.get_sdk_installs(date_range, custom_start, custom_end)
+        return sdk_data["installs"]

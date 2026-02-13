@@ -73,6 +73,14 @@ class Config:
         return None
 
     @classmethod
+    def get_meta_app_id(cls) -> Optional[str]:
+        """Obtém o App ID do Meta (necessário para consultar eventos do SDK)"""
+        env_value = os.getenv("META_APP_ID")
+        if env_value:
+            return env_value
+        return cls._get_streamlit_secret("META_APP_ID")
+
+    @classmethod
     def get_meta_ad_account_id(cls) -> str:
         """Obtém o ID da conta de anúncios do Meta"""
         env_value = os.getenv("META_AD_ACCOUNT_ID")

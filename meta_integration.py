@@ -10,16 +10,18 @@ import pandas as pd
 
 
 class MetaAdsIntegration:
-    def __init__(self, access_token: str, ad_account_id: str):
+    def __init__(self, access_token: str, ad_account_id: str, app_id: str = None):
         """
         Inicializa a integração com Meta Ads API
 
         Args:
             access_token: Token de acesso do Meta
             ad_account_id: ID da conta de anúncios (sem 'act_' prefix)
+            app_id: ID do aplicativo Meta (para consultar eventos do SDK)
         """
         self.access_token = access_token
         self.ad_account_id = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
+        self.app_id = app_id
         self.base_url = "https://graph.facebook.com/v21.0"
 
     def verify_connection(self) -> Dict[str, Any]:
@@ -499,119 +501,103 @@ class MetaAdsIntegration:
             print(f"Erro ao obter insights de criativos: {str(e)}")
             return pd.DataFrame()
 
-    def get_sdk_events_diagnostic(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> dict:
+    def get_app_event_types(self) -> list:
         """
-        Diagnostic method that queries the Meta API and returns detailed info
-        about what action types are available in the response.
-        Useful for debugging missing SDK events.
-        """
-        try:
-            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
-            url = f"{self.base_url}/{self.ad_account_id}/insights"
-            params = {
-                "fields": "campaign_name,actions",
-                "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
-                "level": "campaign",
-                "action_breakdowns": "action_type",
-                "limit": "500",
-                "access_token": self.access_token,
-            }
-
-            response = requests.get(url, params=params, timeout=30)
-
-            if response.status_code != 200:
-                error_data = response.json() if response.text else {}
-                error = error_data.get("error", {})
-                return {
-                    "status": "error",
-                    "error_code": error.get("code", "N/A"),
-                    "error_message": error.get("message", "Unknown error"),
-                    "http_status": response.status_code,
-                }
-
-            data = response.json()
-            insights = data.get("data", [])
-
-            all_action_types: dict = {}
-            campaigns_with_actions = []
-
-            for insight in insights:
-                campaign = insight.get("campaign_name", "unknown")
-                actions = insight.get("actions", [])
-                if actions:
-                    campaigns_with_actions.append(campaign)
-                    for action in actions:
-                        atype = action.get("action_type", "unknown")
-                        try:
-                            val = float(action.get("value", 0) or 0)
-                        except (TypeError, ValueError):
-                            val = 0
-                        all_action_types[atype] = all_action_types.get(atype, 0) + val
-
-            return {
-                "status": "ok",
-                "date_range": {"since": start_date_str, "until": end_date_str},
-                "total_insights_rows": len(insights),
-                "campaigns_with_actions": list(set(campaigns_with_actions)),
-                "all_action_types": {k: int(v) for k, v in sorted(all_action_types.items())},
-                "total_action_types_found": len(all_action_types),
-            }
-
-        except Exception as e:
-            return {"status": "exception", "error_message": str(e)}
-
-    def get_total_app_installs(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> int:
-        """
-        Obtém o total de instalações do app atribuídas aos anúncios,
-        extraindo do campo 'actions' da API de Insights.
-
-        Args:
-            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
-            campaign_name_filter: Nome da campanha para filtrar (opcional)
-            custom_start: Data de início personalizada (YYYY-MM-DD)
-            custom_end: Data de fim personalizada (YYYY-MM-DD)
+        Lista os tipos de evento disponíveis no app (via Meta SDK).
+        Requer META_APP_ID configurado.
 
         Returns:
-            Total de instalações no período
+            Lista de nomes de eventos disponíveis, ou lista vazia se não configurado.
         """
-        from meta_funnel import INSTALL_ACTION_TYPES
+        if not self.app_id:
+            return []
+        try:
+            url = f"{self.base_url}/{self.app_id}/app_event_types"
+            params = {"access_token": self.access_token}
+            response = requests.get(url, params=params)
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            return [e.get("event_type") or e.get("name", "") for e in data]
+        except Exception:
+            return []
+
+    def get_sdk_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> dict:
+        """
+        Obtém instalações do app via Meta SDK App Insights endpoint.
+        Requer META_APP_ID configurado.
+
+        Returns:
+            Dict com chaves: installs (int), source (str), event_types (list)
+        """
+        result = {"installs": 0, "source": "none", "event_types": []}
+        if not self.app_id:
+            result["source"] = "no_app_id"
+            return result
 
         try:
-            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
+            start_str, end_str = self._parse_date_range(date_range, custom_start, custom_end)
+
+            # Tentar buscar via ad account insights com action_type filtrado
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
                 "fields": "actions",
-                "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
-                "level": "account",
+                "time_range": json.dumps({"since": start_str, "until": end_str}),
                 "action_breakdowns": "action_type",
+                "level": "account",
                 "access_token": self.access_token,
             }
+            response = requests.get(url, params=params)
+            response.raise_for_status()
 
-            if campaign_name_filter:
-                params["level"] = "campaign"
-
-            response = requests.get(url, params=params, timeout=30)
-            if response.status_code != 200:
-                return 0
-
-            data = response.json()
-            insights = data.get("data", [])
+            data = response.json().get("data", [])
+            install_types = {
+                "app_install", "mobile_app_install", "omni_app_install",
+                "app_install_event", "mobile_app_install_event",
+                "offsite_conversion.fb_mobile_install", "fb_mobile_install",
+                "offsite_conversion.mobile_app_install", "offsite_conversion.app_install",
+            }
 
             total = 0
-            for insight in insights:
-                if campaign_name_filter:
-                    cname = insight.get("campaign_name", "")
-                    if campaign_name_filter.lower() not in cname.lower():
-                        continue
-                for action in insight.get("actions", []):
-                    atype = (action.get("action_type") or "").strip()
-                    if atype in INSTALL_ACTION_TYPES:
-                        try:
-                            total += int(float(action.get("value", 0)))
-                        except (TypeError, ValueError):
-                            pass
-            return total
+            found_types = []
+            for row in data:
+                for action in row.get("actions", []):
+                    atype = action.get("action_type", "")
+                    if atype in install_types:
+                        total += int(float(action.get("value", 0) or 0))
+                        if atype not in found_types:
+                            found_types.append(atype)
 
-        except Exception as e:
-            print(f"Erro ao obter total de instalações: {e}")
-            return 0
+            if total > 0:
+                result["installs"] = total
+                result["source"] = "ads_insights_account"
+                result["event_types"] = found_types
+                return result
+
+            # Fallback: tentar buscar eventos diretos do app
+            url = f"{self.base_url}/{self.app_id}/activities"
+            params = {
+                "event_name": "fb_mobile_install",
+                "since": start_str,
+                "until": end_str,
+                "access_token": self.access_token,
+            }
+            response = requests.get(url, params=params)
+            if response.status_code == 200:
+                events = response.json().get("data", [])
+                if events:
+                    result["installs"] = len(events)
+                    result["source"] = "app_activities"
+                    result["event_types"] = ["fb_mobile_install"]
+
+            return result
+
+        except Exception:
+            return result
+
+    def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> int:
+        """
+        Obtém o total de instalações do app.
+        Usa get_sdk_installs internamente.
+        """
+        sdk_data = self.get_sdk_installs(date_range, custom_start, custom_end)
+        return sdk_data["installs"]

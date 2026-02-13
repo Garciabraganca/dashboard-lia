@@ -16,25 +16,7 @@ from meta_integration import MetaAdsIntegration
 
 # Importar AIAgent para análise de IA
 from ai_agent import AIAgent
-from meta_funnel import (
-    ACTIVATE_APP_ACTION_TYPES,
-    INSTALL_ACTION_TYPES,
-    STORE_CLICK_ACTION_TYPES,
-    build_meta_funnel,
-    collect_action_type_diagnostics,
-    log_all_action_types,
-    resolve_link_clicks,
-    resolve_store_clicks,
-    sum_actions_by_types,
-)
-
-# Configurar logging — WARNING level to surface diagnostic messages
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-)
-logger = logging.getLogger("lia-dashboard")
-
+from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
 def _now_sp() -> str:
     """Return current time as string in America/Sao_Paulo (UTC-3) without pytz."""
@@ -134,7 +116,8 @@ class DataProvider:
             if Config.validate_meta_credentials():
                 self.meta_client = MetaAdsIntegration(
                     access_token=Config.get_meta_access_token(),
-                    ad_account_id=Config.get_meta_ad_account_id()
+                    ad_account_id=Config.get_meta_ad_account_id(),
+                    app_id=Config.get_meta_app_id(),
                 )
                 logger.info("Meta Ads client initialized")
         except Exception as e:
@@ -198,13 +181,20 @@ class DataProvider:
                         result["alcance"] = aggregated.get("reach", result["alcance"])
                         result["frequencia"] = aggregated.get("frequency", result["frequencia"])
 
-                    # Populate instalacoes_total from actions (no longer hardcoded 0)
-                    result["instalacoes_total"] = self.meta_client.get_total_app_installs(
-                        date_range=api_period,
-                        campaign_name_filter=campaign_filter,
-                        custom_start=custom_start,
-                        custom_end=custom_end,
-                    )
+                    # Se não encontrou install events nas actions, tentar via SDK endpoint
+                    if result.get("instalacoes_sdk", 0) == 0 and self.meta_client.app_id:
+                        try:
+                            sdk_data = self.meta_client.get_sdk_installs(
+                                date_range=api_period,
+                                custom_start=custom_start,
+                                custom_end=custom_end,
+                            )
+                            if sdk_data["installs"] > 0:
+                                result["instalacoes_sdk"] = sdk_data["installs"]
+                                result["_sdk_source"] = sdk_data["source"]
+                                result["_sdk_event_types"] = sdk_data["event_types"]
+                        except Exception:
+                            pass
 
                     result["_data_source"] = "real"
                     result["_filter_applied"] = campaign_filter
@@ -230,12 +220,20 @@ class DataProvider:
                             result["alcance"] = aggregated.get("reach", result["alcance"])
                             result["frequencia"] = aggregated.get("frequency", result["frequencia"])
 
-                        result["instalacoes_total"] = self.meta_client.get_total_app_installs(
-                            date_range=api_period,
-                            campaign_name_filter=None,
-                            custom_start=custom_start,
-                            custom_end=custom_end,
-                        )
+                        # Se não encontrou install events nas actions, tentar via SDK endpoint
+                        if result.get("instalacoes_sdk", 0) == 0 and self.meta_client.app_id:
+                            try:
+                                sdk_data = self.meta_client.get_sdk_installs(
+                                    date_range=api_period,
+                                    custom_start=custom_start,
+                                    custom_end=custom_end,
+                                )
+                                if sdk_data["installs"] > 0:
+                                    result["instalacoes_sdk"] = sdk_data["installs"]
+                                    result["_sdk_source"] = sdk_data["source"]
+                                    result["_sdk_event_types"] = sdk_data["event_types"]
+                            except Exception:
+                                pass
 
                         result["_data_source"] = "real_no_filter"
                         result["_filter_applied"] = None
@@ -299,13 +297,8 @@ class DataProvider:
             # Nota: Alcance e Frequência serão sobrescritos pelo get_aggregated_insights
             # pois não podem ser somados (são métricas de usuários únicos)
             actions_series = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
-            log_all_action_types(actions_series)
-
-            # Collect diagnostics for UI display
-            diagnostics = collect_action_type_diagnostics(actions_series)
-
-            # Store clicks: use STORE_CLICK_ACTION_TYPES (consistent with meta_funnel.py)
-            store_clicks, has_store_clicks = sum_actions_by_types(actions_series, STORE_CLICK_ACTION_TYPES)
+            found_action_types = collect_all_action_types(actions_series)
+            store_clicks, has_store_clicks = sum_actions_by_types(actions_series, store_click_actions)
             if not has_store_clicks:
                 # Fallback: try outbound_click specifically
                 store_clicks, has_outbound = sum_actions_by_types(actions_series, {"outbound_click"})
@@ -364,8 +357,7 @@ class DataProvider:
                 "delta_ctr": 0,
                 "delta_cpc": 0,
                 "delta_cpm": 0,
-                "_sdk_diagnostics": diagnostics,
-                "_fetch_timestamp": datetime.now().isoformat(),
+                "_action_types_found": found_action_types,
             }
         except Exception as e:
             logger.error(f"Erro ao processar insights Meta: {e}")
@@ -559,7 +551,7 @@ class DataProvider:
             "delta_cpc": 0, "delta_cpm": 0,
             "_data_source": "empty", "_filter_applied": None,
             "_requested_filter": None, "_available_campaigns": [],
-            "_sdk_diagnostics": {}, "_fetch_timestamp": None,
+            "_action_types_found": {},
         }
 
     def _empty_metrics(self):
@@ -1978,9 +1970,12 @@ kpi_cards = [
     {"icon": "🎯", "label": "Taxa de cliques", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
     {"icon": "💡", "label": "Custo por clique", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
     {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
-    {"icon": "📲", "label": "Instalações (SDK)", "value": f"{meta_data.get('instalacoes_sdk', 0):,.0f}", "delta": 0, "suffix": ""},
-    {"icon": "🧭", "label": "Instalações atribuídas (Meta Ads)", "value": f"{meta_data.get('instalacoes_total', 0):,.0f}", "delta": 0, "suffix": ""},
 ]
+
+# Só mostrar KPIs de instalação se houver dados (evita exibir "0" sem contexto)
+_sdk_installs = meta_data.get('instalacoes_sdk', 0) or 0
+if _sdk_installs > 0:
+    kpi_cards.append({"icon": "📲", "label": "Instalações (SDK)", "value": f"{_sdk_installs:,.0f}", "delta": 0, "suffix": ""})
 
 kpi_cards_html = "\n".join(
     build_kpi_card(
@@ -2257,18 +2252,55 @@ with cols[0]:
 
 with cols[1]:
     st.markdown('<div class="chart-card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title"><div class="section-icon">V</div> Caminho do usuário até a instalação</div>', unsafe_allow_html=True)
 
-    # Funil 100% Meta: todos os steps vêm do Meta Ads Insights / SDK
-    store_clicks_meta = int(meta_data.get("store_clicks_meta", 0) or 0)
-    instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
-    funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app (SDK)"]
-    funnel_values = [
-        int(meta_data.get('impressoes', 0) or 0),
-        int(meta_data.get('cliques_link', 0) or 0),
-        int(store_clicks_meta or 0),
-        int(instalacoes or 0)
-    ]
+    # Determinar modo do funil com base nos dados disponíveis
+    _has_install_events = int(meta_data.get("instalacoes_sdk", 0) or 0) > 0
+    _has_store_clicks = int(meta_data.get("store_clicks_meta", 0) or 0) > 0
+
+    if _has_install_events or _has_store_clicks:
+        # Funil de instalação: campanha de app install
+        st.markdown('<div class="section-title"><div class="section-icon">V</div> Caminho do usuário até a instalação</div>', unsafe_allow_html=True)
+        store_clicks_meta = int(meta_data.get("store_clicks_meta", 0) or 0)
+        instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
+        funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app (SDK)"]
+        funnel_values = [
+            int(meta_data.get('impressoes', 0) or 0),
+            int(meta_data.get('cliques_link', 0) or 0),
+            store_clicks_meta,
+            instalacoes,
+        ]
+        funnel_caption = "Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app"
+    else:
+        # Funil de landing page: campanha de tráfego/conversão no site
+        st.markdown('<div class="section-title"><div class="section-icon">V</div> Caminho do usuário até a ação no site</div>', unsafe_allow_html=True)
+
+        # Buscar primary_cta_click do GA4 events
+        _cta_clicks = 0
+        try:
+            _events_df = data_provider.get_events_data(
+                period=selected_period,
+                custom_start=custom_start_str,
+                custom_end=custom_end_str,
+                campaign_filter=ga4_campaign_filter,
+            )
+            if not _events_df.empty and "Nome do Evento" in _events_df.columns:
+                _cta_rows = _events_df[_events_df["Nome do Evento"].str.contains("cta_click|primary_cta", case=False, na=False)]
+                if not _cta_rows.empty:
+                    # Extrair número da string formatada "10 (0.23%)"
+                    raw = str(_cta_rows.iloc[0]["Contagem de Eventos"])
+                    _cta_clicks = int(raw.replace(".", "").split("(")[0].strip().split()[0]) if raw else 0
+        except Exception:
+            _cta_clicks = 0
+
+        ga4_sessions = int(ga4_data.get('sessoes', 0) or 0)
+        funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Visitaram o site", "Clicaram no CTA"]
+        funnel_values = [
+            int(meta_data.get('impressoes', 0) or 0),
+            int(meta_data.get('cliques_link', 0) or 0),
+            ga4_sessions,
+            _cta_clicks,
+        ]
+        funnel_caption = "Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até clicar no CTA do site"
 
     funnel_df = pd.DataFrame({"Etapa": funnel_labels, "Valor": funnel_values})
     fig_funnel = go.Figure(go.Funnel(
@@ -2290,12 +2322,45 @@ with cols[1]:
         font=dict(color=LIA["text_light"])
     )
     st.plotly_chart(fig_funnel, use_container_width=True)
-    st.caption("Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app")
-    if instalacoes == 0 and _data_source in ("real", "real_no_filter"):
-        if _proxy_installs > 0:
-            st.caption(f"Install veio 0 — usando proxy activate_app: {_proxy_installs}. Veja diagnóstico acima.")
+    st.caption(funnel_caption)
+
+    # Diagnóstico: mostrar aviso quando não há install events e estamos em modo landing page
+    if not _has_install_events and meta_data.get("_data_source") in ("real", "real_no_filter"):
+        _no_app_id = not getattr(data_provider, 'meta_client', None) or not getattr(data_provider.meta_client, 'app_id', None)
+        action_types = meta_data.get("_action_types_found", {})
+        install_related = {k: v for k, v in action_types.items()
+                          if "install" in k.lower() or "app" in k.lower()}
+        if install_related:
+            types_str = ", ".join(f"{k}: {v}" for k, v in install_related.items())
+            st.info(
+                f"A API retornou eventos de app/install que **não são reconhecidos** "
+                f"pelo dashboard: {types_str}. "
+                f"Entre em contato com o suporte para mapear esses eventos."
+            )
+        elif _no_app_id:
+            with st.expander("Dados de instalação SDK indisponíveis"):
+                st.markdown(
+                    "Para mostrar instalações do app via Meta SDK, configure a variável "
+                    "`META_APP_ID` no Streamlit secrets com o **App ID** do Meta.\n\n"
+                    "Você encontra o App ID em:\n"
+                    "**Meta for Developers** > Seu app > Settings > Basic > App ID\n\n"
+                    "Enquanto isso, o funil mostra o caminho do usuário até o **CTA no site**."
+                )
         else:
-            st.caption("⚠ Nenhuma instalação SDK detectada. Veja 'Diagnóstico de eventos SDK' acima.")
+            with st.expander("Sem instalações SDK detectadas"):
+                st.markdown(
+                    "O `META_APP_ID` está configurado, mas a Meta API **não retornou "
+                    "eventos de instalação**. Possíveis causas:\n\n"
+                    "1. O Meta SDK no app **não está enviando** eventos `fb_mobile_install`\n"
+                    "2. O App ID configurado não corresponde ao app correto\n"
+                    "3. As instalações existem mas não estão **atribuídas** aos anúncios\n\n"
+                    "**Ação recomendada:** Verifique no Meta Events Manager > Test Events "
+                    "se o evento `Install` aparece."
+                )
+            if action_types:
+                with st.expander("Tipos de ação retornados pela Meta API"):
+                    for atype, val in sorted(action_types.items()):
+                        st.text(f"  {atype}: {val:,}")
 
     st.markdown('</div>', unsafe_allow_html=True)
 

@@ -198,6 +198,7 @@ class DataProvider:
                                 date_range=api_period,
                                 custom_start=custom_start,
                                 custom_end=custom_end,
+                                campaign_name_filter=campaign_filter,
                             )
                             if sdk_data["installs"] > 0:
                                 result["instalacoes_sdk"] = sdk_data["installs"]

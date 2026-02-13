@@ -16,7 +16,17 @@ from meta_integration import MetaAdsIntegration
 
 # Importar AIAgent para análise de IA
 from ai_agent import AIAgent
-from meta_funnel import INSTALL_ACTION_TYPES, build_meta_funnel, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
+from meta_funnel import ACTIVATE_APP_ACTION_TYPES, INSTALL_ACTION_TYPES, STORE_CLICK_ACTION_TYPES, build_meta_funnel, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
+
+# =============================================================================
+# CONFIGURACAO DE LOGGING
+# =============================================================================
+logger = logging.getLogger(__name__)
+if not logger.handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s:%(name)s:%(message)s"
+    )
 
 def _now_sp() -> str:
     """Return current time as string in America/Sao_Paulo (UTC-3) without pytz."""
@@ -298,7 +308,7 @@ class DataProvider:
             # pois não podem ser somados (são métricas de usuários únicos)
             actions_series = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
             found_action_types = collect_all_action_types(actions_series)
-            store_clicks, has_store_clicks = sum_actions_by_types(actions_series, store_click_actions)
+            store_clicks, has_store_clicks = sum_actions_by_types(actions_series, STORE_CLICK_ACTION_TYPES)
             if not has_store_clicks:
                 # Fallback: try outbound_click specifically
                 store_clicks, has_outbound = sum_actions_by_types(actions_series, {"outbound_click"})

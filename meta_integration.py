@@ -560,7 +560,10 @@ class MetaAdsIntegration:
             
             # Aplicar filtro de campanha se fornecido
             if campaign_name_filter:
-                data = [row for row in data if campaign_name_filter.lower() in row.get("campaign_name", "").lower()]
+                # Exclude rows without campaign_name and filter by name
+                data = [row for row in data 
+                       if row.get("campaign_name") and 
+                       campaign_name_filter.lower() in row.get("campaign_name", "").lower()]
             
             install_types = {
                 "app_install", "mobile_app_install", "omni_app_install",
@@ -581,7 +584,7 @@ class MetaAdsIntegration:
 
             if total > 0:
                 result["installs"] = total
-                result["source"] = "ads_insights_campaign" if campaign_name_filter else "ads_insights_account"
+                result["source"] = "ads_insights_campaign"
                 result["event_types"] = found_types
                 return result
 

@@ -97,7 +97,8 @@ def test_get_sdk_installs_without_filter_counts_all(mock_meta_client):
         
         # Should count all installs (15 + 25 = 40)
         assert result["installs"] == 40
-        assert result["source"] == "ads_insights_account"
+        # Source is now always ads_insights_campaign since we use campaign level
+        assert result["source"] == "ads_insights_campaign"
 
 
 def test_get_sdk_installs_respects_date_range(mock_meta_client):
@@ -203,3 +204,48 @@ def test_get_total_app_installs_passes_campaign_filter(mock_meta_client):
         
         # Should return the filtered count
         assert total == 30
+
+
+def test_get_sdk_installs_excludes_campaigns_without_names(mock_meta_client):
+    """Test that campaigns without names are excluded when filter is applied"""
+    
+    mock_response_data = {
+        "data": [
+            {
+                "campaign_name": "LIA Campaign",
+                "actions": [
+                    {"action_type": "mobile_app_install", "value": "10"}
+                ]
+            },
+            {
+                # Campaign without name field
+                "actions": [
+                    {"action_type": "mobile_app_install", "value": "5"}
+                ]
+            },
+            {
+                "campaign_name": "",  # Empty campaign name
+                "actions": [
+                    {"action_type": "mobile_app_install", "value": "3"}
+                ]
+            }
+        ]
+    }
+    
+    with patch('requests.get') as mock_get:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_response_data
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+        
+        # Test with campaign filter
+        result = mock_meta_client.get_sdk_installs(
+            date_range="last_7d",
+            campaign_name_filter="LIA"
+        )
+        
+        # Should only count the campaign with "LIA" in the name (10)
+        # Should exclude campaigns without names or with empty names
+        assert result["installs"] == 10
+        assert result["source"] == "ads_insights_campaign"

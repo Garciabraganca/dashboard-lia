@@ -560,31 +560,58 @@ class MetaAdsIntegration:
         except Exception as e:
             return {"status": "exception", "error_message": str(e)}
 
-    def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> int:
+    def get_total_app_installs(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> int:
         """
-        Obtém o total de instalações do app (incluindo orgânicas e atribuídas).
-        
-        NOTA IMPORTANTE: Esta função atualmente retorna 0 porque requer integração com a 
-        Conversions API ou Events Manager do Meta. A API de Ads Insights só retorna 
-        instalações atribuídas aos anúncios.
-        
-        Para implementar:
-        1. Configure a Conversions API para enviar eventos de instalação
-        2. Armazene esses eventos em um banco de dados
-        3. Conte os eventos de instalação no período especificado
-        
-        Alternativa:
-        - Integrar com a API de App Events (legacy) se ainda disponível
-        - Usar a Graph API para consultar eventos do app dataset
-        
+        Obtém o total de instalações do app atribuídas aos anúncios,
+        extraindo do campo 'actions' da API de Insights.
+
         Args:
             date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
+            campaign_name_filter: Nome da campanha para filtrar (opcional)
             custom_start: Data de início personalizada (YYYY-MM-DD)
             custom_end: Data de fim personalizada (YYYY-MM-DD)
-        
+
         Returns:
-            Total de instalações no período (atualmente sempre 0)
+            Total de instalações no período
         """
-        # TODO: Implementar integração com Conversions API / Events Manager
-        # Por enquanto retorna 0 pois não há integração implementada
-        return 0
+        from meta_funnel import INSTALL_ACTION_TYPES
+
+        try:
+            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
+            url = f"{self.base_url}/{self.ad_account_id}/insights"
+            params = {
+                "fields": "actions",
+                "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
+                "level": "account",
+                "action_breakdowns": "action_type",
+                "access_token": self.access_token,
+            }
+
+            if campaign_name_filter:
+                params["level"] = "campaign"
+
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code != 200:
+                return 0
+
+            data = response.json()
+            insights = data.get("data", [])
+
+            total = 0
+            for insight in insights:
+                if campaign_name_filter:
+                    cname = insight.get("campaign_name", "")
+                    if campaign_name_filter.lower() not in cname.lower():
+                        continue
+                for action in insight.get("actions", []):
+                    atype = (action.get("action_type") or "").strip()
+                    if atype in INSTALL_ACTION_TYPES:
+                        try:
+                            total += int(float(action.get("value", 0)))
+                        except (TypeError, ValueError):
+                            pass
+            return total
+
+        except Exception as e:
+            print(f"Erro ao obter total de instalações: {e}")
+            return 0

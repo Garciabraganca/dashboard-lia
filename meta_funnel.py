@@ -12,9 +12,11 @@ STORE_CLICK_ACTION_TYPES = {
     "mobile_store_click",
     "app_install_store_click",
     "outbound_click",
+    "google_play_click",
 }
 
 INSTALL_ACTION_TYPES = {
+    # Classic action types
     "app_install",
     "mobile_app_install",
     "omni_app_install",
@@ -30,9 +32,14 @@ INSTALL_ACTION_TYPES = {
     "offsite_conversion.fb_mobile_first_open",
     "fb_mobile_first_open",
     "omni_app_install_event",
+    "app_custom_event.fb_mobile_first_open",
+    # Generic / short-form variants seen in some pipelines
+    "first_open",
+    "install",
 }
 
 ACTIVATE_APP_ACTION_TYPES = {
+    "activate_app",
     "app_custom_event.fb_mobile_activate_app",
     "offsite_conversion.fb_mobile_activate_app",
     "fb_mobile_activate_app",

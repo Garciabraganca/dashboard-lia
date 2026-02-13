@@ -21,6 +21,7 @@ class Config:
     # Meta Ads
     META_ACCESS_TOKEN: Optional[str] = os.getenv("META_ACCESS_TOKEN")
     META_AD_ACCOUNT_ID: str = os.getenv("META_AD_ACCOUNT_ID", "3937210423214443")
+    META_APP_ID: Optional[str] = os.getenv("META_APP_ID")
 
     # Google Analytics 4
     GA4_PROPERTY_ID: str = os.getenv("GA4_PROPERTY_ID", "487806406")
@@ -79,6 +80,14 @@ class Config:
             return env_value
 
         return cls._get_streamlit_secret("META_AD_ACCOUNT_ID", cls.META_AD_ACCOUNT_ID)
+
+    @classmethod
+    def get_meta_app_id(cls) -> Optional[str]:
+        """Obtém o App ID do Meta (para consultas de eventos do app)"""
+        env_value = os.getenv("META_APP_ID")
+        if env_value:
+            return env_value
+        return cls._get_streamlit_secret("META_APP_ID")
 
     @classmethod
     def get_ga4_property_id(cls) -> str:

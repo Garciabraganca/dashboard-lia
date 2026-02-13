@@ -499,6 +499,67 @@ class MetaAdsIntegration:
             print(f"Erro ao obter insights de criativos: {str(e)}")
             return pd.DataFrame()
 
+    def get_sdk_events_diagnostic(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> dict:
+        """
+        Diagnostic method that queries the Meta API and returns detailed info
+        about what action types are available in the response.
+        Useful for debugging missing SDK events.
+        """
+        try:
+            start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
+            url = f"{self.base_url}/{self.ad_account_id}/insights"
+            params = {
+                "fields": "campaign_name,actions",
+                "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
+                "level": "campaign",
+                "action_breakdowns": "action_type",
+                "limit": "500",
+                "access_token": self.access_token,
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+
+            if response.status_code != 200:
+                error_data = response.json() if response.text else {}
+                error = error_data.get("error", {})
+                return {
+                    "status": "error",
+                    "error_code": error.get("code", "N/A"),
+                    "error_message": error.get("message", "Unknown error"),
+                    "http_status": response.status_code,
+                }
+
+            data = response.json()
+            insights = data.get("data", [])
+
+            all_action_types: dict = {}
+            campaigns_with_actions = []
+
+            for insight in insights:
+                campaign = insight.get("campaign_name", "unknown")
+                actions = insight.get("actions", [])
+                if actions:
+                    campaigns_with_actions.append(campaign)
+                    for action in actions:
+                        atype = action.get("action_type", "unknown")
+                        try:
+                            val = float(action.get("value", 0) or 0)
+                        except (TypeError, ValueError):
+                            val = 0
+                        all_action_types[atype] = all_action_types.get(atype, 0) + val
+
+            return {
+                "status": "ok",
+                "date_range": {"since": start_date_str, "until": end_date_str},
+                "total_insights_rows": len(insights),
+                "campaigns_with_actions": list(set(campaigns_with_actions)),
+                "all_action_types": {k: int(v) for k, v in sorted(all_action_types.items())},
+                "total_action_types_found": len(all_action_types),
+            }
+
+        except Exception as e:
+            return {"status": "exception", "error_message": str(e)}
+
     def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> int:
         """
         Obtém o total de instalações do app (incluindo orgânicas e atribuídas).

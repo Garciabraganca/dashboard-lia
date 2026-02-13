@@ -1,5 +1,7 @@
 """
-Tests for Meta SDK install counting with campaign filtering
+Tests for Meta SDK install counting
+Updated to reflect new behavior where SDK installs come from App Events API
+(showing total real installs, not just attributed ones)
 """
 import pytest
 from unittest.mock import Mock, patch
@@ -16,30 +18,15 @@ def mock_meta_client():
     )
 
 
-def test_get_sdk_installs_filters_by_campaign(mock_meta_client):
-    """Test that SDK installs are filtered by campaign when filter is provided"""
+def test_get_sdk_installs_from_app_event_aggregations(mock_meta_client):
+    """Test that SDK installs are fetched from app_event_aggregations as primary source"""
     
-    # Mock API response with multiple campaigns
+    # Mock API response from app_event_aggregations endpoint
     mock_response_data = {
         "data": [
-            {
-                "campaign_name": "LIA App Install Campaign",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "15"}
-                ]
-            },
-            {
-                "campaign_name": "Other Campaign",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "25"}
-                ]
-            },
-            {
-                "campaign_name": "LIA Remarketing",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "10"}
-                ]
-            }
+            {"timestamp": "2024-01-01", "value": 50},
+            {"timestamp": "2024-01-02", "value": 75},
+            {"timestamp": "2024-01-03", "value": 28},
         ]
     }
     
@@ -47,72 +34,53 @@ def test_get_sdk_installs_filters_by_campaign(mock_meta_client):
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = mock_response_data
-        mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
         
-        # Test with campaign filter for "LIA"
+        # Call get_sdk_installs
+        result = mock_meta_client.get_sdk_installs(date_range="last_7d")
+        
+        # Should sum all values from app_event_aggregations (50 + 75 + 28 = 153)
+        assert result["installs"] == 153
+        assert result["source"] == "app_event_aggregations"
+        assert result["event_types"] == ["fb_mobile_install"]
+        
+        # Verify the correct endpoint was called
+        call_args = mock_get.call_args
+        assert "/app_event_aggregations" in call_args[0][0]
+
+
+def test_get_sdk_installs_ignores_campaign_filter(mock_meta_client):
+    """Test that campaign filter is ignored for SDK installs (returns total)"""
+    
+    mock_response_data = {
+        "data": [
+            {"timestamp": "2024-01-01", "value": 100},
+        ]
+    }
+    
+    with patch('requests.get') as mock_get:
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_response_data
+        mock_get.return_value = mock_response
+        
+        # Call with campaign filter - should be ignored
         result = mock_meta_client.get_sdk_installs(
             date_range="last_7d",
             campaign_name_filter="LIA"
         )
         
-        # Should only count installs from campaigns containing "LIA" (15 + 10 = 25)
-        assert result["installs"] == 25
-        assert result["source"] == "ads_insights_campaign"
-        assert "mobile_app_install" in result["event_types"]
-
-
-def test_get_sdk_installs_without_filter_counts_all(mock_meta_client):
-    """Test that SDK installs count all campaigns when no filter is provided"""
-    
-    mock_response_data = {
-        "data": [
-            {
-                "campaign_name": "Campaign A",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "15"}
-                ]
-            },
-            {
-                "campaign_name": "Campaign B",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "25"}
-                ]
-            }
-        ]
-    }
-    
-    with patch('requests.get') as mock_get:
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = mock_response_data
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
-        
-        # Test without campaign filter
-        result = mock_meta_client.get_sdk_installs(
-            date_range="last_7d",
-            campaign_name_filter=None
-        )
-        
-        # Should count all installs (15 + 25 = 40)
-        assert result["installs"] == 40
-        # Source is now always ads_insights_campaign since we use campaign level
-        assert result["source"] == "ads_insights_campaign"
+        # Should return total installs, campaign filter is ignored
+        assert result["installs"] == 100
+        assert result["source"] == "app_event_aggregations"
 
 
 def test_get_sdk_installs_respects_date_range(mock_meta_client):
     """Test that date range is properly applied in the API request"""
     
-    # Mock response with data to prevent fallback to activities endpoint
     mock_response_data = {
         "data": [
-            {
-                "campaign_name": "Test Campaign",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "10"}
-                ]
-            }
+            {"timestamp": "2024-01-15", "value": 42},
         ]
     }
     
@@ -120,7 +88,6 @@ def test_get_sdk_installs_respects_date_range(mock_meta_client):
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = mock_response_data
-        mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
         
         # Call with specific date range
@@ -142,18 +109,96 @@ def test_get_sdk_installs_respects_date_range(mock_meta_client):
         assert time_range["until"] == "2024-01-31"
 
 
-def test_get_sdk_installs_uses_campaign_level(mock_meta_client):
-    """Test that API request uses campaign level for proper filtering"""
+def test_get_sdk_installs_fallback_to_activities(mock_meta_client):
+    """Test fallback to activities endpoint when aggregations fails"""
     
-    # Mock response with data to prevent fallback
-    mock_response_data = {
+    # Mock activities response
+    mock_activities_data = {
+        "data": [
+            {"event": "fb_mobile_install"},
+            {"event": "fb_mobile_install"},
+            {"event": "fb_mobile_install"},
+        ]
+    }
+    
+    with patch('requests.get') as mock_get:
+        # First call (aggregations) returns 404
+        # Second call (activities) returns data
+        mock_response_agg = Mock()
+        mock_response_agg.status_code = 404
+        
+        mock_response_act = Mock()
+        mock_response_act.status_code = 200
+        mock_response_act.json.return_value = mock_activities_data
+        
+        mock_get.side_effect = [mock_response_agg, mock_response_act]
+        
+        result = mock_meta_client.get_sdk_installs(date_range="last_7d")
+        
+        # Should use activities fallback and count events
+        assert result["installs"] == 3
+        assert result["source"] == "app_activities"
+
+
+def test_get_sdk_installs_fallback_to_ads_insights(mock_meta_client):
+    """Test final fallback to ads insights when app events fail"""
+    
+    # Mock ads insights response (final fallback)
+    mock_ads_data = {
         "data": [
             {
-                "campaign_name": "Test Campaign",
                 "actions": [
-                    {"action_type": "mobile_app_install", "value": "5"}
+                    {"action_type": "mobile_app_install", "value": "4"}
                 ]
             }
+        ]
+    }
+    
+    with patch('requests.get') as mock_get:
+        # First call (aggregations) returns 404
+        # Second call (activities) returns 404
+        # Third call (ads insights) returns data
+        mock_response_agg = Mock()
+        mock_response_agg.status_code = 404
+        
+        mock_response_act = Mock()
+        mock_response_act.status_code = 404
+        
+        mock_response_ads = Mock()
+        mock_response_ads.status_code = 200
+        mock_response_ads.json.return_value = mock_ads_data
+        mock_response_ads.raise_for_status.return_value = None
+        
+        mock_get.side_effect = [mock_response_agg, mock_response_act, mock_response_ads]
+        
+        result = mock_meta_client.get_sdk_installs(date_range="last_7d")
+        
+        # Should use ads insights fallback (attributed installs only)
+        assert result["installs"] == 4
+        assert result["source"] == "ads_insights_fallback"
+
+
+def test_get_sdk_installs_returns_zero_when_no_app_id(mock_meta_client):
+    """Test that no app_id returns zero installs"""
+    # Create client without app_id
+    client_no_app = MetaAdsIntegration(
+        access_token="test_token",
+        ad_account_id="123456789",
+        app_id=None
+    )
+    
+    result = client_no_app.get_sdk_installs(date_range="last_7d")
+    
+    assert result["installs"] == 0
+    assert result["source"] == "no_app_id"
+
+
+def test_get_total_app_installs(mock_meta_client):
+    """Test that get_total_app_installs returns the install count"""
+    
+    mock_response_data = {
+        "data": [
+            {"timestamp": "2024-01-01", "value": 30},
         ]
     }
     
@@ -161,91 +206,10 @@ def test_get_sdk_installs_uses_campaign_level(mock_meta_client):
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = mock_response_data
-        mock_response.raise_for_status.return_value = None
         mock_get.return_value = mock_response
         
-        # Call get_sdk_installs
-        mock_meta_client.get_sdk_installs(date_range="last_7d")
+        # Call get_total_app_installs
+        total = mock_meta_client.get_total_app_installs(date_range="last_7d")
         
-        # Verify the API was called with level="campaign"
-        call_args = mock_get.call_args
-        params = call_args[1]["params"]
-        
-        assert params["level"] == "campaign"
-        assert "campaign_name" in params["fields"]
-
-
-def test_get_total_app_installs_passes_campaign_filter(mock_meta_client):
-    """Test that get_total_app_installs properly passes campaign filter"""
-    
-    mock_response_data = {
-        "data": [
-            {
-                "campaign_name": "Test Campaign",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "30"}
-                ]
-            }
-        ]
-    }
-    
-    with patch('requests.get') as mock_get:
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = mock_response_data
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
-        
-        # Call get_total_app_installs with campaign filter
-        total = mock_meta_client.get_total_app_installs(
-            date_range="last_7d",
-            campaign_name_filter="Test"
-        )
-        
-        # Should return the filtered count
+        # Should return the install count
         assert total == 30
-
-
-def test_get_sdk_installs_excludes_campaigns_without_names(mock_meta_client):
-    """Test that campaigns without names are excluded when filter is applied"""
-    
-    mock_response_data = {
-        "data": [
-            {
-                "campaign_name": "LIA Campaign",
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "10"}
-                ]
-            },
-            {
-                # Campaign without name field
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "5"}
-                ]
-            },
-            {
-                "campaign_name": "",  # Empty campaign name
-                "actions": [
-                    {"action_type": "mobile_app_install", "value": "3"}
-                ]
-            }
-        ]
-    }
-    
-    with patch('requests.get') as mock_get:
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = mock_response_data
-        mock_response.raise_for_status.return_value = None
-        mock_get.return_value = mock_response
-        
-        # Test with campaign filter
-        result = mock_meta_client.get_sdk_installs(
-            date_range="last_7d",
-            campaign_name_filter="LIA"
-        )
-        
-        # Should only count the campaign with "LIA" in the name (10)
-        # Should exclude campaigns without names or with empty names
-        assert result["installs"] == 10
-        assert result["source"] == "ads_insights_campaign"

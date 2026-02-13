@@ -523,14 +523,21 @@ class MetaAdsIntegration:
 
     def get_sdk_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_name_filter: str = None) -> dict:
         """
-        Obtém instalações do app via Meta SDK App Insights endpoint.
+        Obtém instalações do app via Meta SDK - total de instalações reais do SDK.
+        Prioriza dados do SDK (App Events) para mostrar total real de instalações,
+        não apenas as atribuídas a anúncios.
+        
+        IMPORTANTE: Este método retorna o total de instalações do SDK no período,
+        não instalações por campanha. O parâmetro campaign_name_filter é ignorado
+        pois eventos do SDK não são vinculados a campanhas específicas.
+        
         Requer META_APP_ID configurado.
 
         Args:
             date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
             custom_start: Data de início personalizada (YYYY-MM-DD)
             custom_end: Data de fim personalizada (YYYY-MM-DD)
-            campaign_name_filter: Nome da campanha para filtrar (opcional)
+            campaign_name_filter: IGNORADO - SDK installs são totais, não por campanha
 
         Returns:
             Dict com chaves: installs (int), source (str), event_types (list)
@@ -543,30 +550,62 @@ class MetaAdsIntegration:
         try:
             start_str, end_str = self._parse_date_range(date_range, custom_start, custom_end)
 
-            # Buscar via ad account insights com action_type filtrado
-            # Use nível de campanha para permitir filtragem por campanha
+            # PRIMÁRIO: Buscar instalações reais do SDK via app_event_aggregations
+            # Este endpoint retorna o TOTAL de instalações do SDK (como no Events Manager)
+            url = f"{self.base_url}/{self.app_id}/app_event_aggregations"
+            params = {
+                "aggregation_period": "day",
+                "time_range": json.dumps({"since": start_str, "until": end_str}),
+                "event_name": "fb_mobile_install",
+                "access_token": self.access_token,
+            }
+            response = requests.get(url, params=params)
+            
+            if response.status_code == 200:
+                data = response.json().get("data", [])
+                # Somar todas as instalações do período
+                total_installs = 0
+                for day_data in data:
+                    total_installs += int(day_data.get("value", 0))
+                
+                if total_installs > 0:
+                    result["installs"] = total_installs
+                    result["source"] = "app_event_aggregations"
+                    result["event_types"] = ["fb_mobile_install"]
+                    return result
+
+            # FALLBACK 1: Tentar buscar via activities se aggregations falhar
+            url = f"{self.base_url}/{self.app_id}/activities"
+            params = {
+                "event_name": "fb_mobile_install",
+                "since": start_str,
+                "until": end_str,
+                "access_token": self.access_token,
+            }
+            response = requests.get(url, params=params)
+            if response.status_code == 200:
+                events = response.json().get("data", [])
+                if events:
+                    result["installs"] = len(events)
+                    result["source"] = "app_activities"
+                    result["event_types"] = ["fb_mobile_install"]
+                    return result
+
+            # FALLBACK 2: Como último recurso, usar Ads Insights (instalações atribuídas)
+            # NOTA: Este método retorna apenas instalações ATRIBUÍDAS a anúncios,
+            # não o total real de instalações do SDK
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
-                "fields": "actions,campaign_name",
+                "fields": "actions",
                 "time_range": json.dumps({"since": start_str, "until": end_str}),
                 "action_breakdowns": "action_type",
-                "level": "campaign",  # Alterado de "account" para "campaign" para permitir filtragem
+                "level": "account",
                 "access_token": self.access_token,
             }
             response = requests.get(url, params=params)
             response.raise_for_status()
 
             data = response.json().get("data", [])
-            
-            # Aplicar filtro de campanha se fornecido
-            if campaign_name_filter:
-                # Exclude rows without campaign_name and filter by name
-                filtered_data = []
-                for row in data:
-                    campaign_name = row.get("campaign_name")
-                    if campaign_name and campaign_name_filter.lower() in campaign_name.lower():
-                        filtered_data.append(row)
-                data = filtered_data
             
             install_types = {
                 "app_install", "mobile_app_install", "omni_app_install",
@@ -587,26 +626,8 @@ class MetaAdsIntegration:
 
             if total > 0:
                 result["installs"] = total
-                result["source"] = "ads_insights_campaign"
+                result["source"] = "ads_insights_fallback"
                 result["event_types"] = found_types
-                return result
-
-            # Fallback: tentar buscar eventos diretos do app
-            # Nota: este endpoint não suporta filtragem por campanha
-            url = f"{self.base_url}/{self.app_id}/activities"
-            params = {
-                "event_name": "fb_mobile_install",
-                "since": start_str,
-                "until": end_str,
-                "access_token": self.access_token,
-            }
-            response = requests.get(url, params=params)
-            if response.status_code == 200:
-                events = response.json().get("data", [])
-                if events:
-                    result["installs"] = len(events)
-                    result["source"] = "app_activities"
-                    result["event_types"] = ["fb_mobile_install"]
 
             return result
 

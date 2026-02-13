@@ -14,8 +14,12 @@ from config import Config
 from ga_integration import GA4Integration
 from meta_integration import MetaAdsIntegration
 
-# Importar AIAgent para análise de IA
-from ai_agent import AIAgent
+# Importar AIAgent para análise de IA (opcional - não quebra se não disponível)
+try:
+    from ai_agent import AIAgent
+except Exception as e:
+    logger.warning(f"AIAgent não disponível: {e}")
+    AIAgent = None
 from meta_funnel import ACTIVATE_APP_ACTION_TYPES, INSTALL_ACTION_TYPES, STORE_CLICK_ACTION_TYPES, build_meta_funnel, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
 # =============================================================================
@@ -1840,8 +1844,16 @@ if st.session_state.show_integration_settings:
 # =============================================================================
 st.markdown('<div class="section-title"><div class="section-icon">🤖</div> Análise com IA</div>', unsafe_allow_html=True)
 
-# Verificar se a API key está disponível
-if Config.validate_openai_credentials():
+# Verificar se a API key e AIAgent estão disponíveis
+if AIAgent is None:
+    st.markdown(f'''
+    <div class="glass-card" style="padding: 20px; text-align: center;">
+        <p style="color: {LIA["text_muted"]}; margin: 0;">
+            ⚠️ IA Agent desativado (dependência OpenAI indisponível).
+        </p>
+    </div>
+    ''', unsafe_allow_html=True)
+elif Config.validate_openai_credentials():
     # Determinar o ciclo baseado na campanha selecionada
     cycle = campanha if campanha in ["Ciclo 1", "Ciclo 2"] else "Todos os Ciclos"
 
@@ -2093,7 +2105,8 @@ if isinstance(trends_data, pd.DataFrame) and not trends_data.empty and "Data" in
 
         trend_tabs = st.tabs(["Diário", "Semanal"])
         trend_daily = trends_data.copy()
-        trend_daily["__date"] = pd.to_datetime(trend_daily["Data"], dayfirst=True, errors="coerce")
+        # Use explicit format to avoid parsing warnings (Data is in format "dd/mm")
+        trend_daily["__date"] = pd.to_datetime(trend_daily["Data"], format="%d/%m", errors="coerce")
         current_year = datetime.now().year
         trend_daily["__date"] = trend_daily["__date"].apply(
             lambda value: value.replace(year=current_year) if pd.notna(value) else value

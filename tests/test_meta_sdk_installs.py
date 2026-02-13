@@ -50,7 +50,7 @@ def test_get_sdk_installs_from_app_event_aggregations(mock_meta_client):
 
 
 def test_get_sdk_installs_ignores_campaign_filter(mock_meta_client):
-    """Test that campaign filter is ignored for SDK installs (returns total)"""
+    """Test that campaign filter is ignored for SDK installs (returns total) and emits deprecation warning"""
     
     mock_response_data = {
         "data": [
@@ -64,15 +64,23 @@ def test_get_sdk_installs_ignores_campaign_filter(mock_meta_client):
         mock_response.json.return_value = mock_response_data
         mock_get.return_value = mock_response
         
-        # Call with campaign filter - should be ignored
-        result = mock_meta_client.get_sdk_installs(
-            date_range="last_7d",
-            campaign_name_filter="LIA"
-        )
-        
-        # Should return total installs, campaign filter is ignored
-        assert result["installs"] == 100
-        assert result["source"] == "app_event_aggregations"
+        # Call with campaign filter - should emit deprecation warning
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = mock_meta_client.get_sdk_installs(
+                date_range="last_7d",
+                campaign_name_filter="LIA"
+            )
+            
+            # Should return total installs, campaign filter is ignored
+            assert result["installs"] == 100
+            assert result["source"] == "app_event_aggregations"
+            
+            # Verify deprecation warning was emitted
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "campaign_name_filter" in str(w[0].message)
 
 
 def test_get_sdk_installs_respects_date_range(mock_meta_client):

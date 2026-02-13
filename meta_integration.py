@@ -3,10 +3,14 @@ Integração com Meta Ads API para obter dados de campanhas
 """
 
 import json
+import logging
 import requests
+import warnings
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 class MetaAdsIntegration:
@@ -537,11 +541,21 @@ class MetaAdsIntegration:
             date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
             custom_start: Data de início personalizada (YYYY-MM-DD)
             custom_end: Data de fim personalizada (YYYY-MM-DD)
-            campaign_name_filter: IGNORADO - SDK installs são totais, não por campanha
+            campaign_name_filter: DEPRECATED - SDK installs são totais, não por campanha
 
         Returns:
             Dict com chaves: installs (int), source (str), event_types (list)
         """
+        # Emit deprecation warning if campaign_name_filter is provided
+        if campaign_name_filter is not None:
+            warnings.warn(
+                "campaign_name_filter parameter is deprecated for get_sdk_installs() "
+                "as SDK events represent total installs, not campaign-specific attribution. "
+                "This parameter will be ignored.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+        
         result = {"installs": 0, "source": "none", "event_types": []}
         if not self.app_id:
             result["source"] = "no_app_id"
@@ -594,6 +608,11 @@ class MetaAdsIntegration:
             # FALLBACK 2: Como último recurso, usar Ads Insights (instalações atribuídas)
             # NOTA: Este método retorna apenas instalações ATRIBUÍDAS a anúncios,
             # não o total real de instalações do SDK
+            logger.warning(
+                "Falling back to Ads Insights API for SDK installs. "
+                "This will return only attributed installs, not total SDK installs. "
+                "App Event endpoints (aggregations and activities) were unavailable or returned no data."
+            )
             url = f"{self.base_url}/{self.ad_account_id}/insights"
             params = {
                 "fields": "actions",
@@ -628,6 +647,10 @@ class MetaAdsIntegration:
                 result["installs"] = total
                 result["source"] = "ads_insights_fallback"
                 result["event_types"] = found_types
+                logger.info(
+                    f"Ads Insights fallback returned {total} attributed installs. "
+                    "Note: This may be lower than total SDK installs shown in Events Manager."
+                )
 
             return result
 

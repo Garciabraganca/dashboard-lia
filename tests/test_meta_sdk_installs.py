@@ -4,7 +4,7 @@ Updated to reflect new behavior where SDK installs come from get_all_sdk_events
 which queries multiple event types via App Events API and falls back to Ads Insights.
 """
 import pytest
-from unittest.mock import Mock, patch, call
+from unittest.mock import Mock, patch
 from meta_integration import MetaAdsIntegration
 
 

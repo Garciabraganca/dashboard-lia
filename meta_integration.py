@@ -530,7 +530,8 @@ class MetaAdsIntegration:
         Consulta o endpoint app_event_aggregations para um evento específico.
 
         Returns:
-            Dict com chaves: count (int), success (bool), error (str|None)
+            Dict com chaves: count (int), success (bool), error (str|None),
+                             http_status (int|None)
         """
         url = f"{self.base_url}/{self.app_id}/app_event_aggregations"
         params = {
@@ -549,7 +550,11 @@ class MetaAdsIntegration:
                     # Handle different response formats
                     val = day_data.get("value") or day_data.get("count") or 0
                     total += int(float(val))
-                return {"count": total, "success": True, "error": None}
+                logger.debug(
+                    "app_event_aggregations for '%s': HTTP 200, entries=%d, total=%d",
+                    event_name, len(data), total,
+                )
+                return {"count": total, "success": True, "error": None, "http_status": 200}
             else:
                 error_data = response.json() if response.text else {}
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
@@ -558,10 +563,15 @@ class MetaAdsIntegration:
                     "app_event_aggregations failed for '%s': HTTP %d, code=%s, msg=%s",
                     event_name, response.status_code, error_code, error_msg,
                 )
-                return {"count": 0, "success": False, "error": f"HTTP {response.status_code}: {error_msg}"}
+                return {
+                    "count": 0,
+                    "success": False,
+                    "error": f"HTTP {response.status_code}: code={error_code} — {error_msg}",
+                    "http_status": response.status_code,
+                }
         except Exception as e:
             logger.warning("app_event_aggregations exception for '%s': %s", event_name, e)
-            return {"count": 0, "success": False, "error": str(e)}
+            return {"count": 0, "success": False, "error": str(e), "http_status": None}
 
     def get_all_sdk_events(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> dict:
         """
@@ -578,6 +588,7 @@ class MetaAdsIntegration:
                 errors: list[str] - erros encontrados durante consulta
                 install_count: int - total de instalações encontradas
                 activate_count: int - total de activate_app encontradas
+                _debug: dict - informações de diagnóstico internas
         """
         result = {
             "events": {},
@@ -585,10 +596,12 @@ class MetaAdsIntegration:
             "errors": [],
             "install_count": 0,
             "activate_count": 0,
+            "_debug": {},
         }
 
         if not self.app_id:
             result["source"] = "no_app_id"
+            result["errors"].append("META_APP_ID não configurado — eventos SDK não podem ser consultados")
             return result
 
         try:
@@ -609,14 +622,38 @@ class MetaAdsIntegration:
 
         # PRIMÁRIO: Tentar app_event_aggregations para cada evento
         aggregations_worked = False
+        agg_success_count = 0
+        agg_fail_count = 0
+        agg_empty_count = 0
+        agg_fail_statuses = set()
+
         for event_name in sdk_event_names:
             resp = self._query_app_event_aggregations(event_name, start_str, end_str)
             if resp["success"]:
                 aggregations_worked = True
+                agg_success_count += 1
                 if resp["count"] > 0:
                     result["events"][event_name] = resp["count"]
-            elif resp["error"]:
-                result["errors"].append(f"{event_name}: {resp['error']}")
+                else:
+                    agg_empty_count += 1
+            else:
+                agg_fail_count += 1
+                if resp.get("http_status"):
+                    agg_fail_statuses.add(resp["http_status"])
+                if resp["error"]:
+                    result["errors"].append(f"{event_name}: {resp['error']}")
+
+        # Store debug info for diagnostics
+        result["_debug"] = {
+            "agg_attempted": True,
+            "agg_success": agg_success_count,
+            "agg_fail": agg_fail_count,
+            "agg_empty": agg_empty_count,
+            "agg_with_data": agg_success_count - agg_empty_count,
+            "agg_fail_statuses": sorted(agg_fail_statuses),
+            "app_id": self.app_id,
+            "period": f"{start_str} to {end_str}",
+        }
 
         if aggregations_worked and result["events"]:
             result["source"] = "app_event_aggregations"
@@ -626,6 +663,28 @@ class MetaAdsIntegration:
                 "SDK events from app_event_aggregations: %s", result["events"]
             )
             return result
+
+        # Diagnóstico: se todas as chamadas retornaram 200 mas sem dados
+        if aggregations_worked and not result["events"]:
+            msg = (
+                f"app_event_aggregations: {agg_success_count} consultas retornaram HTTP 200 "
+                f"mas todas com contagem 0. O SDK pode não estar enviando eventos, "
+                f"ou o App ID ({self.app_id}) pode não ter dados no período {start_str} a {end_str}."
+            )
+            logger.warning(msg)
+            result["errors"].append(msg)
+
+        # Diagnóstico: se todas falharam (provavelmente permissão)
+        if agg_fail_count == len(sdk_event_names):
+            status_info = ", ".join(str(s) for s in sorted(agg_fail_statuses)) if agg_fail_statuses else "N/A"
+            msg = (
+                f"app_event_aggregations: todas as {agg_fail_count} consultas falharam "
+                f"(HTTP status: {status_info}). "
+                f"Verifique permissões do token e se o App ID ({self.app_id}) está correto."
+            )
+            logger.error(msg)
+            # Individual errors already appended above; add summary
+            result["errors"].append(msg)
 
         # FALLBACK: Usar Ads Insights no nível de CONTA (sem filtro de campanha)
         # para obter todos os action_types com contagens.
@@ -683,7 +742,7 @@ class MetaAdsIntegration:
                 )
             else:
                 result["errors"].append(
-                    "Account-level Ads Insights returned no SDK-related action types"
+                    "Ads Insights (fallback): nenhum action_type relacionado ao SDK encontrado"
                 )
 
         except Exception as e:

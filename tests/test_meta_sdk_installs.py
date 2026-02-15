@@ -252,3 +252,139 @@ def test_get_all_sdk_events_logs_errors(mock_meta_client):
         # Should have errors logged
         assert len(result["errors"]) > 0
         assert result["events"] == {}
+
+
+def test_get_all_sdk_events_returns_debug_info(mock_meta_client):
+    """Test that _debug diagnostics are included in the result"""
+
+    mock_responses = [
+        _make_agg_response(100),  # fb_mobile_install succeeds
+        _make_agg_response(0),    # fb_mobile_activate_app succeeds but empty
+        _make_agg_response(0, status=403),  # fb_mobile_content_view fails
+        _make_agg_response(0),    # fb_mobile_purchase succeeds but empty
+        _make_agg_response(0),    # fb_mobile_add_to_cart succeeds but empty
+        _make_agg_response(0),    # fb_mobile_complete_registration succeeds but empty
+    ]
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = mock_responses
+
+        result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+        # Should have debug info
+        assert "_debug" in result
+        debug = result["_debug"]
+        assert debug["agg_attempted"] is True
+        assert debug["agg_success"] == 5  # 5 returned HTTP 200
+        assert debug["agg_fail"] == 1     # 1 returned HTTP 403
+        assert debug["agg_empty"] == 4    # 4 returned 200 but count 0
+        assert debug["agg_with_data"] == 1  # 1 had actual data
+        assert 403 in debug["agg_fail_statuses"]
+        assert debug["app_id"] == "test_app_id"
+
+
+def test_get_all_sdk_events_no_app_id_reports_error():
+    """Test that no app_id produces an error message (not just source flag)"""
+    client = MetaAdsIntegration(
+        access_token="test_token",
+        ad_account_id="123456789",
+        app_id=None
+    )
+
+    result = client.get_all_sdk_events(date_range="last_7d")
+
+    assert result["source"] == "no_app_id"
+    assert len(result["errors"]) == 1
+    assert "META_APP_ID" in result["errors"][0]
+
+
+def test_get_all_sdk_events_all_200_empty_reports_diagnostic(mock_meta_client):
+    """Test that when all aggregations return 200 but empty data, a diagnostic error is added"""
+
+    # All 6 return HTTP 200 with empty data
+    mock_responses = [_make_agg_response(0)] * _SDK_EVENT_COUNT
+
+    # Ads insights fallback also returns nothing
+    mock_ads_response = Mock()
+    mock_ads_response.status_code = 200
+    mock_ads_response.json.return_value = {"data": []}
+    mock_ads_response.raise_for_status.return_value = None
+    mock_responses.append(mock_ads_response)
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = mock_responses
+
+        result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+        # Should report that aggregations returned 200 but no data
+        assert result["events"] == {}
+        agg_errors = [e for e in result["errors"] if "app_event_aggregations" in e]
+        assert len(agg_errors) >= 1
+        assert "contagem 0" in agg_errors[0] or "HTTP 200" in agg_errors[0]
+
+        # Debug info should reflect the scenario
+        assert result["_debug"]["agg_success"] == 6
+        assert result["_debug"]["agg_fail"] == 0
+        assert result["_debug"]["agg_empty"] == 6
+
+
+def test_get_all_sdk_events_all_403_reports_permission_error(mock_meta_client):
+    """Test that when all aggregations return 403, a clear permission error is added"""
+
+    # All 6 return HTTP 403
+    mock_responses = [_make_agg_response(0, status=403)] * _SDK_EVENT_COUNT
+
+    # Ads insights fallback also returns nothing
+    mock_ads_response = Mock()
+    mock_ads_response.status_code = 200
+    mock_ads_response.json.return_value = {"data": []}
+    mock_ads_response.raise_for_status.return_value = None
+    mock_responses.append(mock_ads_response)
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = mock_responses
+
+        result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+        # Should have per-event errors + summary error
+        assert result["events"] == {}
+        # 6 per-event errors + 1 summary + 1 fallback error
+        assert len(result["errors"]) >= 7
+        # Summary error should mention permissions
+        summary_errors = [e for e in result["errors"] if "permissões" in e.lower() or "falharam" in e.lower()]
+        assert len(summary_errors) >= 1
+
+        # Debug info
+        assert result["_debug"]["agg_fail"] == 6
+        assert result["_debug"]["agg_success"] == 0
+        assert 403 in result["_debug"]["agg_fail_statuses"]
+
+
+def test_query_app_event_aggregations_includes_http_status(mock_meta_client):
+    """Test that _query_app_event_aggregations returns http_status in response"""
+
+    # Success case
+    with patch('requests.get') as mock_get:
+        mock_get.return_value = _make_agg_response(10)
+        resp = mock_meta_client._query_app_event_aggregations("fb_mobile_install", "2024-01-01", "2024-01-07")
+        assert resp["http_status"] == 200
+        assert resp["success"] is True
+
+    # Error case
+    with patch('requests.get') as mock_get:
+        mock_get.return_value = _make_agg_response(0, status=403)
+        resp = mock_meta_client._query_app_event_aggregations("fb_mobile_install", "2024-01-01", "2024-01-07")
+        assert resp["http_status"] == 403
+        assert resp["success"] is False
+        assert "code=" in resp["error"]
+
+
+def test_query_app_event_aggregations_exception_has_no_http_status(mock_meta_client):
+    """Test that network exceptions return http_status=None"""
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = ConnectionError("Network error")
+        resp = mock_meta_client._query_app_event_aggregations("fb_mobile_install", "2024-01-01", "2024-01-07")
+        assert resp["http_status"] is None
+        assert resp["success"] is False
+        assert "Network error" in resp["error"]

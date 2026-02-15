@@ -240,6 +240,36 @@ class GA4Integration:
             logger.error(f"Erro ao obter eventos do GA4: {str(e)}")
             return pd.DataFrame()
 
+    def get_event_count(self, event_name: str, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> int:
+        """Retorna o eventCount total para um evento específico no período."""
+        try:
+            start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
+            request = RunReportRequest(
+                property=f"properties/{self.property_id}",
+                date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
+                dimensions=[Dimension(name="eventName")],
+                metrics=[Metric(name="eventCount")],
+                dimension_filter=FilterExpression(
+                    filter=Filter(
+                        field_name="eventName",
+                        string_filter=Filter.StringFilter(
+                            match_type=Filter.StringFilter.MatchType.EXACT,
+                            value=event_name,
+                            case_sensitive=False,
+                        ),
+                    )
+                ),
+            )
+            response = self.client.run_report(request)
+            total = 0
+            for row in response.rows:
+                total += int(row.metric_values[0].value)
+            return total
+        except Exception as e:
+            logger.error("Erro ao obter eventCount '%s' do GA4: %s", event_name, e)
+            return 0
+
+
     def get_aggregated_metrics(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_filter: str = None) -> Dict[str, Any]:
         """
         Obtém métricas agregadas do GA4 para uso no dashboard

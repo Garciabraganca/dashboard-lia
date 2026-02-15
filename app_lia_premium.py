@@ -8,6 +8,7 @@ import os
 import logging
 import textwrap
 from dashboard_kpis import build_meta_kpi_cards_payload
+from build_info import get_build_stamp
 
 # Importar integrações
 from config import Config
@@ -120,6 +121,7 @@ class DataProvider:
         self.error_message = ""
         self.meta_client = None
         self.ga4_client = None
+        self.ga4_app_client = None
         self._init_clients()
 
     def _init_clients(self):
@@ -140,10 +142,17 @@ class DataProvider:
         try:
             # Inicializar GA4
             if Config.validate_ga4_credentials():
+                creds = Config.get_ga4_credentials()
                 self.ga4_client = GA4Integration(
-                    credentials_json=Config.get_ga4_credentials(),
+                    credentials_json=creds,
                     property_id=Config.get_ga4_property_id()
                 )
+                ga4_app_property_id = Config.get_ga4_app_property_id()
+                if ga4_app_property_id:
+                    self.ga4_app_client = GA4Integration(
+                        credentials_json=creds,
+                        property_id=ga4_app_property_id,
+                    )
                 logger.info("GA4 client initialized")
         except Exception as e:
             logger.error(f"Erro ao inicializar GA4 client: {e}")
@@ -200,7 +209,6 @@ class DataProvider:
             # usar dados do SDK endpoint (que inclui eventos não-atribuídos)
             if result.get("instalacoes_sdk", 0) == 0:
                 sdk_installs = sdk_data["install_count"]
-                # Se não há installs diretos, tentar activate_app como proxy
                 if sdk_installs == 0 and sdk_data["activate_count"] > 0:
                     logger.warning(
                         "Using SDK activate_app (%d) as proxy for installs",
@@ -210,6 +218,28 @@ class DataProvider:
 
                 if sdk_installs > 0:
                     result["instalacoes_sdk"] = sdk_installs
+
+            endpoint_unsupported = bool(result.get("_sdk_debug", {}).get("endpoint_unsupported"))
+            if result.get("instalacoes_sdk", 0) == 0 and endpoint_unsupported:
+                if self.ga4_app_client:
+                    ga4_installs = self.ga4_app_client.get_event_count(
+                        event_name="first_open",
+                        date_range=api_period,
+                        custom_start=custom_start,
+                        custom_end=custom_end,
+                    )
+                    if ga4_installs > 0:
+                        result["instalacoes_sdk"] = ga4_installs
+                        result["_sdk_source"] = "ga4_first_open"
+                        result["_sdk_debug"]["ga4_fallback"] = {
+                            "event": "first_open",
+                            "value": ga4_installs,
+                            "used": True,
+                        }
+                else:
+                    msg = "Instalações indisponíveis: Meta endpoint unsupported e GA4_APP_PROPERTY_ID ausente."
+                    result["_sdk_errors"].append(msg)
+                    result["_sdk_debug"]["ga4_fallback"] = {"used": False, "reason": "missing_ga4_app_property_id"}
 
         except Exception as e:
             logger.error("Failed to fetch SDK events: %s", e)
@@ -1750,6 +1780,8 @@ if _fetch_ts:
 else:
     st.caption(f"Dados carregados em: {_now_sp()} (SP)")
 
+st.caption(f"🔖 {get_build_stamp()}")
+
 # -----------------------------------------------------------------------------
 # SDK EVENTS HEALTH INDICATOR
 # -----------------------------------------------------------------------------
@@ -1777,6 +1809,13 @@ _SDK_EVENT_LABELS = {
 }
 
 if _data_source in ("real", "real_no_filter"):
+    if _sdk_debug.get("endpoint_unsupported"):
+        _unsupported_url = _sdk_debug.get("endpoint_unsupported_request_url") or (_sdk_debug.get("agg_request_urls") or ["N/A"])[0]
+        st.error(
+            "Meta Graph não reconhece /app_event_aggregations para este App ID/versão.\n"
+            f"request_url: `{_unsupported_url}`\n"
+            "Fallback ativo: Ads Insights (atribuído). Se não houver installs atribuídos, usar first_open do GA4."
+        )
     if _all_sdk_events:
         # Mostrar todos os eventos SDK encontrados (como no Events Manager)
         _event_parts = []
@@ -1843,6 +1882,10 @@ with st.expander("Diagnóstico de eventos SDK (clique para expandir)"):
             st.markdown(f"- HTTP status dos erros: `{_sdk_debug['agg_fail_statuses']}`")
         st.markdown(f"- App ID: `{_sdk_debug.get('app_id', 'N/A')}`")
         st.markdown(f"- Período: `{_sdk_debug.get('period', 'N/A')}`")
+        st.markdown(f"- App identity probe OK: `{_sdk_debug.get('app_identity_ok', False)}`")
+        st.markdown(f"- App probe HTTP status: `{_sdk_debug.get('app_probe_http_status', 'N/A')}`")
+        if _sdk_debug.get('app_probe_request_url'):
+            st.markdown(f"- App probe URL: `{_sdk_debug.get('app_probe_request_url')}`")
 
     if _diag and _diag.get("all_action_types"):
         st.markdown("---")

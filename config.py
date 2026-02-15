@@ -28,7 +28,9 @@ class Config:
 
     # Google Analytics 4
     GA4_PROPERTY_ID: str = os.getenv("GA4_PROPERTY_ID", "487806406")
+    GA4_APP_PROPERTY_ID: Optional[str] = os.getenv("GA4_APP_PROPERTY_ID")
     GCP_CREDENTIALS_JSON: Optional[str] = os.getenv("GCP_CREDENTIALS_JSON")
+    GOOGLE_SERVICE_ACCOUNT_JSON: Optional[str] = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 
     # OpenAI
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
@@ -95,6 +97,16 @@ class Config:
 
         return cls._get_streamlit_secret("GA4_PROPERTY_ID", cls.GA4_PROPERTY_ID)
 
+
+    @classmethod
+    def get_ga4_app_property_id(cls) -> Optional[str]:
+        """Obtém o ID da propriedade GA4 do app (fallback de first_open)."""
+        env_value = os.getenv("GA4_APP_PROPERTY_ID")
+        if env_value:
+            return env_value
+
+        return cls._get_streamlit_secret("GA4_APP_PROPERTY_ID")
+
     @classmethod
     def get_ga4_credentials(cls) -> Dict[str, Any]:
         """
@@ -108,13 +120,14 @@ class Config:
             Dicionário com credenciais da service account
         """
         # Tentar variável de ambiente primeiro
-        if cls.GCP_CREDENTIALS_JSON:
+        env_creds_json = os.getenv("GCP_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or cls.GCP_CREDENTIALS_JSON or cls.GOOGLE_SERVICE_ACCOUNT_JSON
+        if env_creds_json:
             try:
-                creds = json.loads(cls.GCP_CREDENTIALS_JSON)
+                creds = json.loads(env_creds_json)
                 logger.info("GA4 credentials loaded from environment variable")
                 return creds
             except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse GCP_CREDENTIALS_JSON: {e}")
+                logger.warning(f"Failed to parse GA4 credentials JSON env var: {e}")
 
         # Tentar Streamlit secrets
         if HAS_STREAMLIT:
@@ -122,6 +135,11 @@ class Config:
                 # Usar acesso direto em vez de .get()
                 if "GCP_CREDENTIALS" in st.secrets:
                     gcp_creds = st.secrets["GCP_CREDENTIALS"]
+                elif "GOOGLE_SERVICE_ACCOUNT_JSON" in st.secrets:
+                    gcp_creds = json.loads(str(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]))
+                else:
+                    gcp_creds = None
+                if gcp_creds is not None:
                     # Converter AttrDict para dict recursivamente
                     creds_dict = {key: str(value) if key == "private_key" else value
                                   for key, value in dict(gcp_creds).items()}
@@ -134,7 +152,7 @@ class Config:
                     logger.info(f"GA4 credentials loaded from Streamlit secrets, keys: {list(creds_dict.keys())}")
                     return creds_dict
                 else:
-                    logger.warning("GCP_CREDENTIALS not found in Streamlit secrets")
+                    logger.warning("GCP_CREDENTIALS/GOOGLE_SERVICE_ACCOUNT_JSON not found in Streamlit secrets")
             except Exception as e:
                 logger.error(f"Error loading GA4 credentials from Streamlit secrets: {e}")
 

@@ -18,6 +18,22 @@ def mock_meta_client():
     )
 
 
+@pytest.fixture(autouse=True)
+def reset_aggregation_cache(monkeypatch):
+    MetaAdsIntegration._AGG_ENDPOINT_UNSUPPORTED_CACHE.clear()
+    monkeypatch.setattr(
+        MetaAdsIntegration,
+        "_probe_app_identity",
+        lambda self: {
+            "app_identity_ok": True,
+            "http_status": 200,
+            "request_url": f"https://graph.facebook.com/{self.api_version}/{self.app_id}",
+            "response": {"id": self.app_id, "name": "Test App"},
+            "error_code": None,
+            "error_message": None,
+        },
+    )
+
 # Number of event types queried by get_all_sdk_events
 _SDK_EVENT_COUNT = 6
 
@@ -36,6 +52,84 @@ def _make_agg_response(value=0, status=200):
         }
     return resp
 
+
+
+
+
+
+def test_app_id_prefix_is_normalized():
+    client = MetaAdsIntegration(
+        access_token="test_token",
+        ad_account_id="123456789",
+        app_id="app_1409816407431745",
+    )
+    assert client.app_id == "1409816407431745"
+
+    url = client._build_graph_url(client.app_id, "app_event_aggregations")
+    assert "/1409816407431745/app_event_aggregations" in url
+    assert "/app_1409816407431745/" not in url
+
+def test_probe_app_identity_ok_continues_flow(mock_meta_client):
+    probe_ok = {
+        "app_identity_ok": True,
+        "http_status": 200,
+        "request_url": "https://graph.facebook.com/v21.0/test_app_id",
+        "response": {"id": "test_app_id", "name": "My App"},
+        "error_code": None,
+        "error_message": None,
+    }
+    with patch.object(mock_meta_client, "_probe_app_identity", return_value=probe_ok):
+        with patch.object(mock_meta_client, "_query_app_event_aggregations", return_value={
+            "count": 0, "success": True, "error": None, "http_status": 200,
+            "request_url": "https://graph.facebook.com/v21.0/test_app_id/app_event_aggregations",
+            "endpoint_unsupported": False, "meta_error_code": None, "meta_error_message": None,
+        }) as mock_query:
+            result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+    assert result["source"] != "app_identity_probe_failed"
+    assert result["_debug"]["app_identity_ok"] is True
+    assert mock_query.call_count > 0
+
+
+def test_probe_app_identity_failure_stops_with_clear_error(mock_meta_client):
+    probe_fail = {
+        "app_identity_ok": False,
+        "http_status": 400,
+        "request_url": "https://graph.facebook.com/v21.0/test_app_id",
+        "response": {"error": {"code": 190, "message": "Invalid OAuth"}},
+        "error_code": 190,
+        "error_message": "Invalid OAuth",
+    }
+    with patch.object(mock_meta_client, "_probe_app_identity", return_value=probe_fail):
+        with patch('requests.get') as mock_get:
+            result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+    assert result["source"] == "app_identity_probe_failed"
+    assert "HTTP 400 code=190" in result["errors"][0]
+    assert "Invalid OAuth" in result["errors"][0]
+    assert mock_get.call_count == 0
+
+
+def test_code_2500_marks_endpoint_unsupported_and_exposes_request_url(mock_meta_client):
+    error_resp = Mock()
+    error_resp.status_code = 400
+    error_resp.text = "x"
+    error_resp.json.return_value = {
+        "error": {"message": "Unknown path components: /app_event_aggregations", "code": 2500}
+    }
+    ads_fallback = Mock()
+    ads_fallback.status_code = 200
+    ads_fallback.raise_for_status.return_value = None
+    ads_fallback.json.return_value = {"data": []}
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = [error_resp, ads_fallback]
+        result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+    assert result["_debug"].get("endpoint_unsupported") is True
+    req_url = result["_debug"].get("endpoint_unsupported_request_url")
+    assert "/test_app_id/app_event_aggregations" in req_url
+    assert any("request_url=" in err for err in result["errors"])
 
 def test_get_sdk_installs_from_app_event_aggregations(mock_meta_client):
     """Test that SDK installs are fetched from app_event_aggregations as primary source"""

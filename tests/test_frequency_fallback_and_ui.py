@@ -102,3 +102,34 @@ def test_debug_request_cap_and_sample_truncation():
     assert len(sample_name) <= 120
     assert sample_name.endswith("...")
     assert len(result["_debug"]["requests"]) <= 2
+
+
+
+def test_aggregated_insights_request_has_timeout():
+    client = MetaAdsIntegration(access_token="token", ad_account_id="123")
+
+    with patch("requests.get", return_value=_response([{"impressions": "10", "reach": "5", "frequency": "2"}])) as mock_get:
+        client.get_aggregated_insights(date_range="last_7d")
+
+    assert mock_get.call_args.kwargs.get("timeout") == 30
+
+
+def test_kpi_payload_handles_none_values_without_type_error():
+    cards = build_meta_kpi_cards_payload(
+        {
+            "investimento": None,
+            "impressoes": None,
+            "alcance": None,
+            "frequencia": None,
+            "cliques_link": None,
+            "ctr_link": None,
+            "cpc_link": None,
+            "cpm": None,
+        }
+    )
+
+    frequency_card = next(c for c in cards if c["label"] == "Vezes que cada pessoa viu")
+    assert frequency_card["value"] == "0.00"
+
+    investimento_card = next(c for c in cards if c["label"] == "Valor investido")
+    assert investimento_card["value"] == "$ 0.00"

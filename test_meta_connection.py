@@ -120,7 +120,7 @@ def main():
             if not insights.empty:
                 total_spend = insights['spend'].sum() if 'spend' in insights.columns else 0
                 total_impressions = insights['impressions'].sum() if 'impressions' in insights.columns else 0
-                print(f"  ✓ Insights obtidos com sucesso")
+                print("  ✓ Insights obtidos com sucesso")
                 print(f"    Gasto total: ${total_spend:,.2f}")
                 print(f"    Impressões: {total_impressions:,.0f}")
             else:

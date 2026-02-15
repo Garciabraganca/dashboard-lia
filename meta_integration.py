@@ -210,7 +210,7 @@ class MetaAdsIntegration:
                 "access_token": self.access_token
             }
 
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
 
             data = response.json()
@@ -322,7 +322,7 @@ class MetaAdsIntegration:
             print(f"Erro ao obter insights do Meta: {str(e)}")
             return pd.DataFrame()
 
-    def get_aggregated_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> dict:
+    def get_aggregated_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None, breakdowns: List[str] = None) -> dict:
         """
         Obtém insights AGREGADOS do período (sem breakdown diário).
         Importante para métricas como Reach que não podem ser somadas diariamente.
@@ -337,12 +337,73 @@ class MetaAdsIntegration:
             Dict com métricas agregadas (reach, frequency, impressions, etc.)
         """
         fields = ["impressions", "reach", "frequency", "spend", "clicks", "ctr", "cpc", "cpm"]
+        debug_info = {
+            "requests": [],
+            "fallback_reason": None,
+            "frequency_present_in_response": False,
+            "response_sample": None,
+        }
+
+        def _safe_float(value: Any) -> float:
+            try:
+                return float(value or 0)
+            except (TypeError, ValueError):
+                return 0.0
+
+        def _safe_int(value: Any) -> int:
+            try:
+                return int(float(value or 0))
+            except (TypeError, ValueError):
+                return 0
+
+        def _sanitize_value(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {k: _sanitize_value(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [_sanitize_value(v) for v in value]
+            if isinstance(value, str) and len(value) > 120:
+                return value[:117] + "..."
+            return value
+
+        def _sanitize_params(params: Dict[str, Any]) -> Dict[str, Any]:
+            clean = _sanitize_value(dict(params))
+            if "access_token" in clean:
+                clean["access_token"] = "***"
+            return clean
+
+        def _sanitize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+            if not row:
+                return {}
+            sample = {}
+            for key in ["date_start", "date_stop", "campaign_name", "impressions", "reach", "frequency"]:
+                if key in row:
+                    sample[key] = _sanitize_value(row.get(key))
+            return sample
+
+        def _has_hourly_breakdown(breakdowns_list: List[str]) -> bool:
+            return any("hourly_stats_aggregated_by_" in b for b in breakdowns_list)
+
+        def _run_request(params: Dict[str, Any]) -> List[Dict[str, Any]]:
+            if len(debug_info["requests"]) < 2:
+                debug_info["requests"].append(_sanitize_params(params))
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            insights = data.get("data", [])
+            if insights:
+                debug_info["frequency_present_in_response"] = "frequency" in insights[0]
+                debug_info["response_sample"] = _sanitize_row(insights[0])
+            return insights
 
         try:
             start_date_str, end_date_str = self._parse_date_range(date_range, custom_start, custom_end)
 
             # Buscar insights SEM time_increment para obter valores agregados
             url = f"{self.base_url}/{self.ad_account_id}/insights"
+            if breakdowns and "frequency_value" in breakdowns:
+                # frequency_value breakdown requer reach/impressions junto para compatibilidade
+                fields = list(dict.fromkeys(fields + ["reach", "impressions", "frequency"]))
+
             params = {
                 "fields": ",".join(fields),
                 "time_range": json.dumps({"since": start_date_str, "until": end_date_str}),
@@ -353,32 +414,46 @@ class MetaAdsIntegration:
             # Se há filtro de campanha, buscar por campanha e agregar
             if campaign_name_filter:
                 params["level"] = "campaign"
+                # Necessário para filtro local por nome da campanha
+                params["fields"] = ",".join(fields + ["campaign_name"])
 
-            response = requests.get(url, params=params)
-            response.raise_for_status()
+            normalized_breakdowns = sorted({b.strip() for b in (breakdowns or []) if b and b.strip()})
+            if normalized_breakdowns:
+                params["breakdowns"] = ",".join(normalized_breakdowns)
 
-            data = response.json()
-            insights = data.get("data", [])
+            insights = _run_request(params)
+
+            hourly_requested = _has_hourly_breakdown(normalized_breakdowns)
+            has_delivery = bool(insights) and any(_safe_int(i.get("impressions", 0)) > 0 for i in insights)
+            missing_frequency = bool(insights) and all(_safe_float(i.get("frequency", 0)) == 0 for i in insights)
+            missing_reach = bool(insights) and all(_safe_int(i.get("reach", 0)) == 0 for i in insights)
+
+            should_fallback = hourly_requested and has_delivery and (missing_frequency or missing_reach)
+            if should_fallback:
+                fallback_params = dict(params)
+                fallback_params.pop("breakdowns", None)
+                debug_info["fallback_reason"] = "hourly_breakdown_missing_frequency_or_reach_with_delivery"
+                insights = _run_request(fallback_params)
 
             if not insights:
-                return {}
+                return {"_debug": debug_info}
 
             # Se filtro de campanha, filtrar e agregar
             if campaign_name_filter:
                 filtered = [i for i in insights if campaign_name_filter.lower() in i.get('campaign_name', '').lower()]
                 if not filtered:
-                    return {}
+                    return {"_debug": debug_info}
 
                 # Se há múltiplas campanhas que match, agregar os dados
                 if len(filtered) > 1:
                     # Somar métricas que podem ser somadas
-                    total_impressions = sum(int(i.get("impressions", 0)) for i in filtered)
-                    total_spend = sum(float(i.get("spend", 0)) for i in filtered)
-                    total_clicks = sum(int(i.get("clicks", 0)) for i in filtered)
+                    total_impressions = sum(_safe_int(i.get("impressions", 0)) for i in filtered)
+                    total_spend = sum(_safe_float(i.get("spend", 0)) for i in filtered)
+                    total_clicks = sum(_safe_int(i.get("clicks", 0)) for i in filtered)
 
                     # Para reach: não podemos somar, usar o maior valor como estimativa
                     # (representa o alcance máximo, assumindo sobreposição de público)
-                    max_reach = max(int(i.get("reach", 0)) for i in filtered)
+                    max_reach = max(_safe_int(i.get("reach", 0)) for i in filtered)
 
                     # Calcular métricas derivadas
                     frequency = total_impressions / max_reach if max_reach > 0 else 0
@@ -395,26 +470,28 @@ class MetaAdsIntegration:
                         "ctr": round(ctr, 2),
                         "cpc": round(cpc, 2),
                         "cpm": round(cpm, 2),
+                        "_debug": debug_info,
                     }
-                else:
-                    insight = filtered[0]
+                insight = filtered[0]
             else:
                 insight = insights[0]
 
             return {
-                "reach": int(insight.get("reach", 0)),
-                "frequency": float(insight.get("frequency", 0)),
-                "impressions": int(insight.get("impressions", 0)),
-                "spend": float(insight.get("spend", 0)),
-                "clicks": int(insight.get("clicks", 0)),
-                "ctr": float(insight.get("ctr", 0)),
-                "cpc": float(insight.get("cpc", 0)),
-                "cpm": float(insight.get("cpm", 0)),
+                "reach": _safe_int(insight.get("reach", 0)),
+                "frequency": _safe_float(insight.get("frequency", 0)),
+                "impressions": _safe_int(insight.get("impressions", 0)),
+                "spend": _safe_float(insight.get("spend", 0)),
+                "clicks": _safe_int(insight.get("clicks", 0)),
+                "ctr": _safe_float(insight.get("ctr", 0)),
+                "cpc": _safe_float(insight.get("cpc", 0)),
+                "cpm": _safe_float(insight.get("cpm", 0)),
+                "_debug": debug_info,
             }
 
         except Exception as e:
             print(f"Erro ao obter insights agregados do Meta: {str(e)}")
-            return {}
+            debug_info["error"] = str(e)
+            return {"_debug": debug_info}
 
     def get_creative_insights(self, date_range: str = "last_7d", campaign_name_filter: str = None, custom_start: str = None, custom_end: str = None) -> pd.DataFrame:
         """

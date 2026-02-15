@@ -173,7 +173,15 @@ class DataProvider:
 
     def _enrich_with_sdk_events(self, result: dict, api_period: str, custom_start, custom_end):
         """Busca eventos SDK e enriquece o resultado com dados do SDK."""
-        if not self.meta_client or not self.meta_client.app_id:
+        if not self.meta_client:
+            return
+
+        if not self.meta_client.app_id:
+            result["_all_sdk_events"] = {}
+            result["_sdk_source"] = "no_app_id"
+            result["_sdk_event_types"] = []
+            result["_sdk_errors"] = ["META_APP_ID não configurado — eventos SDK não podem ser consultados"]
+            result["_sdk_debug"] = {}
             return
 
         try:
@@ -186,6 +194,7 @@ class DataProvider:
             result["_sdk_source"] = sdk_data["source"]
             result["_sdk_event_types"] = list(sdk_data["events"].keys())
             result["_sdk_errors"] = sdk_data["errors"]
+            result["_sdk_debug"] = sdk_data.get("_debug", {})
 
             # Se não encontrou install events nas actions do Ads Insights,
             # usar dados do SDK endpoint (que inclui eventos não-atribuídos)
@@ -205,6 +214,7 @@ class DataProvider:
         except Exception as e:
             logger.error("Failed to fetch SDK events: %s", e)
             result["_sdk_errors"] = [str(e)]
+            result["_sdk_debug"] = {}
 
     def get_meta_metrics(self, period="7d", level="campaign", filters=None, campaign_filter=None, custom_start=None, custom_end=None):
         # Tentar dados reais primeiro
@@ -1735,6 +1745,7 @@ _sdk_installs = meta_data.get("instalacoes_sdk", 0)
 _all_sdk_events = meta_data.get("_all_sdk_events", {})
 _sdk_source = meta_data.get("_sdk_source", "none")
 _sdk_errors = meta_data.get("_sdk_errors", [])
+_sdk_debug = meta_data.get("_sdk_debug", {})
 
 # Nomes amigáveis para eventos SDK
 _SDK_EVENT_LABELS = {
@@ -1761,6 +1772,16 @@ if _data_source in ("real", "real_no_filter"):
         _events_summary = " | ".join(_event_parts)
         _source_label = "SDK total" if _sdk_source == "app_event_aggregations" else "atribuido a anuncios"
         st.success(f"SDK Events ({_source_label}): {_events_summary}")
+    elif _sdk_source == "no_app_id":
+        st.error("SDK Events: META_APP_ID não configurado. Configure o App ID nos Streamlit Secrets para habilitar eventos SDK.")
+    elif _sdk_errors:
+        # Mostrar erros proeminentemente quando app_event_aggregations falha
+        _first_error = _sdk_errors[0] if _sdk_errors else ""
+        _error_count = len(_sdk_errors)
+        if _error_count == 1:
+            st.error(f"SDK Events: {_first_error}")
+        else:
+            st.error(f"SDK Events: {_error_count} erros encontrados. Primeiro: {_first_error}")
     elif _sdk_installs > 0:
         st.success(f"SDK Events: {_sdk_installs:,} instalações detectadas no período")
     elif _diag.get("has_activate_app_events"):
@@ -1792,7 +1813,22 @@ with st.expander("Diagnóstico de eventos SDK (clique para expandir)"):
         st.markdown("---")
         st.markdown("**Erros ao buscar eventos SDK:**")
         for err in _sdk_errors:
-            st.markdown(f"- {err}")
+            st.error(f"{err}")
+
+    # Debug info from aggregation queries
+    if _sdk_debug:
+        st.markdown("---")
+        st.markdown("**Diagnóstico app_event_aggregations:**")
+        _agg_s = _sdk_debug.get("agg_success", 0)
+        _agg_f = _sdk_debug.get("agg_fail", 0)
+        _agg_e = _sdk_debug.get("agg_empty", 0)
+        _agg_d = _sdk_debug.get("agg_with_data", 0)
+        st.markdown(f"- Consultas OK: **{_agg_s}** (com dados: {_agg_d}, vazias: {_agg_e})")
+        st.markdown(f"- Consultas com erro: **{_agg_f}**")
+        if _sdk_debug.get("agg_fail_statuses"):
+            st.markdown(f"- HTTP status dos erros: `{_sdk_debug['agg_fail_statuses']}`")
+        st.markdown(f"- App ID: `{_sdk_debug.get('app_id', 'N/A')}`")
+        st.markdown(f"- Período: `{_sdk_debug.get('period', 'N/A')}`")
 
     if _diag and _diag.get("all_action_types"):
         st.markdown("---")

@@ -235,8 +235,16 @@ def test_get_sdk_installs_fallback_to_ads_insights(mock_meta_client):
     }
     mock_ads_response.raise_for_status.return_value = None
 
-    # All app_event_aggregations calls fail, then ads insights succeeds
-    mock_responses = [_make_agg_response(0, status=404)] * _SDK_EVENT_COUNT + [mock_ads_response]
+    # All app_event_aggregations calls fail, then app_insights calls fail, then ads insights succeeds
+    mock_app_insights_fail = Mock()
+    mock_app_insights_fail.status_code = 400
+    mock_app_insights_fail.json.return_value = {"error": {"message": "Not supported", "code": 100}}
+
+    mock_responses = (
+        [_make_agg_response(0, status=404)] * _SDK_EVENT_COUNT
+        + [mock_app_insights_fail] * 3   # 3 app_insights metric_key attempts
+        + [mock_ads_response]
+    )
 
     with patch('requests.get') as mock_get:
         mock_get.side_effect = mock_responses

@@ -1,0 +1,421 @@
+From f6e4192aed2246b644e31637560a1abe92e857ea Mon Sep 17 00:00:00 2001
+From: Claude <claude@anthropic.com>
+Date: Sun, 15 Feb 2026 21:55:14 +0000
+Subject: [PATCH] =?UTF-8?q?fix:=20remover=20polui=C3=A7=C3=A3o=20de=20debu?=
+ =?UTF-8?q?g=20SDK=20+=20adicionar=20fallback=20app=5Finsights?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Removidas 26/27 mensagens st.error/st.warning/st.info visíveis na tela
+- Diagnósticos SDK movidos para expander admin-only colapsado
+- Indicadores de status Meta/GA4 agora usam st.caption discreto
+- Novo fallback via /{app_id}/app_insights antes de Ads Insights
+- Cadeia: app_event_aggregations → app_insights → Ads Insights
+- 35/35 testes passando
+---
+ app_lia_premium.py              | 259 ++++++++------------------------
+ meta_integration.py             |  45 ++++++
+ tests/test_meta_sdk_installs.py |  12 +-
+ 3 files changed, 119 insertions(+), 197 deletions(-)
+
+diff --git a/app_lia_premium.py b/app_lia_premium.py
+index 66e90fc..42a54bd 100644
+--- a/app_lia_premium.py
++++ b/app_lia_premium.py
+@@ -1745,8 +1745,7 @@ try:
+         trends_data = _fetch_trends_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
+         cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
+ except Exception as e:
+-    import streamlit as st
+-    st.error(f"Erro ao carregar dados do módulo Premium: {e}")
++    logger.error(f"Erro ao carregar dados do módulo Premium: {e}")
+     meta_data = {
+         **data_provider._empty_meta_metrics(),
+         "_data_source": "error",
+@@ -1783,7 +1782,7 @@ else:
+ st.caption(f"🔖 {get_build_stamp()}")
+
+ # -----------------------------------------------------------------------------
+-# SDK EVENTS HEALTH INDICATOR
++# SDK EVENTS — dados para uso interno (sem poluir a tela)
+ # -----------------------------------------------------------------------------
+ _diag = meta_data.get("_sdk_diagnostics", {})
+ _data_source = meta_data.get("_data_source", "unknown")
+@@ -1793,145 +1792,46 @@ _sdk_source = meta_data.get("_sdk_source", "none")
+ _sdk_errors = meta_data.get("_sdk_errors", [])
+ _sdk_debug = meta_data.get("_sdk_debug", {})
+
+-# Nomes amigáveis para eventos SDK
+-_SDK_EVENT_LABELS = {
+-    "fb_mobile_install": "App Installs",
+-    "fb_mobile_activate_app": "Activate App",
+-    "fb_mobile_content_view": "View Content",
+-    "fb_mobile_purchase": "Purchase",
+-    "fb_mobile_add_to_cart": "Add to Cart",
+-    "fb_mobile_complete_registration": "Complete Registration",
+-    "app_install": "App Install",
+-    "mobile_app_install": "Mobile App Install",
+-    "omni_app_install": "Omni App Install",
+-    "activate_app": "Activate App",
+-    "omni_activate_app": "Omni Activate App",
+-}
+-
+-if _data_source in ("real", "real_no_filter"):
+-    if _sdk_debug.get("endpoint_unsupported"):
+-        _unsupported_url = _sdk_debug.get("endpoint_unsupported_request_url") or (_sdk_debug.get("agg_request_urls") or ["N/A"])[0]
+-        st.error(
+-            "Meta Graph não reconhece /app_event_aggregations para este App ID/versão.\n"
+-            f"request_url: `{_unsupported_url}`\n"
+-            "Fallback ativo: Ads Insights (atribuído). Se não houver installs atribuídos, usar first_open do GA4."
+-        )
+-    if _all_sdk_events:
+-        # Mostrar todos os eventos SDK encontrados (como no Events Manager)
+-        _event_parts = []
+-        for evt, count in sorted(_all_sdk_events.items(), key=lambda x: -x[1]):
+-            label = _SDK_EVENT_LABELS.get(evt, evt)
+-            _event_parts.append(f"{label}: **{count:,}**")
+-        _events_summary = " | ".join(_event_parts)
+-        _source_label = "SDK total" if _sdk_source == "app_event_aggregations" else "atribuido a anuncios"
+-        st.success(f"SDK Events ({_source_label}): {_events_summary}")
+-    elif _sdk_source == "no_app_id":
+-        st.error("SDK Events: META_APP_ID não configurado. Configure o App ID nos Streamlit Secrets para habilitar eventos SDK.")
+-    elif _sdk_errors:
+-        # Mostrar erros proeminentemente quando app_event_aggregations falha
+-        _first_error = _sdk_errors[0] if _sdk_errors else ""
+-        _error_count = len(_sdk_errors)
+-        if _error_count == 1:
+-            st.error(f"SDK Events: {_first_error}")
+-        else:
+-            st.error(f"SDK Events: {_error_count} erros encontrados. Primeiro: {_first_error}")
+-    elif _sdk_installs > 0:
+-        st.success(f"SDK Events: {_sdk_installs:,} instalações detectadas no período")
+-    elif _diag.get("has_activate_app_events"):
+-        _proxy_installs = sum(_diag.get("activate_app_events", {}).values())
+-        st.warning(
+-            f"SDK Events: nenhum evento de instalação direto, mas {_proxy_installs} eventos "
+-            f"activate_app encontrados (usados como proxy para instalações)"
+-        )
+-    elif _diag.get("total_action_types", 0) > 0:
+-        st.warning(
+-            f"SDK Events: 0 instalações detectadas. "
+-            f"A API retornou {_diag.get('total_action_types', 0)} tipos de ação, "
+-            f"mas nenhum é evento de instalação do SDK. "
+-            f"Verifique a configuração do Meta SDK no app."
+-        )
+-    else:
+-        st.warning("SDK Events: a API Meta não retornou nenhum tipo de ação (actions vazio)")
+-
+-# Expandable diagnostics (always available, collapsed by default)
+-with st.expander("Diagnóstico de eventos SDK (clique para expandir)"):
+-    # Mostrar eventos SDK do endpoint dedicado (app_event_aggregations ou fallback)
+-    if _all_sdk_events:
+-        st.markdown(f"**Eventos SDK encontrados (fonte: `{_sdk_source}`):**")
+-        for evt, count in sorted(_all_sdk_events.items(), key=lambda x: -x[1]):
+-            label = _SDK_EVENT_LABELS.get(evt, evt)
+-            st.markdown(f"- `{evt}` ({label}): **{count:,}**")
+-
+-    if _sdk_errors:
+-        st.markdown("---")
+-        st.markdown("**Erros ao buscar eventos SDK:**")
+-        for err in _sdk_errors:
+-            st.error(f"{err}")
+-
+-    # Debug info from aggregation queries
+-    if _sdk_debug:
+-        st.markdown("---")
+-        st.markdown("**Diagnóstico app_event_aggregations:**")
+-        _agg_s = _sdk_debug.get("agg_success", 0)
+-        _agg_f = _sdk_debug.get("agg_fail", 0)
+-        _agg_e = _sdk_debug.get("agg_empty", 0)
+-        _agg_d = _sdk_debug.get("agg_with_data", 0)
+-        st.markdown(f"- Consultas OK: **{_agg_s}** (com dados: {_agg_d}, vazias: {_agg_e})")
+-        st.markdown(f"- Consultas com erro: **{_agg_f}**")
+-        if _sdk_debug.get("agg_fail_statuses"):
+-            st.markdown(f"- HTTP status dos erros: `{_sdk_debug['agg_fail_statuses']}`")
+-        st.markdown(f"- App ID: `{_sdk_debug.get('app_id', 'N/A')}`")
+-        st.markdown(f"- Período: `{_sdk_debug.get('period', 'N/A')}`")
+-        st.markdown(f"- App identity probe OK: `{_sdk_debug.get('app_identity_ok', False)}`")
+-        st.markdown(f"- App probe HTTP status: `{_sdk_debug.get('app_probe_http_status', 'N/A')}`")
+-        if _sdk_debug.get('app_probe_request_url'):
+-            st.markdown(f"- App probe URL: `{_sdk_debug.get('app_probe_request_url')}`")
+-
+-    if _diag and _diag.get("all_action_types"):
+-        st.markdown("---")
+-        st.markdown("**Action types do Ads Insights (atribuídos a anúncios):**")
+-        for atype, count in sorted(_diag["all_action_types"].items()):
+-            marker = ""
+-            if atype in INSTALL_ACTION_TYPES:
+-                marker = " **INSTALL**"
+-            elif atype in STORE_CLICK_ACTION_TYPES:
+-                marker = " **STORE CLICK**"
+-            elif atype in ACTIVATE_APP_ACTION_TYPES:
+-                marker = " **ACTIVATE APP**"
+-            st.markdown(f"- `{atype}`: **{count}**{marker}")
+-
+-        st.markdown("---")
+-        st.markdown("**Install action_types encontrados:**")
+-        st.json(_diag.get("install_events", {}))
+-        st.markdown("**Activate_app action_types encontrados:**")
+-        st.json(_diag.get("activate_app_events", {}))
+-        st.markdown("**Store click action_types encontrados:**")
+-        st.json(_diag.get("store_click_events", {}))
+-
+-    elif not _all_sdk_events and _data_source in ("real", "real_no_filter"):
+-        st.warning("Nenhum tipo de ação retornado pela API. Possíveis causas:")
+-        st.markdown("""
+-1. **Token expirado ou sem permissão** — Verifique no Meta Business Suite
+-2. **Campanha sem conversões** — A campanha pode não estar otimizada para instalações
+-3. **SDK não inicializado** — Verifique os logs do app (debug build)
+-4. **App ID incorreto** — Verifique se o App ID no SDK corresponde ao da conta de anúncios
+-5. **Janela de atribuição** — Eventos podem levar até 48h para aparecer na API
+-        """)
+-    elif _data_source == "mock":
+-        st.info("Usando dados de demonstração. Configure as credenciais Meta no Streamlit Secrets.")
+-
+-    st.markdown("---")
+-    st.markdown("**Runbook — Se os eventos sumirem novamente:**")
+-    st.markdown("""
+-1. Abra o Meta Events Manager → Test Events → confirme recebimento
+-2. Clique em **Atualizar dados** ou **Limpar cache** acima
+-3. Expanda este diagnóstico e verifique:
+-   - Se `all_action_types` vazio → token/permissão expirada
+-   - Se action types existem mas sem `install` → SDK não configurado ou evento com nome novo
+-   - Se install events aparecem mas valor é 0 → reporte como bug
+-4. Se nada funcionar: verifique no Meta Business Suite > Events Manager > Diagnostics
+-5. Confirme que o App ID no SDK corresponde à conta de anúncios usada
+-    """)
++# Painel de diagnóstico SDK (apenas modo admin — colapsado por padrão)
++if st.session_state.get("show_integration_settings") and _data_source in ("real", "real_no_filter"):
++    with st.expander("🔧 Diagnóstico SDK (admin)", expanded=False):
++        _SDK_EVENT_LABELS = {
++            "fb_mobile_install": "App Installs",
++            "fb_mobile_activate_app": "Activate App",
++            "fb_mobile_content_view": "View Content",
++            "fb_mobile_purchase": "Purchase",
++            "fb_mobile_add_to_cart": "Add to Cart",
++            "fb_mobile_complete_registration": "Complete Registration",
++            "app_install": "App Install",
++            "mobile_app_install": "Mobile App Install",
++            "omni_app_install": "Omni App Install",
++            "activate_app": "Activate App",
++            "omni_activate_app": "Omni Activate App",
++        }
++        st.markdown(f"**Fonte dos dados SDK:** `{_sdk_source}`")
++        if _all_sdk_events:
++            for evt, count in sorted(_all_sdk_events.items(), key=lambda x: -x[1]):
++                label = _SDK_EVENT_LABELS.get(evt, evt)
++                st.markdown(f"- {label} (`{evt}`): **{count:,}**")
++        elif _sdk_installs > 0:
++            st.markdown(f"Instalações detectadas: **{_sdk_installs:,}**")
++        if _sdk_errors:
++            st.markdown("**Erros:**")
++            for err in _sdk_errors:
++                st.caption(f"⚠️ {err}")
++        if _sdk_debug:
++            st.markdown(f"App ID: `{_sdk_debug.get('app_id', 'N/A')}` | "
++                        f"Período: `{_sdk_debug.get('period', 'N/A')}` | "
++                        f"Probe OK: `{_sdk_debug.get('app_identity_ok', False)}`")
++        if _diag and _diag.get("all_action_types"):
++            st.markdown("**Action types do Ads Insights:**")
++            for atype, count in sorted(_diag["all_action_types"].items()):
++                marker = ""
++                if atype in INSTALL_ACTION_TYPES:
++                    marker = " ← INSTALL"
++                elif atype in ACTIVATE_APP_ACTION_TYPES:
++                    marker = " ← ACTIVATE"
++                st.caption(f"`{atype}`: {count}{marker}")
+
+ # -----------------------------------------------------------------------------
+ # STATUS DO CICLO (COM CORUJA)
+@@ -1939,8 +1839,7 @@ with st.expander("Diagnóstico de eventos SDK (clique para expandir)"):
+ try:
+     owl_img = f'<img src="data:image/png;base64,{logo_base64}" class="status-owl">' if logo_base64 else ''
+ except Exception as e:
+-    import streamlit as st
+-    st.error(f"Erro interno no módulo Premium: {e}")
++    logger.error(f"Erro ao gerar imagem da coruja: {e}")
+     owl_img = ''
+ insights_text = ". ".join(cycle_status["insights"]) + "."
+ campaign_objective_map = {
+@@ -1959,16 +1858,14 @@ st.markdown(f'''
+ ''', unsafe_allow_html=True)
+
+ if st.session_state.show_integration_settings:
+-    # Indicador de fonte de dados e diagnóstico de conexão
++    # Indicador discreto de fonte de dados (apenas em modo admin)
+     data_source = meta_data.get("_data_source", "unknown")
+     if data_source == "real":
+-        st.success(f"✅ Conectado ao Meta Ads - Filtro: {meta_data.get('_filter_applied', 'Nenhum')}")
++        st.caption(f"✅ Meta Ads conectado | Filtro: {meta_data.get('_filter_applied', 'Nenhum')}")
+     elif data_source == "real_no_filter":
+-        st.warning(f"⚠️ Meta Ads: Sem dados para '{meta_data.get('_requested_filter')}'. Mostrando total da conta.")
+-        if "_available_campaigns" in meta_data:
+-            st.info(f"Campanhas encontradas: {', '.join(meta_data['_available_campaigns'])}")
++        st.caption(f"⚠️ Meta Ads: Sem dados para '{meta_data.get('_requested_filter')}'. Mostrando total da conta.")
+     else:
+-        st.info("💡 Usando dados de demonstração. Verifique as credenciais no Streamlit Secrets.")
++        st.caption("💡 Dados de demonstração. Configure as credenciais no Streamlit Secrets.")
+
+ # =============================================================================
+ # SEÇÃO DE ANÁLISE COM IA (PRIMEIRA DOBRA)
+@@ -2465,43 +2362,14 @@ with cols[1]:
+     st.plotly_chart(fig_funnel, use_container_width=True)
+     st.caption(funnel_caption)
+
+-    # Diagnóstico: mostrar aviso quando não há install events e estamos em modo landing page
++    # Se sem installs em modo real, exibir nota discreta no admin
+     if not _has_install_events and meta_data.get("_data_source") in ("real", "real_no_filter"):
+-        _no_app_id = not getattr(data_provider, 'meta_client', None) or not getattr(data_provider.meta_client, 'app_id', None)
+-        action_types = meta_data.get("_action_types_found", {})
+-        install_related = {k: v for k, v in action_types.items()
+-                          if "install" in k.lower() or "app" in k.lower()}
+-        if install_related:
+-            types_str = ", ".join(f"{k}: {v}" for k, v in install_related.items())
+-            st.info(
+-                f"A API retornou eventos de app/install que **não são reconhecidos** "
+-                f"pelo dashboard: {types_str}. "
+-                f"Entre em contato com o suporte para mapear esses eventos."
+-            )
+-        elif _no_app_id:
+-            with st.expander("Dados de instalação SDK indisponíveis"):
+-                st.markdown(
+-                    "Para mostrar instalações do app via Meta SDK, configure a variável "
+-                    "`META_APP_ID` no Streamlit secrets com o **App ID** do Meta.\n\n"
+-                    "Você encontra o App ID em:\n"
+-                    "**Meta for Developers** > Seu app > Settings > Basic > App ID\n\n"
+-                    "Enquanto isso, o funil mostra o caminho do usuário até o **CTA no site**."
+-                )
+-        else:
+-            with st.expander("Sem instalações SDK detectadas"):
+-                st.markdown(
+-                    "O `META_APP_ID` está configurado, mas a Meta API **não retornou "
+-                    "eventos de instalação**. Possíveis causas:\n\n"
+-                    "1. O Meta SDK no app **não está enviando** eventos `fb_mobile_install`\n"
+-                    "2. O App ID configurado não corresponde ao app correto\n"
+-                    "3. As instalações existem mas não estão **atribuídas** aos anúncios\n\n"
+-                    "**Ação recomendada:** Verifique no Meta Events Manager > Test Events "
+-                    "se o evento `Install` aparece."
+-                )
+-            if action_types:
+-                with st.expander("Tipos de ação retornados pela Meta API"):
+-                    for atype, val in sorted(action_types.items()):
+-                        st.text(f"  {atype}: {val:,}")
++        if st.session_state.get("show_integration_settings"):
++            _no_app_id = not getattr(data_provider, 'meta_client', None) or not getattr(data_provider.meta_client, 'app_id', None)
++            if _no_app_id:
++                st.caption("ℹ️ Configure META_APP_ID nos Secrets para habilitar dados de instalação do SDK.")
++            else:
++                st.caption("ℹ️ Nenhum evento de instalação SDK detectado no período. Verifique o Meta Events Manager.")
+
+     st.markdown('</div>', unsafe_allow_html=True)
+
+@@ -2511,17 +2379,18 @@ with cols[1]:
+ st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+ st.markdown('<div class="section-title"><div class="section-icon">@</div> Comportamento no site</div>', unsafe_allow_html=True)
+
+-# Indicador de fonte de dados GA4
++# Indicador de fonte de dados GA4 (discreto)
+ ga4_source = ga4_data.get("_data_source", "unknown")
+ ga4_filter = ga4_data.get("_campaign_filter", None)
+-if ga4_source == "real":
+-    st.success(f"✅ Dados reais do GA4 - Filtro: {ga4_filter if ga4_filter else 'Todas as campanhas'}")
+-elif ga4_source == "partial":
+-    st.warning(f"⚠️ Dados parciais do GA4 (pageviews/usuarios sem sessoes) - Filtro: {ga4_filter if ga4_filter else 'Todas as campanhas'}. Verifique se o gtag.js esta configurado corretamente.")
+-elif ga4_source == "no_data":
+-    st.warning(f"⚠️ GA4 conectado, mas sem dados para campanha '{ga4_filter}'. Aguarde as UTMs serem processadas (ate 24-48h).")
+-elif ga4_source == "mock":
+-    st.info("💡 Usando dados de demonstracao. Verifique as credenciais GA4 no Streamlit Secrets.")
++if st.session_state.get("show_integration_settings"):
++    if ga4_source == "real":
++        st.caption(f"✅ GA4 conectado | Filtro: {ga4_filter if ga4_filter else 'Todas as campanhas'}")
++    elif ga4_source == "partial":
++        st.caption(f"⚠️ GA4: dados parciais | Filtro: {ga4_filter if ga4_filter else 'Todas as campanhas'}")
++    elif ga4_source == "no_data":
++        st.caption(f"⚠️ GA4 conectado, sem dados para '{ga4_filter}'. UTMs podem levar até 48h.")
++    elif ga4_source == "mock":
++        st.caption("💡 GA4: dados de demonstração. Configure credenciais nos Secrets.")
+
+ ga4_cards = [
+     {"icon": "🌐", "label": "Visitas ao site", "value": f"{ga4_data['sessoes']:,.0f}", "delta": ga4_data['delta_sessoes']},
+diff --git a/meta_integration.py b/meta_integration.py
+index 9682ecf..3619412 100644
+--- a/meta_integration.py
++++ b/meta_integration.py
+@@ -919,6 +919,51 @@ class MetaAdsIntegration:
+
+         logger.warning(
+             "app_event_aggregations unavailable or empty. "
++            "Trying /{app_id}/app_insights as secondary approach."
++        )
++
++        # --- Fallback 2: /{app_id}/app_insights (Application Analytics) ---
++        try:
++            app_insights_url = self._build_graph_url(self.app_id, "app_insights")
++            for metric_key in [
++                "application_mobile_app_installs",
++                "application_mobile_app_active_users",
++                "app_event",
++            ]:
++                params = {
++                    "metric_key": metric_key,
++                    "since": start_str,
++                    "until": end_str,
++                    "access_token": self.access_token,
++                }
++                try:
++                    resp = requests.get(app_insights_url, params=params, timeout=30)
++                    if resp.status_code == 200:
++                        insights_data = resp.json().get("data", [])
++                        total_val = 0
++                        for entry in insights_data:
++                            total_val += int(float(entry.get("value", 0) or 0))
++                        if total_val > 0:
++                            if "install" in metric_key:
++                                result["events"]["app_insights_installs"] = total_val
++                                result["install_count"] = total_val
++                            elif "active" in metric_key:
++                                result["events"]["app_insights_active_users"] = total_val
++                                result["activate_count"] = total_val
++                            result["source"] = "app_insights"
++                            result["_debug"]["app_insights_metric"] = metric_key
++                            result["_debug"]["app_insights_value"] = total_val
++                except Exception as ei:
++                    logger.debug("app_insights metric %s failed: %s", metric_key, ei)
++
++            if result["events"]:
++                return result
++        except Exception as e:
++            logger.debug("app_insights fallback failed entirely: %s", e)
++
++        # --- Fallback 3: account-level Ads Insights (attributed events only) ---
++        logger.warning(
++            "app_insights also unavailable. "
+             "Falling back to account-level Ads Insights (attributed events only)."
+         )
+         try:
+diff --git a/tests/test_meta_sdk_installs.py b/tests/test_meta_sdk_installs.py
+index 9774119..69d0069 100644
+--- a/tests/test_meta_sdk_installs.py
++++ b/tests/test_meta_sdk_installs.py
+@@ -235,8 +235,16 @@ def test_get_sdk_installs_fallback_to_ads_insights(mock_meta_client):
+     }
+     mock_ads_response.raise_for_status.return_value = None
+
+-    # All app_event_aggregations calls fail, then ads insights succeeds
+-    mock_responses = [_make_agg_response(0, status=404)] * _SDK_EVENT_COUNT + [mock_ads_response]
++    # All app_event_aggregations calls fail, then app_insights calls fail, then ads insights succeeds
++    mock_app_insights_fail = Mock()
++    mock_app_insights_fail.status_code = 400
++    mock_app_insights_fail.json.return_value = {"error": {"message": "Not supported", "code": 100}}
++
++    mock_responses = (
++        [_make_agg_response(0, status=404)] * _SDK_EVENT_COUNT
++        + [mock_app_insights_fail] * 3   # 3 app_insights metric_key attempts
++        + [mock_ads_response]
++    )
+
+     with patch('requests.get') as mock_get:
+         mock_get.side_effect = mock_responses
+--
+2.43.0

@@ -919,6 +919,51 @@ class MetaAdsIntegration:
 
         logger.warning(
             "app_event_aggregations unavailable or empty. "
+            "Trying /{app_id}/app_insights as secondary approach."
+        )
+
+        # --- Fallback 2: /{app_id}/app_insights (Application Analytics) ---
+        try:
+            app_insights_url = self._build_graph_url(self.app_id, "app_insights")
+            for metric_key in [
+                "application_mobile_app_installs",
+                "application_mobile_app_active_users",
+                "app_event",
+            ]:
+                params = {
+                    "metric_key": metric_key,
+                    "since": start_str,
+                    "until": end_str,
+                    "access_token": self.access_token,
+                }
+                try:
+                    resp = requests.get(app_insights_url, params=params, timeout=30)
+                    if resp.status_code == 200:
+                        insights_data = resp.json().get("data", [])
+                        total_val = 0
+                        for entry in insights_data:
+                            total_val += int(float(entry.get("value", 0) or 0))
+                        if total_val > 0:
+                            if "install" in metric_key:
+                                result["events"]["app_insights_installs"] = total_val
+                                result["install_count"] = total_val
+                            elif "active" in metric_key:
+                                result["events"]["app_insights_active_users"] = total_val
+                                result["activate_count"] = total_val
+                            result["source"] = "app_insights"
+                            result["_debug"]["app_insights_metric"] = metric_key
+                            result["_debug"]["app_insights_value"] = total_val
+                except Exception as ei:
+                    logger.debug("app_insights metric %s failed: %s", metric_key, ei)
+
+            if result["events"]:
+                return result
+        except Exception as e:
+            logger.debug("app_insights fallback failed entirely: %s", e)
+
+        # --- Fallback 3: account-level Ads Insights (attributed events only) ---
+        logger.warning(
+            "app_insights also unavailable. "
             "Falling back to account-level Ads Insights (attributed events only)."
         )
         try:

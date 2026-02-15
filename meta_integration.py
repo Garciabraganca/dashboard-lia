@@ -525,17 +525,177 @@ class MetaAdsIntegration:
         except Exception:
             return []
 
+    def _query_app_event_aggregations(self, event_name: str, start_str: str, end_str: str) -> dict:
+        """
+        Consulta o endpoint app_event_aggregations para um evento específico.
+
+        Returns:
+            Dict com chaves: count (int), success (bool), error (str|None)
+        """
+        url = f"{self.base_url}/{self.app_id}/app_event_aggregations"
+        params = {
+            "aggregation_period": "day",
+            "time_range": json.dumps({"since": start_str, "until": end_str}),
+            "event_name": event_name,
+            "access_token": self.access_token,
+        }
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            if response.status_code == 200:
+                raw = response.json()
+                data = raw.get("data", [])
+                total = 0
+                for day_data in data:
+                    # Handle different response formats
+                    val = day_data.get("value") or day_data.get("count") or 0
+                    total += int(float(val))
+                return {"count": total, "success": True, "error": None}
+            else:
+                error_data = response.json() if response.text else {}
+                error_msg = error_data.get("error", {}).get("message", "Unknown error")
+                error_code = error_data.get("error", {}).get("code", "N/A")
+                logger.warning(
+                    "app_event_aggregations failed for '%s': HTTP %d, code=%s, msg=%s",
+                    event_name, response.status_code, error_code, error_msg,
+                )
+                return {"count": 0, "success": False, "error": f"HTTP {response.status_code}: {error_msg}"}
+        except Exception as e:
+            logger.warning("app_event_aggregations exception for '%s': %s", event_name, e)
+            return {"count": 0, "success": False, "error": str(e)}
+
+    def get_all_sdk_events(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> dict:
+        """
+        Busca TODOS os eventos SDK relevantes com contagens para o período.
+        Retorna dados equivalentes ao que aparece no Events Manager do Facebook.
+
+        Tenta buscar via app_event_aggregations (dados totais do SDK).
+        Se falhar, faz fallback para Ads Insights no nível de conta (apenas atribuídos).
+
+        Returns:
+            Dict com chaves:
+                events: dict[str, int] - mapa de evento → contagem
+                source: str - endpoint que forneceu os dados
+                errors: list[str] - erros encontrados durante consulta
+                install_count: int - total de instalações encontradas
+                activate_count: int - total de activate_app encontradas
+        """
+        result = {
+            "events": {},
+            "source": "none",
+            "errors": [],
+            "install_count": 0,
+            "activate_count": 0,
+        }
+
+        if not self.app_id:
+            result["source"] = "no_app_id"
+            return result
+
+        try:
+            start_str, end_str = self._parse_date_range(date_range, custom_start, custom_end)
+        except Exception as e:
+            result["errors"].append(f"Date parse error: {e}")
+            return result
+
+        # Eventos SDK para consultar (nomes internos do Facebook SDK)
+        sdk_event_names = [
+            "fb_mobile_install",
+            "fb_mobile_activate_app",
+            "fb_mobile_content_view",
+            "fb_mobile_purchase",
+            "fb_mobile_add_to_cart",
+            "fb_mobile_complete_registration",
+        ]
+
+        # PRIMÁRIO: Tentar app_event_aggregations para cada evento
+        aggregations_worked = False
+        for event_name in sdk_event_names:
+            resp = self._query_app_event_aggregations(event_name, start_str, end_str)
+            if resp["success"]:
+                aggregations_worked = True
+                if resp["count"] > 0:
+                    result["events"][event_name] = resp["count"]
+            elif resp["error"]:
+                result["errors"].append(f"{event_name}: {resp['error']}")
+
+        if aggregations_worked and result["events"]:
+            result["source"] = "app_event_aggregations"
+            result["install_count"] = result["events"].get("fb_mobile_install", 0)
+            result["activate_count"] = result["events"].get("fb_mobile_activate_app", 0)
+            logger.info(
+                "SDK events from app_event_aggregations: %s", result["events"]
+            )
+            return result
+
+        # FALLBACK: Usar Ads Insights no nível de CONTA (sem filtro de campanha)
+        # para obter todos os action_types com contagens.
+        # NOTA: Retorna apenas eventos ATRIBUÍDOS a anúncios.
+        logger.warning(
+            "app_event_aggregations unavailable or empty. "
+            "Falling back to account-level Ads Insights (attributed events only)."
+        )
+        try:
+            url = f"{self.base_url}/{self.ad_account_id}/insights"
+            params = {
+                "fields": "actions",
+                "time_range": json.dumps({"since": start_str, "until": end_str}),
+                "action_breakdowns": "action_type",
+                "level": "account",
+                "access_token": self.access_token,
+            }
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+
+            data = response.json().get("data", [])
+
+            # Coletar TODOS os action_types (não apenas installs)
+            sdk_related_prefixes = (
+                "app_install", "mobile_app_install", "omni_app_install",
+                "fb_mobile_", "offsite_conversion.fb_mobile_",
+                "app_custom_event.fb_mobile_", "activate_app",
+                "omni_activate_app",
+            )
+
+            from meta_funnel import INSTALL_ACTION_TYPES, ACTIVATE_APP_ACTION_TYPES
+
+            for row in data:
+                for action in row.get("actions", []):
+                    atype = action.get("action_type", "")
+                    val = int(float(action.get("value", 0) or 0))
+                    if val > 0 and (
+                        atype in INSTALL_ACTION_TYPES
+                        or atype in ACTIVATE_APP_ACTION_TYPES
+                        or any(atype.startswith(p) for p in sdk_related_prefixes)
+                    ):
+                        result["events"][atype] = result["events"].get(atype, 0) + val
+
+            if result["events"]:
+                result["source"] = "ads_insights_account_level"
+                # Somar instalações e activate_app
+                for atype, val in result["events"].items():
+                    if atype in INSTALL_ACTION_TYPES:
+                        result["install_count"] += val
+                    if atype in ACTIVATE_APP_ACTION_TYPES:
+                        result["activate_count"] += val
+                logger.info(
+                    "SDK events from account-level Ads Insights (attributed only): %s",
+                    result["events"],
+                )
+            else:
+                result["errors"].append(
+                    "Account-level Ads Insights returned no SDK-related action types"
+                )
+
+        except Exception as e:
+            logger.error("Account-level Ads Insights fallback failed: %s", e)
+            result["errors"].append(f"Ads Insights fallback: {e}")
+
+        return result
+
     def get_sdk_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_name_filter: str = None) -> dict:
         """
         Obtém instalações do app via Meta SDK - total de instalações reais do SDK.
-        Prioriza dados do SDK (App Events) para mostrar total real de instalações,
-        não apenas as atribuídas a anúncios.
-        
-        IMPORTANTE: Este método retorna o total de instalações do SDK no período,
-        não instalações por campanha. O parâmetro campaign_name_filter é ignorado
-        pois eventos do SDK não são vinculados a campanhas específicas.
-        
-        Requer META_APP_ID configurado.
+        Usa get_all_sdk_events internamente e extrai a contagem de installs.
 
         Args:
             date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
@@ -546,127 +706,38 @@ class MetaAdsIntegration:
         Returns:
             Dict com chaves: installs (int), source (str), event_types (list)
         """
-        # Emit deprecation warning if campaign_name_filter is provided
         if campaign_name_filter is not None:
             warnings.warn(
                 "campaign_name_filter parameter is deprecated for get_sdk_installs() "
                 "as SDK events represent total installs, not campaign-specific attribution. "
                 "This parameter will be ignored.",
                 DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
-        
-        result = {"installs": 0, "source": "none", "event_types": []}
-        if not self.app_id:
-            result["source"] = "no_app_id"
-            return result
 
-        try:
-            start_str, end_str = self._parse_date_range(date_range, custom_start, custom_end)
+        all_events = self.get_all_sdk_events(date_range, custom_start, custom_end)
 
-            # PRIMÁRIO: Buscar instalações reais do SDK via app_event_aggregations
-            # Este endpoint retorna o TOTAL de instalações do SDK (como no Events Manager)
-            url = f"{self.base_url}/{self.app_id}/app_event_aggregations"
-            params = {
-                "aggregation_period": "day",
-                "time_range": json.dumps({"since": start_str, "until": end_str}),
-                "event_name": "fb_mobile_install",
-                "access_token": self.access_token,
-            }
-            response = requests.get(url, params=params)
-            
-            if response.status_code == 200:
-                data = response.json().get("data", [])
-                # Somar todas as instalações do período
-                total_installs = 0
-                for day_data in data:
-                    total_installs += int(day_data.get("value", 0))
-                
-                if total_installs > 0:
-                    result["installs"] = total_installs
-                    result["source"] = "app_event_aggregations"
-                    result["event_types"] = ["fb_mobile_install"]
-                    return result
-
-            # FALLBACK 1: Tentar buscar via activities se aggregations falhar
-            url = f"{self.base_url}/{self.app_id}/activities"
-            params = {
-                "event_name": "fb_mobile_install",
-                "since": start_str,
-                "until": end_str,
-                "access_token": self.access_token,
-            }
-            response = requests.get(url, params=params)
-            if response.status_code == 200:
-                events = response.json().get("data", [])
-                if events:
-                    result["installs"] = len(events)
-                    result["source"] = "app_activities"
-                    result["event_types"] = ["fb_mobile_install"]
-                    return result
-
-            # FALLBACK 2: Como último recurso, usar Ads Insights (instalações atribuídas)
-            # NOTA: Este método retorna apenas instalações ATRIBUÍDAS a anúncios,
-            # não o total real de instalações do SDK
+        installs = all_events["install_count"]
+        # Se não houver install events, usar activate_app como proxy
+        if installs == 0 and all_events["activate_count"] > 0:
             logger.warning(
-                "Falling back to Ads Insights API for SDK installs. "
-                "This will return only attributed installs, not total SDK installs. "
-                "App Event endpoints (aggregations and activities) were unavailable or returned no data."
+                "No install events found, using activate_app (%d) as proxy.",
+                all_events["activate_count"],
             )
-            url = f"{self.base_url}/{self.ad_account_id}/insights"
-            params = {
-                "fields": "actions",
-                "time_range": json.dumps({"since": start_str, "until": end_str}),
-                "action_breakdowns": "action_type",
-                "level": "account",
-                "access_token": self.access_token,
-            }
-            response = requests.get(url, params=params)
-            response.raise_for_status()
+            installs = all_events["activate_count"]
 
-            data = response.json().get("data", [])
-            
-            install_types = {
-                "app_install", "mobile_app_install", "omni_app_install",
-                "app_install_event", "mobile_app_install_event",
-                "offsite_conversion.fb_mobile_install", "fb_mobile_install",
-                "offsite_conversion.mobile_app_install", "offsite_conversion.app_install",
-            }
-
-            total = 0
-            found_types = []
-            for row in data:
-                for action in row.get("actions", []):
-                    atype = action.get("action_type", "")
-                    if atype in install_types:
-                        total += int(float(action.get("value", 0) or 0))
-                        if atype not in found_types:
-                            found_types.append(atype)
-
-            if total > 0:
-                result["installs"] = total
-                result["source"] = "ads_insights_fallback"
-                result["event_types"] = found_types
-                logger.info(
-                    f"Ads Insights fallback returned {total} attributed installs. "
-                    "Note: This may be lower than total SDK installs shown in Events Manager."
-                )
-
-            return result
-
-        except Exception:
-            return result
+        return {
+            "installs": installs,
+            "source": all_events["source"],
+            "event_types": list(all_events["events"].keys()),
+            "all_sdk_events": all_events["events"],
+            "errors": all_events["errors"],
+        }
 
     def get_total_app_installs(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None, campaign_name_filter: str = None) -> int:
         """
         Obtém o total de instalações do app.
         Usa get_sdk_installs internamente.
-        
-        Args:
-            date_range: Período (last_7d, last_14d, last_30d, today, yesterday, custom)
-            custom_start: Data de início personalizada (YYYY-MM-DD)
-            custom_end: Data de fim personalizada (YYYY-MM-DD)
-            campaign_name_filter: Nome da campanha para filtrar (opcional)
         """
         sdk_data = self.get_sdk_installs(date_range, custom_start, custom_end, campaign_name_filter)
         return sdk_data["installs"]

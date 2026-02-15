@@ -1,10 +1,10 @@
 """
 Tests for Meta SDK install counting
-Updated to reflect new behavior where SDK installs come from App Events API
-(showing total real installs, not just attributed ones)
+Updated to reflect new behavior where SDK installs come from get_all_sdk_events
+which queries multiple event types via App Events API and falls back to Ads Insights.
 """
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, call
 from meta_integration import MetaAdsIntegration
 
 
@@ -18,52 +18,66 @@ def mock_meta_client():
     )
 
 
+# Number of event types queried by get_all_sdk_events
+_SDK_EVENT_COUNT = 6
+
+
+def _make_agg_response(value=0, status=200):
+    """Helper to create a mock response for app_event_aggregations."""
+    resp = Mock()
+    resp.status_code = status
+    if status == 200:
+        resp.json.return_value = {
+            "data": [{"timestamp": "2024-01-01", "value": value}] if value > 0 else []
+        }
+    else:
+        resp.json.return_value = {
+            "error": {"message": "Not found", "code": 803}
+        }
+    return resp
+
+
 def test_get_sdk_installs_from_app_event_aggregations(mock_meta_client):
     """Test that SDK installs are fetched from app_event_aggregations as primary source"""
-    
-    # Mock API response from app_event_aggregations endpoint
-    mock_response_data = {
-        "data": [
-            {"timestamp": "2024-01-01", "value": 50},
-            {"timestamp": "2024-01-02", "value": 75},
-            {"timestamp": "2024-01-03", "value": 28},
-        ]
-    }
-    
+
+    # Mock different values per event type
+    mock_responses = [
+        _make_agg_response(153),  # fb_mobile_install
+        _make_agg_response(200),  # fb_mobile_activate_app
+        _make_agg_response(50),   # fb_mobile_content_view
+        _make_agg_response(0),    # fb_mobile_purchase
+        _make_agg_response(0),    # fb_mobile_add_to_cart
+        _make_agg_response(0),    # fb_mobile_complete_registration
+    ]
+
     with patch('requests.get') as mock_get:
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = mock_response_data
-        mock_get.return_value = mock_response
-        
-        # Call get_sdk_installs
+        mock_get.side_effect = mock_responses
+
         result = mock_meta_client.get_sdk_installs(date_range="last_7d")
-        
-        # Should sum all values from app_event_aggregations (50 + 75 + 28 = 153)
+
+        # Should get installs from fb_mobile_install
         assert result["installs"] == 153
         assert result["source"] == "app_event_aggregations"
-        assert result["event_types"] == ["fb_mobile_install"]
-        
-        # Verify the correct endpoint was called
-        call_args = mock_get.call_args
-        assert "/app_event_aggregations" in call_args[0][0]
+        assert "fb_mobile_install" in result["event_types"]
+        assert "fb_mobile_activate_app" in result["event_types"]
+        assert "fb_mobile_content_view" in result["event_types"]
+
+        # all_sdk_events should contain all non-zero events
+        assert result["all_sdk_events"]["fb_mobile_install"] == 153
+        assert result["all_sdk_events"]["fb_mobile_activate_app"] == 200
+        assert result["all_sdk_events"]["fb_mobile_content_view"] == 50
 
 
 def test_get_sdk_installs_ignores_campaign_filter(mock_meta_client):
     """Test that campaign filter is ignored for SDK installs (returns total) and emits deprecation warning"""
-    
-    mock_response_data = {
-        "data": [
-            {"timestamp": "2024-01-01", "value": 100},
-        ]
-    }
-    
+
+    mock_responses = [
+        _make_agg_response(100),  # fb_mobile_install
+    ] + [_make_agg_response(0)] * (_SDK_EVENT_COUNT - 1)
+
     with patch('requests.get') as mock_get:
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = mock_response_data
-        mock_get.return_value = mock_response
-        
+        mock_get.side_effect = mock_responses
+
         # Call with campaign filter - should emit deprecation warning
         import warnings
         with warnings.catch_warnings(record=True) as w:
@@ -72,11 +86,11 @@ def test_get_sdk_installs_ignores_campaign_filter(mock_meta_client):
                 date_range="last_7d",
                 campaign_name_filter="LIA"
             )
-            
+
             # Should return total installs, campaign filter is ignored
             assert result["installs"] == 100
             assert result["source"] == "app_event_aggregations"
-            
+
             # Verify deprecation warning was emitted
             assert len(w) == 1
             assert issubclass(w[0].category, DeprecationWarning)
@@ -85,31 +99,23 @@ def test_get_sdk_installs_ignores_campaign_filter(mock_meta_client):
 
 def test_get_sdk_installs_respects_date_range(mock_meta_client):
     """Test that date range is properly applied in the API request"""
-    
-    mock_response_data = {
-        "data": [
-            {"timestamp": "2024-01-15", "value": 42},
-        ]
-    }
-    
+
+    mock_responses = [_make_agg_response(42)] + [_make_agg_response(0)] * (_SDK_EVENT_COUNT - 1)
+
     with patch('requests.get') as mock_get:
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = mock_response_data
-        mock_get.return_value = mock_response
-        
+        mock_get.side_effect = mock_responses
+
         # Call with specific date range
         mock_meta_client.get_sdk_installs(
             date_range="custom",
             custom_start="2024-01-01",
             custom_end="2024-01-31"
         )
-        
-        # Verify the API was called with correct time_range
-        call_args = mock_get.call_args
-        params = call_args[1]["params"]
-        
-        # Check that time_range is in params and contains the correct dates
+
+        # Verify the first API call (fb_mobile_install) has correct time_range
+        first_call = mock_get.call_args_list[0]
+        params = first_call[1]["params"]
+
         assert "time_range" in params
         import json
         time_range = json.loads(params["time_range"])
@@ -117,73 +123,56 @@ def test_get_sdk_installs_respects_date_range(mock_meta_client):
         assert time_range["until"] == "2024-01-31"
 
 
-def test_get_sdk_installs_fallback_to_activities(mock_meta_client):
-    """Test fallback to activities endpoint when aggregations fails"""
-    
-    # Mock activities response
-    mock_activities_data = {
-        "data": [
-            {"event": "fb_mobile_install"},
-            {"event": "fb_mobile_install"},
-            {"event": "fb_mobile_install"},
-        ]
-    }
-    
-    with patch('requests.get') as mock_get:
-        # First call (aggregations) returns 404
-        # Second call (activities) returns data
-        mock_response_agg = Mock()
-        mock_response_agg.status_code = 404
-        
-        mock_response_act = Mock()
-        mock_response_act.status_code = 200
-        mock_response_act.json.return_value = mock_activities_data
-        
-        mock_get.side_effect = [mock_response_agg, mock_response_act]
-        
-        result = mock_meta_client.get_sdk_installs(date_range="last_7d")
-        
-        # Should use activities fallback and count events
-        assert result["installs"] == 3
-        assert result["source"] == "app_activities"
-
-
 def test_get_sdk_installs_fallback_to_ads_insights(mock_meta_client):
-    """Test final fallback to ads insights when app events fail"""
-    
-    # Mock ads insights response (final fallback)
-    mock_ads_data = {
+    """Test fallback to account-level ads insights when all app_event_aggregations fail"""
+
+    # Mock ads insights response (fallback)
+    mock_ads_response = Mock()
+    mock_ads_response.status_code = 200
+    mock_ads_response.json.return_value = {
         "data": [
             {
                 "actions": [
-                    {"action_type": "mobile_app_install", "value": "4"}
+                    {"action_type": "mobile_app_install", "value": "4"},
+                    {"action_type": "fb_mobile_activate_app", "value": "10"},
                 ]
             }
         ]
     }
-    
+    mock_ads_response.raise_for_status.return_value = None
+
+    # All app_event_aggregations calls fail, then ads insights succeeds
+    mock_responses = [_make_agg_response(0, status=404)] * _SDK_EVENT_COUNT + [mock_ads_response]
+
     with patch('requests.get') as mock_get:
-        # First call (aggregations) returns 404
-        # Second call (activities) returns 404
-        # Third call (ads insights) returns data
-        mock_response_agg = Mock()
-        mock_response_agg.status_code = 404
-        
-        mock_response_act = Mock()
-        mock_response_act.status_code = 404
-        
-        mock_response_ads = Mock()
-        mock_response_ads.status_code = 200
-        mock_response_ads.json.return_value = mock_ads_data
-        mock_response_ads.raise_for_status.return_value = None
-        
-        mock_get.side_effect = [mock_response_agg, mock_response_act, mock_response_ads]
-        
+        mock_get.side_effect = mock_responses
+
         result = mock_meta_client.get_sdk_installs(date_range="last_7d")
-        
+
         # Should use ads insights fallback (attributed installs only)
         assert result["installs"] == 4
-        assert result["source"] == "ads_insights_fallback"
+        assert result["source"] == "ads_insights_account_level"
+        assert "mobile_app_install" in result["event_types"]
+
+
+def test_get_sdk_installs_uses_activate_app_as_proxy(mock_meta_client):
+    """Test that activate_app is used as proxy when no install events found"""
+
+    # Only activate_app events, no installs
+    mock_responses = [
+        _make_agg_response(0),    # fb_mobile_install = 0
+        _make_agg_response(390),  # fb_mobile_activate_app = 390
+    ] + [_make_agg_response(0)] * (_SDK_EVENT_COUNT - 2)
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = mock_responses
+
+        result = mock_meta_client.get_sdk_installs(date_range="last_7d")
+
+        # Should use activate_app as proxy for installs
+        assert result["installs"] == 390
+        assert result["source"] == "app_event_aggregations"
+        assert result["all_sdk_events"]["fb_mobile_activate_app"] == 390
 
 
 def test_get_sdk_installs_returns_zero_when_no_app_id(mock_meta_client):
@@ -194,30 +183,72 @@ def test_get_sdk_installs_returns_zero_when_no_app_id(mock_meta_client):
         ad_account_id="123456789",
         app_id=None
     )
-    
+
     result = client_no_app.get_sdk_installs(date_range="last_7d")
-    
+
     assert result["installs"] == 0
     assert result["source"] == "no_app_id"
 
 
 def test_get_total_app_installs(mock_meta_client):
     """Test that get_total_app_installs returns the install count"""
-    
-    mock_response_data = {
-        "data": [
-            {"timestamp": "2024-01-01", "value": 30},
-        ]
-    }
-    
+
+    mock_responses = [_make_agg_response(30)] + [_make_agg_response(0)] * (_SDK_EVENT_COUNT - 1)
+
     with patch('requests.get') as mock_get:
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = mock_response_data
-        mock_get.return_value = mock_response
-        
-        # Call get_total_app_installs
+        mock_get.side_effect = mock_responses
+
         total = mock_meta_client.get_total_app_installs(date_range="last_7d")
-        
-        # Should return the install count
+
         assert total == 30
+
+
+def test_get_all_sdk_events_returns_all_event_counts(mock_meta_client):
+    """Test that get_all_sdk_events returns counts for all SDK event types"""
+
+    mock_responses = [
+        _make_agg_response(167),  # fb_mobile_install
+        _make_agg_response(390),  # fb_mobile_activate_app
+        _make_agg_response(74),   # fb_mobile_content_view
+        _make_agg_response(0),    # fb_mobile_purchase
+        _make_agg_response(0),    # fb_mobile_add_to_cart
+        _make_agg_response(5),    # fb_mobile_complete_registration
+    ]
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = mock_responses
+
+        result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+        assert result["source"] == "app_event_aggregations"
+        assert result["events"]["fb_mobile_install"] == 167
+        assert result["events"]["fb_mobile_activate_app"] == 390
+        assert result["events"]["fb_mobile_content_view"] == 74
+        assert result["events"]["fb_mobile_complete_registration"] == 5
+        assert "fb_mobile_purchase" not in result["events"]
+        assert result["install_count"] == 167
+        assert result["activate_count"] == 390
+        assert result["errors"] == []
+
+
+def test_get_all_sdk_events_logs_errors(mock_meta_client):
+    """Test that errors from app_event_aggregations are logged"""
+
+    # All calls fail
+    mock_responses = [_make_agg_response(0, status=403)] * _SDK_EVENT_COUNT
+
+    # Ads insights also fails
+    mock_ads_response = Mock()
+    mock_ads_response.status_code = 200
+    mock_ads_response.json.return_value = {"data": []}
+    mock_ads_response.raise_for_status.return_value = None
+    mock_responses.append(mock_ads_response)
+
+    with patch('requests.get') as mock_get:
+        mock_get.side_effect = mock_responses
+
+        result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+        # Should have errors logged
+        assert len(result["errors"]) > 0
+        assert result["events"] == {}

@@ -20,7 +20,7 @@ try:
 except Exception as e:
     logger.warning(f"AIAgent não disponível: {e}")
     AIAgent = None
-from meta_funnel import ACTIVATE_APP_ACTION_TYPES, INSTALL_ACTION_TYPES, STORE_CLICK_ACTION_TYPES, build_meta_funnel, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
+from meta_funnel import ACTIVATE_APP_ACTION_TYPES, INSTALL_ACTION_TYPES, STORE_CLICK_ACTION_TYPES, build_meta_funnel, collect_action_type_diagnostics, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
 
 # =============================================================================
 # CONFIGURACAO DE LOGGING
@@ -171,6 +171,41 @@ class DataProvider:
         }
         return mapping.get(period, "last_7d")
 
+    def _enrich_with_sdk_events(self, result: dict, api_period: str, custom_start, custom_end):
+        """Busca eventos SDK e enriquece o resultado com dados do SDK."""
+        if not self.meta_client or not self.meta_client.app_id:
+            return
+
+        try:
+            sdk_data = self.meta_client.get_all_sdk_events(
+                date_range=api_period,
+                custom_start=custom_start,
+                custom_end=custom_end,
+            )
+            result["_all_sdk_events"] = sdk_data["events"]
+            result["_sdk_source"] = sdk_data["source"]
+            result["_sdk_event_types"] = list(sdk_data["events"].keys())
+            result["_sdk_errors"] = sdk_data["errors"]
+
+            # Se não encontrou install events nas actions do Ads Insights,
+            # usar dados do SDK endpoint (que inclui eventos não-atribuídos)
+            if result.get("instalacoes_sdk", 0) == 0:
+                sdk_installs = sdk_data["install_count"]
+                # Se não há installs diretos, tentar activate_app como proxy
+                if sdk_installs == 0 and sdk_data["activate_count"] > 0:
+                    logger.warning(
+                        "Using SDK activate_app (%d) as proxy for installs",
+                        sdk_data["activate_count"],
+                    )
+                    sdk_installs = sdk_data["activate_count"]
+
+                if sdk_installs > 0:
+                    result["instalacoes_sdk"] = sdk_installs
+
+        except Exception as e:
+            logger.error("Failed to fetch SDK events: %s", e)
+            result["_sdk_errors"] = [str(e)]
+
     def get_meta_metrics(self, period="7d", level="campaign", filters=None, campaign_filter=None, custom_start=None, custom_end=None):
         # Tentar dados reais primeiro
         if self.meta_client and self.mode != "mock":
@@ -194,21 +229,8 @@ class DataProvider:
                         result["alcance"] = aggregated.get("reach", result["alcance"])
                         result["frequencia"] = aggregated.get("frequency", result["frequencia"])
 
-                    # Se não encontrou install events nas actions, tentar via SDK endpoint
-                    # NOTA: SDK installs são TOTAIS do período, não específicos de campanha
-                    if result.get("instalacoes_sdk", 0) == 0 and self.meta_client.app_id:
-                        try:
-                            sdk_data = self.meta_client.get_sdk_installs(
-                                date_range=api_period,
-                                custom_start=custom_start,
-                                custom_end=custom_end,
-                            )
-                            if sdk_data["installs"] > 0:
-                                result["instalacoes_sdk"] = sdk_data["installs"]
-                                result["_sdk_source"] = sdk_data["source"]
-                                result["_sdk_event_types"] = sdk_data["event_types"]
-                        except Exception:
-                            pass
+                    # Sempre buscar eventos SDK (são totais, não por campanha)
+                    self._enrich_with_sdk_events(result, api_period, custom_start, custom_end)
 
                     result["_data_source"] = "real"
                     result["_filter_applied"] = campaign_filter
@@ -234,21 +256,8 @@ class DataProvider:
                             result["alcance"] = aggregated.get("reach", result["alcance"])
                             result["frequencia"] = aggregated.get("frequency", result["frequencia"])
 
-                        # Se não encontrou install events nas actions, tentar via SDK endpoint
-                        # NOTA: SDK installs são TOTAIS do período, não específicos de campanha
-                        if result.get("instalacoes_sdk", 0) == 0 and self.meta_client.app_id:
-                            try:
-                                sdk_data = self.meta_client.get_sdk_installs(
-                                    date_range=api_period,
-                                    custom_start=custom_start,
-                                    custom_end=custom_end,
-                                )
-                                if sdk_data["installs"] > 0:
-                                    result["instalacoes_sdk"] = sdk_data["installs"]
-                                    result["_sdk_source"] = sdk_data["source"]
-                                    result["_sdk_event_types"] = sdk_data["event_types"]
-                            except Exception:
-                                pass
+                        # Sempre buscar eventos SDK (são totais, não por campanha)
+                        self._enrich_with_sdk_events(result, api_period, custom_start, custom_end)
 
                         result["_data_source"] = "real_no_filter"
                         result["_filter_applied"] = None
@@ -313,6 +322,7 @@ class DataProvider:
             # pois não podem ser somados (são métricas de usuários únicos)
             actions_series = df["actions"] if "actions" in df.columns else pd.Series(dtype=object)
             found_action_types = collect_all_action_types(actions_series)
+            diagnostics = collect_action_type_diagnostics(actions_series)
             store_clicks, has_store_clicks = sum_actions_by_types(actions_series, STORE_CLICK_ACTION_TYPES)
             if not has_store_clicks:
                 # Fallback: try outbound_click specifically
@@ -373,6 +383,7 @@ class DataProvider:
                 "delta_cpc": 0,
                 "delta_cpm": 0,
                 "_action_types_found": found_action_types,
+                "_sdk_diagnostics": diagnostics,
             }
         except Exception as e:
             logger.error(f"Erro ao processar insights Meta: {e}")
@@ -1721,11 +1732,37 @@ else:
 _diag = meta_data.get("_sdk_diagnostics", {})
 _data_source = meta_data.get("_data_source", "unknown")
 _sdk_installs = meta_data.get("instalacoes_sdk", 0)
+_all_sdk_events = meta_data.get("_all_sdk_events", {})
+_sdk_source = meta_data.get("_sdk_source", "none")
+_sdk_errors = meta_data.get("_sdk_errors", [])
 
-_proxy_installs = 0
+# Nomes amigáveis para eventos SDK
+_SDK_EVENT_LABELS = {
+    "fb_mobile_install": "App Installs",
+    "fb_mobile_activate_app": "Activate App",
+    "fb_mobile_content_view": "View Content",
+    "fb_mobile_purchase": "Purchase",
+    "fb_mobile_add_to_cart": "Add to Cart",
+    "fb_mobile_complete_registration": "Complete Registration",
+    "app_install": "App Install",
+    "mobile_app_install": "Mobile App Install",
+    "omni_app_install": "Omni App Install",
+    "activate_app": "Activate App",
+    "omni_activate_app": "Omni Activate App",
+}
+
 if _data_source in ("real", "real_no_filter"):
-    if _sdk_installs > 0:
-        st.success(f"SDK Events: {_sdk_installs} instalações detectadas no período")
+    if _all_sdk_events:
+        # Mostrar todos os eventos SDK encontrados (como no Events Manager)
+        _event_parts = []
+        for evt, count in sorted(_all_sdk_events.items(), key=lambda x: -x[1]):
+            label = _SDK_EVENT_LABELS.get(evt, evt)
+            _event_parts.append(f"{label}: **{count:,}**")
+        _events_summary = " | ".join(_event_parts)
+        _source_label = "SDK total" if _sdk_source == "app_event_aggregations" else "atribuido a anuncios"
+        st.success(f"SDK Events ({_source_label}): {_events_summary}")
+    elif _sdk_installs > 0:
+        st.success(f"SDK Events: {_sdk_installs:,} instalações detectadas no período")
     elif _diag.get("has_activate_app_events"):
         _proxy_installs = sum(_diag.get("activate_app_events", {}).values())
         st.warning(
@@ -1744,8 +1781,22 @@ if _data_source in ("real", "real_no_filter"):
 
 # Expandable diagnostics (always available, collapsed by default)
 with st.expander("Diagnóstico de eventos SDK (clique para expandir)"):
+    # Mostrar eventos SDK do endpoint dedicado (app_event_aggregations ou fallback)
+    if _all_sdk_events:
+        st.markdown(f"**Eventos SDK encontrados (fonte: `{_sdk_source}`):**")
+        for evt, count in sorted(_all_sdk_events.items(), key=lambda x: -x[1]):
+            label = _SDK_EVENT_LABELS.get(evt, evt)
+            st.markdown(f"- `{evt}` ({label}): **{count:,}**")
+
+    if _sdk_errors:
+        st.markdown("---")
+        st.markdown("**Erros ao buscar eventos SDK:**")
+        for err in _sdk_errors:
+            st.markdown(f"- {err}")
+
     if _diag and _diag.get("all_action_types"):
-        st.markdown("**All action_types retornados pela API Meta:**")
+        st.markdown("---")
+        st.markdown("**Action types do Ads Insights (atribuídos a anúncios):**")
         for atype, count in sorted(_diag["all_action_types"].items()):
             marker = ""
             if atype in INSTALL_ACTION_TYPES:
@@ -1763,21 +1814,8 @@ with st.expander("Diagnóstico de eventos SDK (clique para expandir)"):
         st.json(_diag.get("activate_app_events", {}))
         st.markdown("**Store click action_types encontrados:**")
         st.json(_diag.get("store_click_events", {}))
-        st.markdown("**Contadores:**")
-        st.json({
-            "total_action_types": _diag.get("total_action_types", 0),
-            "install_count": len(_diag.get("install_events", {})),
-            "activate_app_count": len(_diag.get("activate_app_events", {})),
-            "store_click_count": len(_diag.get("store_click_events", {})),
-        })
 
-        if _proxy_installs > 0:
-            st.info(
-                f"Install veio 0, usando proxy por Activate App: "
-                f"**{_proxy_installs}** (sinal secundário)."
-            )
-
-    elif _data_source in ("real", "real_no_filter"):
+    elif not _all_sdk_events and _data_source in ("real", "real_no_filter"):
         st.warning("Nenhum tipo de ação retornado pela API. Possíveis causas:")
         st.markdown("""
 1. **Token expirado ou sem permissão** — Verifique no Meta Business Suite
@@ -1995,10 +2033,20 @@ kpi_cards = [
     {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
 ]
 
-# Só mostrar KPIs de instalação se houver dados (evita exibir "0" sem contexto)
-_sdk_installs = meta_data.get('instalacoes_sdk', 0) or 0
-if _sdk_installs > 0:
-    kpi_cards.append({"icon": "📲", "label": "Instalações (SDK)", "value": f"{_sdk_installs:,.0f}", "delta": 0, "suffix": ""})
+# Mostrar KPIs de eventos SDK se houver dados
+_kpi_sdk_events = meta_data.get("_all_sdk_events", {})
+_kpi_sdk_installs = meta_data.get("instalacoes_sdk", 0) or 0
+
+if _kpi_sdk_installs > 0:
+    kpi_cards.append({"icon": "📲", "label": "Instalações (SDK)", "value": f"{_kpi_sdk_installs:,.0f}", "delta": 0, "suffix": ""})
+
+_kpi_activate = _kpi_sdk_events.get("fb_mobile_activate_app", 0) or _kpi_sdk_events.get("activate_app", 0)
+if _kpi_activate > 0 and _kpi_activate != _kpi_sdk_installs:
+    kpi_cards.append({"icon": "📱", "label": "Activate App (SDK)", "value": f"{_kpi_activate:,.0f}", "delta": 0, "suffix": ""})
+
+_kpi_view_content = _kpi_sdk_events.get("fb_mobile_content_view", 0)
+if _kpi_view_content > 0:
+    kpi_cards.append({"icon": "👁️", "label": "View Content (SDK)", "value": f"{_kpi_view_content:,.0f}", "delta": 0, "suffix": ""})
 
 kpi_cards_html = "\n".join(
     build_kpi_card(

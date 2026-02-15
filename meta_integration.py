@@ -210,7 +210,7 @@ class MetaAdsIntegration:
                 "access_token": self.access_token
             }
 
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
 
             data = response.json()
@@ -386,7 +386,7 @@ class MetaAdsIntegration:
         def _run_request(params: Dict[str, Any]) -> List[Dict[str, Any]]:
             if len(debug_info["requests"]) < 2:
                 debug_info["requests"].append(_sanitize_params(params))
-            response = requests.get(url, params=params)
+            response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
             data = response.json()
             insights = data.get("data", [])

@@ -4,17 +4,25 @@ Integração com Meta Ads API para obter dados de campanhas
 
 import json
 import logging
+import re
 import requests
+import time
 import warnings
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
+from urllib.parse import urljoin
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
 class MetaAdsIntegration:
-    def __init__(self, access_token: str, ad_account_id: str, app_id: str = None):
+    API_VERSION_PATTERN = re.compile(r"^v\d+\.\d+$")
+    DEFAULT_API_VERSION = "v21.0"
+    _AGG_ENDPOINT_UNSUPPORTED_CACHE = {}
+    _AGG_ENDPOINT_UNSUPPORTED_TTL_SECONDS = 3600
+
+    def __init__(self, access_token: str, ad_account_id: str, app_id: str = None, api_version: str = None):
         """
         Inicializa a integração com Meta Ads API
 
@@ -25,8 +33,98 @@ class MetaAdsIntegration:
         """
         self.access_token = access_token
         self.ad_account_id = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
-        self.app_id = app_id
-        self.base_url = "https://graph.facebook.com/v21.0"
+        self.app_id = self._normalize_app_id(app_id)
+        self.api_version = self._validate_api_version(api_version)
+        self.base_url = f"https://graph.facebook.com/{self.api_version}"
+
+
+    @staticmethod
+    def _normalize_app_id(app_id: str = None) -> str:
+        """Normaliza App ID para formato numérico esperado pelo Graph API."""
+        if app_id is None:
+            return None
+        normalized = str(app_id).strip()
+        if normalized.lower().startswith("app_"):
+            normalized = normalized[4:]
+        return normalized
+
+    def _validate_api_version(self, api_version: str = None) -> str:
+        """Valida a versão da API para evitar paths inválidos no Graph API."""
+        version = (api_version or self.DEFAULT_API_VERSION).strip()
+        if self.API_VERSION_PATTERN.fullmatch(version):
+            return version
+        logger.warning(
+            "Invalid API_VERSION '%s'. Falling back to default '%s'.",
+            version,
+            self.DEFAULT_API_VERSION,
+        )
+        return self.DEFAULT_API_VERSION
+
+    def _build_graph_url(self, object_id: str, edge: str = "") -> str:
+        """Monta URL do Graph API garantindo versão e segmentos corretos."""
+        base = f"{self.base_url.rstrip('/')}/"
+        object_id = str(object_id).strip("/")
+        edge = str(edge or "").lstrip("/")
+        path = f"{object_id}/{edge}" if edge else object_id
+        return urljoin(base, path)
+
+    @staticmethod
+    def _sanitize_debug_payload(payload: Any) -> Any:
+        """Remove dados sensíveis como tokens de payloads de debug."""
+        if isinstance(payload, dict):
+            sanitized = {}
+            for key, value in payload.items():
+                key_lower = str(key).lower()
+                if "token" in key_lower or "access_token" in key_lower:
+                    sanitized[key] = "***"
+                else:
+                    sanitized[key] = MetaAdsIntegration._sanitize_debug_payload(value)
+            return sanitized
+        if isinstance(payload, list):
+            return [MetaAdsIntegration._sanitize_debug_payload(i) for i in payload]
+        if isinstance(payload, str) and len(payload) > 12 and "EAA" in payload:
+            return f"{payload[:4]}***{payload[-4:]}"
+        return payload
+
+    def _probe_app_identity(self) -> dict:
+        """Prova de vida para validar app_id + token antes de aggregations."""
+        url = self._build_graph_url(self.app_id)
+        params = {"fields": "id,name", "access_token": self.access_token}
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            raw = response.json() if response.text else {}
+            if response.status_code == 200:
+                return {
+                    "app_identity_ok": True,
+                    "http_status": 200,
+                    "request_url": url,
+                    "response": self._sanitize_debug_payload({
+                        "id": raw.get("id"),
+                        "name": raw.get("name"),
+                    }),
+                    "error_code": None,
+                    "error_message": None,
+                }
+
+            err = raw.get("error", {}) if isinstance(raw, dict) else {}
+            return {
+                "app_identity_ok": False,
+                "http_status": response.status_code,
+                "request_url": url,
+                "response": self._sanitize_debug_payload(raw),
+                "error_code": err.get("code"),
+                "error_message": err.get("message", "Unknown error"),
+            }
+        except Exception as exc:
+            return {
+                "app_identity_ok": False,
+                "http_status": None,
+                "request_url": url,
+                "response": {"exception": str(exc)},
+                "error_code": None,
+                "error_message": str(exc),
+            }
+
 
     def verify_connection(self) -> Dict[str, Any]:
         """
@@ -610,13 +708,20 @@ class MetaAdsIntegration:
             Dict com chaves: count (int), success (bool), error (str|None),
                              http_status (int|None)
         """
-        url = f"{self.base_url}/{self.app_id}/app_event_aggregations"
+        url = self._build_graph_url(self.app_id, "app_event_aggregations")
         params = {
             "aggregation_period": "day",
             "time_range": json.dumps({"since": start_str, "until": end_str}),
             "event_name": event_name,
             "access_token": self.access_token,
         }
+        logger.debug(
+            "app_event_aggregations request_url=%s event=%s period=%s..%s",
+            url,
+            event_name,
+            start_str,
+            end_str,
+        )
         try:
             response = requests.get(url, params=params, timeout=30)
             if response.status_code == 200:
@@ -624,49 +729,57 @@ class MetaAdsIntegration:
                 data = raw.get("data", [])
                 total = 0
                 for day_data in data:
-                    # Handle different response formats
                     val = day_data.get("value") or day_data.get("count") or 0
                     total += int(float(val))
                 logger.debug(
                     "app_event_aggregations for '%s': HTTP 200, entries=%d, total=%d",
                     event_name, len(data), total,
                 )
-                return {"count": total, "success": True, "error": None, "http_status": 200}
-            else:
-                error_data = response.json() if response.text else {}
-                error_msg = error_data.get("error", {}).get("message", "Unknown error")
-                error_code = error_data.get("error", {}).get("code", "N/A")
-                logger.warning(
-                    "app_event_aggregations failed for '%s': HTTP %d, code=%s, msg=%s",
-                    event_name, response.status_code, error_code, error_msg,
-                )
                 return {
-                    "count": 0,
-                    "success": False,
-                    "error": f"HTTP {response.status_code}: code={error_code} — {error_msg}",
-                    "http_status": response.status_code,
+                    "count": total,
+                    "success": True,
+                    "error": None,
+                    "http_status": 200,
+                    "request_url": url,
+                    "endpoint_unsupported": False,
+                    "meta_error_code": None,
+                    "meta_error_message": None,
                 }
+
+            error_data = response.json() if response.text else {}
+            error_msg = error_data.get("error", {}).get("message", "Unknown error")
+            error_code = error_data.get("error", {}).get("code", "N/A")
+            logger.warning(
+                "app_event_aggregations failed for '%s': HTTP %d, code=%s, msg=%s",
+                event_name, response.status_code, error_code, error_msg,
+            )
+            is_url_correct = f"/{self.app_id}/app_event_aggregations" in url
+            endpoint_unsupported = response.status_code == 400 and str(error_code) == "2500" and is_url_correct
+            return {
+                "count": 0,
+                "success": False,
+                "error": f"HTTP {response.status_code}: code={error_code} — {error_msg} | request_url={url}",
+                "http_status": response.status_code,
+                "request_url": url,
+                "endpoint_unsupported": endpoint_unsupported,
+                "meta_error_code": error_code,
+                "meta_error_message": error_msg,
+            }
         except Exception as e:
             logger.warning("app_event_aggregations exception for '%s': %s", event_name, e)
-            return {"count": 0, "success": False, "error": str(e), "http_status": None}
+            return {
+                "count": 0,
+                "success": False,
+                "error": str(e),
+                "http_status": None,
+                "request_url": url,
+                "endpoint_unsupported": False,
+                "meta_error_code": None,
+                "meta_error_message": str(e),
+            }
 
     def get_all_sdk_events(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> dict:
-        """
-        Busca TODOS os eventos SDK relevantes com contagens para o período.
-        Retorna dados equivalentes ao que aparece no Events Manager do Facebook.
-
-        Tenta buscar via app_event_aggregations (dados totais do SDK).
-        Se falhar, faz fallback para Ads Insights no nível de conta (apenas atribuídos).
-
-        Returns:
-            Dict com chaves:
-                events: dict[str, int] - mapa de evento → contagem
-                source: str - endpoint que forneceu os dados
-                errors: list[str] - erros encontrados durante consulta
-                install_count: int - total de instalações encontradas
-                activate_count: int - total de activate_app encontradas
-                _debug: dict - informações de diagnóstico internas
-        """
+        """Busca eventos SDK com diagnóstico explícito e fallback seguro."""
         result = {
             "events": {},
             "source": "none",
@@ -687,7 +800,23 @@ class MetaAdsIntegration:
             result["errors"].append(f"Date parse error: {e}")
             return result
 
-        # Eventos SDK para consultar (nomes internos do Facebook SDK)
+        probe = self._probe_app_identity()
+        result["_debug"] = {
+            "app_identity_ok": probe.get("app_identity_ok", False),
+            "app_probe_http_status": probe.get("http_status"),
+            "app_probe_response": self._sanitize_debug_payload(probe.get("response", {})),
+            "app_probe_request_url": probe.get("request_url"),
+        }
+        if not probe.get("app_identity_ok"):
+            code = probe.get("error_code", "N/A")
+            msg = probe.get("error_message", "Unknown error")
+            http_status = probe.get("http_status")
+            result["source"] = "app_identity_probe_failed"
+            result["errors"].append(
+                f"Meta app identity probe failed: HTTP {http_status} code={code} — {msg}"
+            )
+            return result
+
         sdk_event_names = [
             "fb_mobile_install",
             "fb_mobile_activate_app",
@@ -697,15 +826,37 @@ class MetaAdsIntegration:
             "fb_mobile_complete_registration",
         ]
 
-        # PRIMÁRIO: Tentar app_event_aggregations para cada evento
         aggregations_worked = False
         agg_success_count = 0
         agg_fail_count = 0
         agg_empty_count = 0
         agg_fail_statuses = set()
+        agg_request_urls = []
+
+        cache_key = f"{self.app_id}:{self.api_version}"
+        cache_expiry = self._AGG_ENDPOINT_UNSUPPORTED_CACHE.get(cache_key, 0)
+        cache_active = cache_expiry > time.time()
+
+        if cache_active:
+            cached_url = self._build_graph_url(self.app_id, "app_event_aggregations")
+            agg_request_urls.append(cached_url)
+            result["errors"].append(
+                "Meta Graph não reconhece /app_event_aggregations para este App ID/versão. "
+                f"request_url={cached_url}"
+            )
+            result["_debug"].update({
+                "endpoint_unsupported": True,
+                "endpoint_unsupported_cached": True,
+                "endpoint_unsupported_request_url": cached_url,
+            })
 
         for event_name in sdk_event_names:
+            if cache_active:
+                break
             resp = self._query_app_event_aggregations(event_name, start_str, end_str)
+            if resp.get("request_url"):
+                agg_request_urls.append(resp["request_url"])
+
             if resp["success"]:
                 aggregations_worked = True
                 agg_success_count += 1
@@ -713,16 +864,30 @@ class MetaAdsIntegration:
                     result["events"][event_name] = resp["count"]
                 else:
                     agg_empty_count += 1
-            else:
-                agg_fail_count += 1
-                if resp.get("http_status"):
-                    agg_fail_statuses.add(resp["http_status"])
-                if resp["error"]:
-                    result["errors"].append(f"{event_name}: {resp['error']}")
+                continue
 
-        # Store debug info for diagnostics
-        result["_debug"] = {
-            "agg_attempted": True,
+            agg_fail_count += 1
+            if resp.get("http_status"):
+                agg_fail_statuses.add(resp["http_status"])
+
+            if resp.get("endpoint_unsupported"):
+                self._AGG_ENDPOINT_UNSUPPORTED_CACHE[cache_key] = time.time() + self._AGG_ENDPOINT_UNSUPPORTED_TTL_SECONDS
+                result["errors"].append(
+                    "Meta Graph não reconhece /app_event_aggregations para este App ID/versão. "
+                    f"request_url={resp.get('request_url')}"
+                )
+                result["_debug"].update({
+                    "endpoint_unsupported": True,
+                    "endpoint_unsupported_cached": False,
+                    "endpoint_unsupported_request_url": resp.get("request_url"),
+                })
+                break
+
+            if resp.get("error"):
+                result["errors"].append(f"{event_name}: {resp['error']}")
+
+        result["_debug"].update({
+            "agg_attempted": not cache_active,
             "agg_success": agg_success_count,
             "agg_fail": agg_fail_count,
             "agg_empty": agg_empty_count,
@@ -730,42 +895,28 @@ class MetaAdsIntegration:
             "agg_fail_statuses": sorted(agg_fail_statuses),
             "app_id": self.app_id,
             "period": f"{start_str} to {end_str}",
-        }
+            "agg_request_urls": agg_request_urls,
+        })
 
         if aggregations_worked and result["events"]:
             result["source"] = "app_event_aggregations"
             result["install_count"] = result["events"].get("fb_mobile_install", 0)
             result["activate_count"] = result["events"].get("fb_mobile_activate_app", 0)
-            logger.info(
-                "SDK events from app_event_aggregations: %s", result["events"]
-            )
             return result
 
-        # Diagnóstico: se todas as chamadas retornaram 200 mas sem dados
         if aggregations_worked and not result["events"]:
-            msg = (
+            result["errors"].append(
                 f"app_event_aggregations: {agg_success_count} consultas retornaram HTTP 200 "
-                f"mas todas com contagem 0. O SDK pode não estar enviando eventos, "
-                f"ou o App ID ({self.app_id}) pode não ter dados no período {start_str} a {end_str}."
+                f"mas todas com contagem 0 no período {start_str} a {end_str}."
             )
-            logger.warning(msg)
-            result["errors"].append(msg)
 
-        # Diagnóstico: se todas falharam (provavelmente permissão)
         if agg_fail_count == len(sdk_event_names):
             status_info = ", ".join(str(s) for s in sorted(agg_fail_statuses)) if agg_fail_statuses else "N/A"
-            msg = (
+            result["errors"].append(
                 f"app_event_aggregations: todas as {agg_fail_count} consultas falharam "
-                f"(HTTP status: {status_info}). "
-                f"Verifique permissões do token e se o App ID ({self.app_id}) está correto."
+                f"(HTTP status: {status_info}). Verifique permissões do token e App ID."
             )
-            logger.error(msg)
-            # Individual errors already appended above; add summary
-            result["errors"].append(msg)
 
-        # FALLBACK: Usar Ads Insights no nível de CONTA (sem filtro de campanha)
-        # para obter todos os action_types com contagens.
-        # NOTA: Retorna apenas eventos ATRIBUÍDOS a anúncios.
         logger.warning(
             "app_event_aggregations unavailable or empty. "
             "Falling back to account-level Ads Insights (attributed events only)."
@@ -783,8 +934,6 @@ class MetaAdsIntegration:
             response.raise_for_status()
 
             data = response.json().get("data", [])
-
-            # Coletar TODOS os action_types (não apenas installs)
             sdk_related_prefixes = (
                 "app_install", "mobile_app_install", "omni_app_install",
                 "fb_mobile_", "offsite_conversion.fb_mobile_",
@@ -807,16 +956,11 @@ class MetaAdsIntegration:
 
             if result["events"]:
                 result["source"] = "ads_insights_account_level"
-                # Somar instalações e activate_app
                 for atype, val in result["events"].items():
                     if atype in INSTALL_ACTION_TYPES:
                         result["install_count"] += val
                     if atype in ACTIVATE_APP_ACTION_TYPES:
                         result["activate_count"] += val
-                logger.info(
-                    "SDK events from account-level Ads Insights (attributed only): %s",
-                    result["events"],
-                )
             else:
                 result["errors"].append(
                     "Ads Insights (fallback): nenhum action_type relacionado ao SDK encontrado"

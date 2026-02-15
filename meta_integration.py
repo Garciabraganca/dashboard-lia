@@ -4,17 +4,22 @@ Integração com Meta Ads API para obter dados de campanhas
 
 import json
 import logging
+import re
 import requests
 import warnings
 from datetime import datetime, timedelta
 from typing import Dict, List, Any
+from urllib.parse import urljoin
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
 class MetaAdsIntegration:
-    def __init__(self, access_token: str, ad_account_id: str, app_id: str = None):
+    API_VERSION_PATTERN = re.compile(r"^v\d+\.\d+$")
+    DEFAULT_API_VERSION = "v21.0"
+
+    def __init__(self, access_token: str, ad_account_id: str, app_id: str = None, api_version: str = None):
         """
         Inicializa a integração com Meta Ads API
 
@@ -26,7 +31,28 @@ class MetaAdsIntegration:
         self.access_token = access_token
         self.ad_account_id = f"act_{ad_account_id}" if not ad_account_id.startswith("act_") else ad_account_id
         self.app_id = app_id
-        self.base_url = "https://graph.facebook.com/v21.0"
+        self.api_version = self._validate_api_version(api_version)
+        self.base_url = f"https://graph.facebook.com/{self.api_version}"
+
+    def _validate_api_version(self, api_version: str = None) -> str:
+        """Valida a versão da API para evitar paths inválidos no Graph API."""
+        version = (api_version or self.DEFAULT_API_VERSION).strip()
+        if self.API_VERSION_PATTERN.fullmatch(version):
+            return version
+        logger.warning(
+            "Invalid API_VERSION '%s'. Falling back to default '%s'.",
+            version,
+            self.DEFAULT_API_VERSION,
+        )
+        return self.DEFAULT_API_VERSION
+
+    def _build_graph_url(self, object_id: str, edge: str = "") -> str:
+        """Monta URL do Graph API garantindo versão e segmentos corretos."""
+        base = f"{self.base_url.rstrip('/')}/"
+        object_id = str(object_id).strip("/")
+        edge = str(edge or "").lstrip("/")
+        path = f"{object_id}/{edge}" if edge else object_id
+        return urljoin(base, path)
 
     def verify_connection(self) -> Dict[str, Any]:
         """
@@ -610,13 +636,20 @@ class MetaAdsIntegration:
             Dict com chaves: count (int), success (bool), error (str|None),
                              http_status (int|None)
         """
-        url = f"{self.base_url}/{self.app_id}/app_event_aggregations"
+        url = self._build_graph_url(self.app_id, "/app_event_aggregations")
         params = {
             "aggregation_period": "day",
             "time_range": json.dumps({"since": start_str, "until": end_str}),
             "event_name": event_name,
             "access_token": self.access_token,
         }
+        logger.debug(
+            "app_event_aggregations request_url=%s event=%s period=%s..%s",
+            url,
+            event_name,
+            start_str,
+            end_str,
+        )
         try:
             response = requests.get(url, params=params, timeout=30)
             if response.status_code == 200:
@@ -631,7 +664,13 @@ class MetaAdsIntegration:
                     "app_event_aggregations for '%s': HTTP 200, entries=%d, total=%d",
                     event_name, len(data), total,
                 )
-                return {"count": total, "success": True, "error": None, "http_status": 200}
+                return {
+                    "count": total,
+                    "success": True,
+                    "error": None,
+                    "http_status": 200,
+                    "request_url": url,
+                }
             else:
                 error_data = response.json() if response.text else {}
                 error_msg = error_data.get("error", {}).get("message", "Unknown error")
@@ -645,10 +684,17 @@ class MetaAdsIntegration:
                     "success": False,
                     "error": f"HTTP {response.status_code}: code={error_code} — {error_msg}",
                     "http_status": response.status_code,
+                    "request_url": url,
                 }
         except Exception as e:
             logger.warning("app_event_aggregations exception for '%s': %s", event_name, e)
-            return {"count": 0, "success": False, "error": str(e), "http_status": None}
+            return {
+                "count": 0,
+                "success": False,
+                "error": str(e),
+                "http_status": None,
+                "request_url": url,
+            }
 
     def get_all_sdk_events(self, date_range: str = "last_7d", custom_start: str = None, custom_end: str = None) -> dict:
         """
@@ -703,9 +749,12 @@ class MetaAdsIntegration:
         agg_fail_count = 0
         agg_empty_count = 0
         agg_fail_statuses = set()
+        agg_request_urls = []
 
         for event_name in sdk_event_names:
             resp = self._query_app_event_aggregations(event_name, start_str, end_str)
+            if resp.get("request_url"):
+                agg_request_urls.append(resp["request_url"])
             if resp["success"]:
                 aggregations_worked = True
                 agg_success_count += 1
@@ -730,6 +779,7 @@ class MetaAdsIntegration:
             "agg_fail_statuses": sorted(agg_fail_statuses),
             "app_id": self.app_id,
             "period": f"{start_str} to {end_str}",
+            "agg_request_urls": agg_request_urls,
         }
 
         if aggregations_worked and result["events"]:

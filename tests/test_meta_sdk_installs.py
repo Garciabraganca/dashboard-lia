@@ -231,6 +231,32 @@ def test_get_all_sdk_events_returns_all_event_counts(mock_meta_client):
         assert result["errors"] == []
 
 
+
+def test_app_event_aggregations_url_includes_app_id_and_valid_version(mock_meta_client):
+    """Garantir URL final no formato /{app_id}/app_event_aggregations e debug preenchido."""
+    mock_response = _make_agg_response(10)
+
+    with patch('requests.get') as mock_get:
+        mock_get.return_value = mock_response
+
+        result = mock_meta_client.get_all_sdk_events(date_range="last_7d")
+
+        first_call_url = mock_get.call_args_list[0][0][0]
+        assert "/test_app_id/app_event_aggregations" in first_call_url
+
+        debug_urls = result["_debug"]["agg_request_urls"]
+        assert debug_urls
+        assert all("/test_app_id/app_event_aggregations" in url for url in debug_urls)
+
+    # API version inválida deve cair para default válido
+    invalid_version_client = MetaAdsIntegration(
+        access_token="test_token",
+        ad_account_id="123456789",
+        app_id="test_app_id",
+        api_version="2024-01"
+    )
+    assert invalid_version_client.api_version == MetaAdsIntegration.DEFAULT_API_VERSION
+
 def test_get_all_sdk_events_logs_errors(mock_meta_client):
     """Test that errors from app_event_aggregations are logged"""
 

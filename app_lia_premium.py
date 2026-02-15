@@ -3,11 +3,11 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import base64
-import json
 import html
 import os
 import logging
 import textwrap
+from dashboard_kpis import build_meta_kpi_cards_payload
 
 # Importar integrações
 from config import Config
@@ -18,9 +18,9 @@ from meta_integration import MetaAdsIntegration
 try:
     from ai_agent import AIAgent
 except Exception as e:
-    logger.warning(f"AIAgent não disponível: {e}")
+    print(f"AIAgent não disponível: {e}")
     AIAgent = None
-from meta_funnel import ACTIVATE_APP_ACTION_TYPES, INSTALL_ACTION_TYPES, STORE_CLICK_ACTION_TYPES, build_meta_funnel, collect_action_type_diagnostics, collect_all_action_types, log_all_action_types, resolve_link_clicks, resolve_store_clicks, sum_actions_by_types
+from meta_funnel import ACTIVATE_APP_ACTION_TYPES, INSTALL_ACTION_TYPES, STORE_CLICK_ACTION_TYPES, collect_action_type_diagnostics, collect_all_action_types, sum_actions_by_types
 
 # =============================================================================
 # CONFIGURACAO DE LOGGING
@@ -213,6 +213,7 @@ class DataProvider:
 
         except Exception as e:
             logger.error("Failed to fetch SDK events: %s", e)
+            result["_sdk_source"] = result.get("_sdk_source", "error")
             result["_sdk_errors"] = [str(e)]
             result["_sdk_debug"] = {}
 
@@ -238,6 +239,7 @@ class DataProvider:
                     if aggregated:
                         result["alcance"] = aggregated.get("reach", result["alcance"])
                         result["frequencia"] = aggregated.get("frequency", result["frequencia"])
+                        result["_debug"] = {"aggregated_insights": aggregated.get("_debug", {})}
 
                     # Sempre buscar eventos SDK (são totais, não por campanha)
                     self._enrich_with_sdk_events(result, api_period, custom_start, custom_end)
@@ -265,6 +267,7 @@ class DataProvider:
                         if aggregated:
                             result["alcance"] = aggregated.get("reach", result["alcance"])
                             result["frequencia"] = aggregated.get("frequency", result["frequencia"])
+                            result["_debug"] = {"aggregated_insights": aggregated.get("_debug", {})}
 
                         # Sempre buscar eventos SDK (são totais, não por campanha)
                         self._enrich_with_sdk_events(result, api_period, custom_start, custom_end)
@@ -588,6 +591,8 @@ class DataProvider:
             "_data_source": "empty", "_filter_applied": None,
             "_requested_filter": None, "_available_campaigns": [],
             "_action_types_found": {},
+            "_sdk_source": "none", "_sdk_errors": [], "_sdk_debug": {},
+            "_debug": {},
         }
 
     def _empty_metrics(self):
@@ -605,6 +610,8 @@ class DataProvider:
             "delta_investimento": 12.5, "delta_impressoes": -5.2, "delta_alcance": 3.1,
             "delta_frequencia": 0.5, "delta_cliques": 15.8, "delta_ctr": 0.45,
             "delta_cpc": -8.2, "delta_cpm": 2.3,
+            "_sdk_source": "none", "_sdk_errors": [], "_sdk_debug": {},
+            "_debug": {},
         }
 
     def _get_mock_ga4_metrics(self):
@@ -728,10 +735,15 @@ data_provider = DataProvider(mode="auto")
 # =============================================================================
 # CACHED DATA FETCHERS (TTL = 5 min, keyed by params)
 # =============================================================================
+
+
+def _normalize_breakdowns_for_cache(breakdowns):
+    return tuple(sorted({str(b).strip() for b in (breakdowns or ()) if str(b).strip()}))
+
 @st.cache_data(ttl=300, show_spinner=False)
-def _fetch_meta_cached(period, campaign_filter, custom_start, custom_end):
+def _fetch_meta_cached(period, campaign_filter, custom_start, custom_end, level, breakdowns, app_id):
     return data_provider.get_meta_metrics(
-        period=period, campaign_filter=campaign_filter,
+        period=period, campaign_filter=campaign_filter, level=level,
         custom_start=custom_start, custom_end=custom_end,
     )
 
@@ -1695,7 +1707,9 @@ else:
 cycle_status = {"insights": ["Processando..."], "phase": "Carregando", "is_learning": True}
 try:
     with st.spinner("Sincronizando dados..."):
-        meta_data = _fetch_meta_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
+        _cache_app_id = data_provider.meta_client.app_id if data_provider.meta_client else "no_app_id"
+        _cache_breakdowns = _normalize_breakdowns_for_cache(())
+        meta_data = _fetch_meta_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str, "campaign", _cache_breakdowns, _cache_app_id)
         ga4_data = _fetch_ga4_cached(selected_period, custom_start_str, custom_end_str, ga4_campaign_filter)
         creative_data = _fetch_creative_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
         trends_data = _fetch_trends_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
@@ -2058,31 +2072,7 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
     </label>
     """).strip()
 
-kpi_cards = [
-    {"icon": "💰", "label": "Valor investido", "value": f"$ {meta_data.get('investimento', 0):,.2f}", "delta": meta_data.get('delta_investimento', 0), "suffix": "%"},
-    {"icon": "👀", "label": "Vezes que o anúncio apareceu", "value": f"{meta_data.get('impressoes', 0):,.0f}", "delta": meta_data.get('delta_impressoes', 0), "suffix": "%"},
-    {"icon": "📡", "label": "Pessoas alcançadas", "value": f"{meta_data.get('alcance', 0):,.0f}", "delta": meta_data.get('delta_alcance', 0), "suffix": "%"},
-    {"icon": "🔁", "label": "Vezes que cada pessoa viu", "value": f"{meta_data.get('frequencia', 0):.2f}", "delta": meta_data.get('delta_frequencia', 0), "suffix": "", "precision": 2},
-    {"icon": "🖱️", "label": "Cliques no anúncio", "value": f"{meta_data.get('cliques_link', 0):,.0f}", "delta": meta_data.get('delta_cliques', 0), "suffix": "%"},
-    {"icon": "🎯", "label": "Taxa de cliques", "value": f"{meta_data.get('ctr_link', 0):.2f}%", "delta": meta_data.get('delta_ctr', 0), "suffix": "pp", "precision": 2},
-    {"icon": "💡", "label": "Custo por clique", "value": f"$ {meta_data.get('cpc_link', 0):.2f}", "delta": meta_data.get('delta_cpc', 0), "suffix": "%", "invert": True},
-    {"icon": "📊", "label": "Custo por mil exibições", "value": f"$ {meta_data.get('cpm', 0):.2f}", "delta": meta_data.get('delta_cpm', 0), "suffix": "%", "invert": True},
-]
-
-# Mostrar KPIs de eventos SDK se houver dados
-_kpi_sdk_events = meta_data.get("_all_sdk_events", {})
-_kpi_sdk_installs = meta_data.get("instalacoes_sdk", 0) or 0
-
-if _kpi_sdk_installs > 0:
-    kpi_cards.append({"icon": "📲", "label": "Instalações (SDK)", "value": f"{_kpi_sdk_installs:,.0f}", "delta": 0, "suffix": ""})
-
-_kpi_activate = _kpi_sdk_events.get("fb_mobile_activate_app", 0) or _kpi_sdk_events.get("activate_app", 0)
-if _kpi_activate > 0 and _kpi_activate != _kpi_sdk_installs:
-    kpi_cards.append({"icon": "📱", "label": "Activate App (SDK)", "value": f"{_kpi_activate:,.0f}", "delta": 0, "suffix": ""})
-
-_kpi_view_content = _kpi_sdk_events.get("fb_mobile_content_view", 0)
-if _kpi_view_content > 0:
-    kpi_cards.append({"icon": "👁️", "label": "View Content (SDK)", "value": f"{_kpi_view_content:,.0f}", "delta": 0, "suffix": ""})
+kpi_cards = build_meta_kpi_cards_payload(meta_data)
 
 kpi_cards_html = "\n".join(
     build_kpi_card(

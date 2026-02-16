@@ -1731,6 +1731,9 @@ else:
     </div>
     ''', unsafe_allow_html=True)
 
+build_stamp = get_build_stamp()
+st.markdown(f"<div style='text-align:right;color:{LIA['text_muted']};font-size:12px;margin-bottom:8px;'>Build: {html.escape(build_stamp)}</div>", unsafe_allow_html=True)
+
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)
 # -----------------------------------------------------------------------------
@@ -1779,7 +1782,6 @@ if _fetch_ts:
 else:
     st.caption(f"Dados carregados em: {_now_sp()} (SP)")
 
-st.caption(f"🔖 {get_build_stamp()}")
 
 # -----------------------------------------------------------------------------
 # SDK EVENTS — dados para uso interno (sem poluir a tela)
@@ -1794,44 +1796,12 @@ _sdk_debug = meta_data.get("_sdk_debug", {})
 
 # Painel de diagnóstico SDK (apenas modo admin — colapsado por padrão)
 if st.session_state.get("show_integration_settings") and _data_source in ("real", "real_no_filter"):
-    with st.expander("🔧 Diagnóstico SDK (admin)", expanded=False):
-        _SDK_EVENT_LABELS = {
-            "fb_mobile_install": "App Installs",
-            "fb_mobile_activate_app": "Activate App",
-            "fb_mobile_content_view": "View Content",
-            "fb_mobile_purchase": "Purchase",
-            "fb_mobile_add_to_cart": "Add to Cart",
-            "fb_mobile_complete_registration": "Complete Registration",
-            "app_install": "App Install",
-            "mobile_app_install": "Mobile App Install",
-            "omni_app_install": "Omni App Install",
-            "activate_app": "Activate App",
-            "omni_activate_app": "Omni Activate App",
-        }
-        st.markdown(f"**Fonte dos dados SDK:** `{_sdk_source}`")
-        if _all_sdk_events:
-            for evt, count in sorted(_all_sdk_events.items(), key=lambda x: -x[1]):
-                label = _SDK_EVENT_LABELS.get(evt, evt)
-                st.markdown(f"- {label} (`{evt}`): **{count:,}**")
-        elif _sdk_installs > 0:
-            st.markdown(f"Instalações detectadas: **{_sdk_installs:,}**")
+    with st.expander("🔧 Instalações Meta (admin)", expanded=False):
+        st.info("Aguardando integração com campanha de instalações Meta.")
         if _sdk_errors:
-            st.markdown("**Erros:**")
+            st.caption("Detalhes técnicos (interno):")
             for err in _sdk_errors:
-                st.caption(f"⚠️ {err}")
-        if _sdk_debug:
-            st.markdown(f"App ID: `{_sdk_debug.get('app_id', 'N/A')}` | "
-                        f"Período: `{_sdk_debug.get('period', 'N/A')}` | "
-                        f"Probe OK: `{_sdk_debug.get('app_identity_ok', False)}`")
-        if _diag and _diag.get("all_action_types"):
-            st.markdown("**Action types do Ads Insights:**")
-            for atype, count in sorted(_diag["all_action_types"].items()):
-                marker = ""
-                if atype in INSTALL_ACTION_TYPES:
-                    marker = " ← INSTALL"
-                elif atype in ACTIVATE_APP_ACTION_TYPES:
-                    marker = " ← ACTIVATE"
-                st.caption(f"`{atype}`: {count}{marker}")
+                st.caption(f"• {err}")
 
 # -----------------------------------------------------------------------------
 # STATUS DO CICLO (COM CORUJA)
@@ -2299,15 +2269,14 @@ with cols[1]:
         # Funil de instalação: campanha de app install
         st.markdown('<div class="section-title"><div class="section-icon">V</div> Caminho do usuário até a instalação</div>', unsafe_allow_html=True)
         store_clicks_meta = int(meta_data.get("store_clicks_meta", 0) or 0)
-        instalacoes = int(meta_data.get("instalacoes_sdk", 0) or 0)
-        funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Instalaram o app (SDK)"]
+        funnel_labels = ["Viram o anúncio", "Clicaram no anúncio", "Foram para a loja do app", "Aguardando integração (campanha de instalações Meta)"]
         funnel_values = [
             int(meta_data.get('impressoes', 0) or 0),
             int(meta_data.get('cliques_link', 0) or 0),
             store_clicks_meta,
-            instalacoes,
+            0,
         ]
-        funnel_caption = "Funil de conversão · Mostra quantas pessoas passaram por cada etapa, desde ver o anúncio até instalar o app"
+        funnel_caption = "Funil de conversão · Etapa final de instalações aguardando integração com campanha de instalações Meta"
     else:
         # Funil de landing page: campanha de tráfego/conversão no site
         st.markdown('<div class="section-title"><div class="section-icon">V</div> Caminho do usuário até a ação no site</div>', unsafe_allow_html=True)
@@ -2367,9 +2336,9 @@ with cols[1]:
         if st.session_state.get("show_integration_settings"):
             _no_app_id = not getattr(data_provider, 'meta_client', None) or not getattr(data_provider.meta_client, 'app_id', None)
             if _no_app_id:
-                st.caption("ℹ️ Configure META_APP_ID nos Secrets para habilitar dados de instalação do SDK.")
+                st.caption("ℹ️ Instalações: aguardando integração com campanha de instalações Meta.")
             else:
-                st.caption("ℹ️ Nenhum evento de instalação SDK detectado no período. Verifique o Meta Events Manager.")
+                st.caption("ℹ️ Instalações: aguardando integração com campanha de instalações Meta.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -2477,7 +2446,7 @@ with table_cols[1]:
                 "cta_click_store": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
                 "click": "Clique genérico em algum elemento da página.",
                 "store_click": "Clique no botão que direciona para a loja do app (App Store ou Google Play). Indica intenção clara de instalação.",
-                "install": "Instalações do app (evento dependente da integração do SDK dentro do app).",
+                "install": "Aguardando integração com campanha de instalações Meta.",
             }
             columns = list(events_data.columns)
             header_html = "".join(f"<th>{html.escape(str(col))}</th>" for col in columns)
@@ -2505,13 +2474,13 @@ with table_cols[1]:
             st.markdown('</div>', unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de eventos: {e}")
-
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
-st.markdown('''
+st.markdown(f'''
 <div class="footer glass-card">
-    Dashboard Ciclo 2 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real
+    Dashboard Ciclo 2 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real<br>
+    <small>{html.escape(build_stamp)}</small>
 </div>
 ''', unsafe_allow_html=True)
 

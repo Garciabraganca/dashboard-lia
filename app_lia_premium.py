@@ -9,6 +9,7 @@ import logging
 import textwrap
 from dashboard_kpis import build_meta_kpi_cards_payload
 from build_info import get_build_stamp
+from landing_events_service import build_landing_events_card_data
 
 # Importar integrações
 from config import Config
@@ -527,74 +528,17 @@ class DataProvider:
 
     def get_landing_events_card_data(self, period="7d", custom_start=None, custom_end=None):
         """Retorna dados do card de Eventos da Landing (GA4) com fallback seguro."""
-        if not self.ga4_client or self.mode == "mock":
-            return {
-                "status": "unavailable",
-                "title": "Eventos (em desenvolvimento)",
-                "message": "Integração GA4/Meta em configuração. Este bloco será ativado quando GA4_PROPERTY_ID e credenciais estiverem válidos.",
-                "checklist": [
-                    "Adicionar a service account como Viewer na propriedade GA4",
-                    "Setar GA4_PROPERTY_ID",
-                    "Validar eventos da landing page",
-                ],
-                "error": "Credenciais GA4 ausentes ou modo mock ativo.",
-            }
-
+        events_mode = Config.get_events_mode()
         api_period = self._period_to_api_format(period)
         landing_host_filter = Config.get_landing_host_filter()
-        try:
-            summary = self.ga4_client.get_landing_events_summary(
-                date_range=api_period,
-                custom_start=custom_start,
-                custom_end=custom_end,
-                landing_host_filter=landing_host_filter,
-                limit=100,
-            )
-
-            rows = summary.get("rows", [])
-            if not rows:
-                return {
-                    "status": "no_data",
-                    "title": "Eventos da Landing (GA4)",
-                    "message": "GA4 conectado, mas sem eventos para o período selecionado.",
-                    "date_range": summary.get("date_range"),
-                    "landing_host_filter": landing_host_filter,
-                }
-
-            events_df = pd.DataFrame(rows)
-            grouped = events_df.groupby("Evento", as_index=False).agg({
-                "Contagem": "sum",
-                "Usuários": "sum",
-                "Conversões": "sum",
-            })
-            grouped = grouped.sort_values("Contagem", ascending=False).head(8)
-
-            return {
-                "status": "ok",
-                "title": "Eventos da Landing (GA4)",
-                "table": grouped,
-                "kpi_total_events": int(summary.get("total_events", 0)),
-                "kpi_total_users": int(summary.get("total_users", 0)),
-                "kpi_total_conversions": float(summary.get("total_conversions", 0)),
-                "key_event_totals": summary.get("key_event_totals", {}),
-                "has_key_events": bool(summary.get("has_key_events", False)),
-                "has_conversions": bool(summary.get("has_conversions", False)),
-                "date_range": summary.get("date_range"),
-                "landing_host_filter": landing_host_filter,
-            }
-        except Exception as e:
-            logger.error("Erro ao obter Eventos da Landing (GA4): %s", e)
-            return {
-                "status": "error",
-                "title": "Eventos (em desenvolvimento)",
-                "message": "Integração GA4/Meta em configuração. Este bloco será ativado quando GA4_PROPERTY_ID e credenciais estiverem válidos.",
-                "checklist": [
-                    "Adicionar a service account como Viewer na propriedade GA4",
-                    "Setar GA4_PROPERTY_ID",
-                    "Validar eventos da landing page",
-                ],
-                "error": str(e),
-            }
+        return build_landing_events_card_data(
+            self.ga4_client,
+            events_mode=events_mode,
+            period_api=api_period,
+            custom_start=custom_start,
+            custom_end=custom_end,
+            landing_host_filter=landing_host_filter,
+        )
 
     def get_creative_data(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
         if self.meta_client and self.mode != "mock":
@@ -1802,6 +1746,9 @@ else:
     </div>
     ''', unsafe_allow_html=True)
 
+build_stamp = get_build_stamp()
+st.markdown(f"<div style='text-align:right;color:{LIA['text_muted']};font-size:12px;margin-bottom:8px;'>Build: {html.escape(build_stamp)}</div>", unsafe_allow_html=True)
+
 # -----------------------------------------------------------------------------
 # CARREGAR DADOS (com tratamento de erro)
 # -----------------------------------------------------------------------------
@@ -1815,6 +1762,7 @@ try:
         creative_data = _fetch_creative_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
         trends_data = _fetch_trends_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
         cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
+        events_mode = Config.get_events_mode()
         landing_events_card_data = data_provider.get_landing_events_card_data(selected_period, custom_start_str, custom_end_str)
 except Exception as e:
     logger.error(f"Erro ao carregar dados do módulo Premium: {e}")
@@ -1831,6 +1779,7 @@ except Exception as e:
     }
     creative_data = {}
     trends_data = []
+    events_mode = Config.get_events_mode()
     landing_events_card_data = {"status": "error", "title": "Eventos (em desenvolvimento)", "message": "Integração GA4/Meta em configuração. Este bloco será ativado quando GA4_PROPERTY_ID e credenciais estiverem válidos.", "checklist": ["Adicionar a service account como Viewer na propriedade GA4", "Setar GA4_PROPERTY_ID", "Validar eventos da landing page"], "error": "Falha no carregamento de dados."}
 
 # -----------------------------------------------------------------------------
@@ -1852,7 +1801,6 @@ if _fetch_ts:
 else:
     st.caption(f"Dados carregados em: {_now_sp()} (SP)")
 
-st.caption(f"🔖 {get_build_stamp()}")
 
 # -----------------------------------------------------------------------------
 # SDK EVENTS — dados para uso interno (sem poluir a tela)
@@ -2495,7 +2443,8 @@ ga4_section = textwrap.dedent(f"""
 st.markdown(ga4_section, unsafe_allow_html=True)
 
 # Tabelas lado a lado: Origem/Midia e Eventos
-table_cols = st.columns(2)
+show_events_card = events_mode != "off"
+table_cols = st.columns(2) if show_events_card else st.columns(1)
 
 with table_cols[0]:
     # Tabela Origem/Midia
@@ -2530,80 +2479,82 @@ with table_cols[0]:
     except Exception as e:
         logger.error(f"Erro ao renderizar tabela de origem/midia: {e}")
 
-with table_cols[1]:
-    # Card: Eventos da Landing (GA4) com fallback seguro
-    try:
-        card_status = landing_events_card_data.get("status", "unavailable")
-        if card_status == "ok":
-            st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos da Landing (GA4)</span></div>', unsafe_allow_html=True)
+if show_events_card:
+    with table_cols[1]:
+        # Card: Eventos da Landing (GA4) com fallback seguro
+        try:
+            card_status = landing_events_card_data.get("status", "unavailable")
+            if card_status == "ok":
+                st.markdown('<div class="table-container">', unsafe_allow_html=True)
+                st.markdown('<div class="table-header"><span class="table-header-title">Eventos da Landing (GA4)</span></div>', unsafe_allow_html=True)
 
-            kpi_cols = st.columns(3)
-            with kpi_cols[0]:
-                st.metric("Total de eventos", f"{landing_events_card_data.get('kpi_total_events', 0):,}".replace(',', '.'))
-            with kpi_cols[1]:
-                st.metric("Usuários impactados", f"{landing_events_card_data.get('kpi_total_users', 0):,}".replace(',', '.'))
-            with kpi_cols[2]:
-                st.metric("Conversões GA4", f"{landing_events_card_data.get('kpi_total_conversions', 0):,.0f}".replace(',', '.'))
+                kpi_cols = st.columns(3)
+                with kpi_cols[0]:
+                    st.metric("Total de eventos", f"{landing_events_card_data.get('kpi_total_events', 0):,}".replace(',', '.'))
+                with kpi_cols[1]:
+                    st.metric("Usuários impactados", f"{landing_events_card_data.get('kpi_total_users', 0):,}".replace(',', '.'))
+                with kpi_cols[2]:
+                    st.metric("Conversões GA4", f"{landing_events_card_data.get('kpi_total_conversions', 0):,.0f}".replace(',', '.'))
 
-            table_df = landing_events_card_data.get("table", pd.DataFrame()).copy()
-            if not table_df.empty:
-                table_df = table_df.rename(columns={
-                    "Evento": "Evento",
-                    "Contagem": "Contagem",
-                    "Usuários": "Usuários",
-                    "Conversões": "Conversões",
-                })
-                st.dataframe(table_df, use_container_width=True, hide_index=True)
+                table_df = landing_events_card_data.get("table", pd.DataFrame()).copy()
+                if not table_df.empty:
+                    table_df = table_df.rename(columns={
+                        "Evento": "Evento",
+                        "Contagem": "Contagem",
+                        "Usuários": "Usuários",
+                        "Conversões": "Conversões",
+                    })
+                    st.dataframe(table_df, use_container_width=True, hide_index=True)
 
-            if landing_events_card_data.get("has_key_events"):
-                mapped = landing_events_card_data.get("key_event_totals", {})
-                mapped_text = " | ".join([f"{k}: {v:,}".replace(',', '.') for k, v in mapped.items()])
-                st.caption(f"Eventos-chave mapeados: {mapped_text}")
+                if landing_events_card_data.get("has_key_events"):
+                    mapped = landing_events_card_data.get("key_event_totals", {})
+                    mapped_text = " | ".join([f"{k}: {v:,}".replace(',', '.') for k, v in mapped.items()])
+                    st.caption(f"Eventos-chave mapeados: {mapped_text}")
+                else:
+                    st.caption("Conversões não configuradas no GA4 para os eventos-chave (generate_lead, form_submit, whatsapp_click, page_view).")
+
+                if not landing_events_card_data.get("has_conversions"):
+                    st.caption("Conversões não configuradas no GA4 (métrica conversions = 0 no período).")
+
+                if landing_events_card_data.get("landing_host_filter"):
+                    st.caption(f"Filtro de host da landing: {landing_events_card_data['landing_host_filter']}")
+                if landing_events_card_data.get("date_range"):
+                    st.caption(f"Período GA4: {landing_events_card_data['date_range']}")
+
+                st.markdown('</div>', unsafe_allow_html=True)
+            elif card_status == "no_data":
+                st.markdown('<div class="table-container">', unsafe_allow_html=True)
+                st.markdown('<div class="table-header"><span class="table-header-title">Eventos da Landing (GA4)</span></div>', unsafe_allow_html=True)
+                st.info(landing_events_card_data.get("message", "Sem dados no período."))
+                st.markdown('</div>', unsafe_allow_html=True)
             else:
-                st.caption("Conversões não configuradas no GA4 para os eventos-chave (generate_lead, form_submit, whatsapp_click, page_view).")
+                st.markdown('<div class="table-container">', unsafe_allow_html=True)
+                st.markdown('<div class="table-header"><span class="table-header-title">Eventos (em desenvolvimento)</span></div>', unsafe_allow_html=True)
+                st.markdown(
+                    "Integração GA4/Meta em configuração. Este bloco será ativado quando GA4_PROPERTY_ID e credenciais estiverem válidos."
+                )
+                checklist = landing_events_card_data.get("checklist", [
+                    "Adicionar a service account como Viewer na propriedade GA4",
+                    "Setar GA4_PROPERTY_ID",
+                    "Validar eventos da LP",
+                ])
+                for item in checklist:
+                    st.markdown(f"- [ ] {item}")
 
-            if not landing_events_card_data.get("has_conversions"):
-                st.caption("Conversões não configuradas no GA4 (métrica conversions = 0 no período).")
-
-            if landing_events_card_data.get("landing_host_filter"):
-                st.caption(f"Filtro de host da landing: {landing_events_card_data['landing_host_filter']}")
-            if landing_events_card_data.get("date_range"):
-                st.caption(f"Período GA4: {landing_events_card_data['date_range']}")
-
-            st.markdown('</div>', unsafe_allow_html=True)
-        elif card_status == "no_data":
-            st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos da Landing (GA4)</span></div>', unsafe_allow_html=True)
-            st.info(landing_events_card_data.get("message", "Sem dados no período."))
-            st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="table-container">', unsafe_allow_html=True)
-            st.markdown('<div class="table-header"><span class="table-header-title">Eventos (em desenvolvimento)</span></div>', unsafe_allow_html=True)
-            st.markdown(
-                "Integração GA4/Meta em configuração. Este bloco será ativado quando GA4_PROPERTY_ID e credenciais estiverem válidos."
-            )
-            checklist = landing_events_card_data.get("checklist", [
-                "Adicionar a service account como Viewer na propriedade GA4",
-                "Setar GA4_PROPERTY_ID",
-                "Validar eventos da LP",
-            ])
-            for item in checklist:
-                st.markdown(f"- [ ] {item}")
-
-            error_msg = landing_events_card_data.get("error")
-            if error_msg and st.session_state.get("show_integration_settings"):
-                with st.expander("Detalhes técnicos (operador)", expanded=False):
-                    st.code(str(error_msg))
-            st.markdown('</div>', unsafe_allow_html=True)
-    except Exception as e:
-        logger.error(f"Erro ao renderizar card de eventos da landing: {e}")
+                error_msg = landing_events_card_data.get("error")
+                if error_msg and st.session_state.get("show_integration_settings"):
+                    with st.expander("Detalhes técnicos (operador)", expanded=False):
+                        st.code(str(error_msg))
+                st.markdown('</div>', unsafe_allow_html=True)
+        except Exception as e:
+            logger.error(f"Erro ao renderizar card de eventos da landing: {e}")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Footer
-st.markdown('''
+st.markdown(f'''
 <div class="footer glass-card">
-    Dashboard Ciclo 2 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real
+    Dashboard Ciclo 2 - <a href="https://applia.ai" target="_blank">LIA App</a> - Atualizado em tempo real<br>
+    <small>{html.escape(build_stamp)}</small>
 </div>
 ''', unsafe_allow_html=True)
 

@@ -179,6 +179,23 @@ class Config:
         return {}
 
     @classmethod
+    def get_events_mode(cls) -> str:
+        """Define modo dos eventos: ga4|off.
+
+        Prioridade:
+        1) ENV/secret EVENTS_MODE (ga4/off)
+        2) default automático: ga4 se GA4 configurado, senão off
+        """
+        raw = os.getenv("EVENTS_MODE") or cls._get_streamlit_secret("EVENTS_MODE")
+        if raw:
+            normalized = str(raw).strip().lower()
+            if normalized in {"ga4", "off"}:
+                return normalized
+            logger.warning("EVENTS_MODE inválido '%s'; usando fallback automático", raw)
+
+        return "ga4" if cls.validate_ga4_credentials() else "off"
+
+    @classmethod
     def get_openai_api_key(cls) -> Optional[str]:
         """Obtém a chave da API OpenAI"""
         # Primeiro tenta variável de ambiente

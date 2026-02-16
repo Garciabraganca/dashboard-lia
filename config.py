@@ -31,6 +31,8 @@ class Config:
     GA4_APP_PROPERTY_ID: Optional[str] = os.getenv("GA4_APP_PROPERTY_ID")
     GCP_CREDENTIALS_JSON: Optional[str] = os.getenv("GCP_CREDENTIALS_JSON")
     GOOGLE_SERVICE_ACCOUNT_JSON: Optional[str] = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    GA4_SERVICE_ACCOUNT_JSON: Optional[str] = os.getenv("GA4_SERVICE_ACCOUNT_JSON")
+    LANDING_HOST_FILTER: Optional[str] = os.getenv("LANDING_HOST_FILTER")
 
     # OpenAI
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
@@ -97,6 +99,14 @@ class Config:
 
         return cls._get_streamlit_secret("GA4_PROPERTY_ID", cls.GA4_PROPERTY_ID)
 
+    @classmethod
+    def get_landing_host_filter(cls) -> Optional[str]:
+        """Obtém host opcional para filtrar eventos da landing page."""
+        env_value = os.getenv("LANDING_HOST_FILTER")
+        if env_value:
+            return env_value
+        return cls._get_streamlit_secret("LANDING_HOST_FILTER")
+
 
     @classmethod
     def get_ga4_app_property_id(cls) -> Optional[str]:
@@ -120,7 +130,14 @@ class Config:
             Dicionário com credenciais da service account
         """
         # Tentar variável de ambiente primeiro
-        env_creds_json = os.getenv("GCP_CREDENTIALS_JSON") or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON") or cls.GCP_CREDENTIALS_JSON or cls.GOOGLE_SERVICE_ACCOUNT_JSON
+        env_creds_json = (
+            os.getenv("GA4_SERVICE_ACCOUNT_JSON")
+            or os.getenv("GCP_CREDENTIALS_JSON")
+            or os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+            or cls.GA4_SERVICE_ACCOUNT_JSON
+            or cls.GCP_CREDENTIALS_JSON
+            or cls.GOOGLE_SERVICE_ACCOUNT_JSON
+        )
         if env_creds_json:
             try:
                 creds = json.loads(env_creds_json)
@@ -133,7 +150,9 @@ class Config:
         if HAS_STREAMLIT:
             try:
                 # Usar acesso direto em vez de .get()
-                if "GCP_CREDENTIALS" in st.secrets:
+                if "GA4_SERVICE_ACCOUNT_JSON" in st.secrets:
+                    gcp_creds = json.loads(str(st.secrets["GA4_SERVICE_ACCOUNT_JSON"]))
+                elif "GCP_CREDENTIALS" in st.secrets:
                     gcp_creds = st.secrets["GCP_CREDENTIALS"]
                 elif "GOOGLE_SERVICE_ACCOUNT_JSON" in st.secrets:
                     gcp_creds = json.loads(str(st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]))

@@ -2001,7 +2001,8 @@ def build_kpi_card(icon, label, value, delta, suffix="%", invert=False, precisio
     </label>
     """).strip()
 
-kpi_cards = build_meta_kpi_cards_payload(meta_data)
+meta_cards_data = {**meta_data, "show_install_kpis": Config.get_install_campaigns_configured()}
+kpi_cards = build_meta_kpi_cards_payload(meta_cards_data)
 
 kpi_cards_html = "\n".join(
     build_kpi_card(

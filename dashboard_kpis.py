@@ -26,19 +26,20 @@ def build_meta_kpi_cards_payload(meta_data: dict) -> list:
 
     sdk_events = meta_data.get("_all_sdk_events", {})
     sdk_installs = int(_num(meta_data.get("instalacoes_sdk"), 0.0))
+    show_install_kpis = bool(meta_data.get("show_install_kpis", False))
 
-    if sdk_installs > 0:
+    if show_install_kpis and sdk_installs > 0:
         installs_label = "Instalações (GA4)" if meta_data.get("_sdk_source") == "ga4_first_open" else "Instalações (SDK)"
         cards.append({"icon": "📲", "label": installs_label, "value": f"{sdk_installs:,.0f}", "delta": 0, "suffix": ""})
 
     primary_activate = sdk_events.get("fb_mobile_activate_app")
     activate_raw = primary_activate if primary_activate is not None else sdk_events.get("activate_app", 0.0)
     activate = int(_num(activate_raw, 0.0))
-    if activate > 0 and activate != sdk_installs:
+    if show_install_kpis and activate > 0 and activate != sdk_installs:
         cards.append({"icon": "📱", "label": "Activate App (SDK)", "value": f"{activate:,.0f}", "delta": 0, "suffix": ""})
 
     view_content = int(_num(sdk_events.get("fb_mobile_content_view"), 0.0))
-    if view_content > 0:
+    if show_install_kpis and view_content > 0:
         cards.append({"icon": "👁️", "label": "View Content (SDK)", "value": f"{view_content:,.0f}", "delta": 0, "suffix": ""})
 
     return cards

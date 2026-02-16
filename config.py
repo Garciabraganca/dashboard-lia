@@ -179,6 +179,13 @@ class Config:
         return {}
 
     @classmethod
+    def get_install_campaigns_configured(cls) -> bool:
+        """Indica se as campanhas de instalação Meta já estão configuradas."""
+        raw = os.getenv("INSTALL_CAMPAIGNS_CONFIGURED") or cls._get_streamlit_secret("INSTALL_CAMPAIGNS_CONFIGURED", False)
+        normalized = str(raw).strip().lower()
+        return normalized in {"1", "true", "yes", "on"}
+
+    @classmethod
     def get_events_mode(cls) -> str:
         """Define modo dos eventos: ga4|off.
 

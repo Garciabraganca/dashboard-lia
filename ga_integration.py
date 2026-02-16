@@ -40,6 +40,14 @@ class GA4Integration:
         # Inicializar cliente
         self.client = BetaAnalyticsDataClient(credentials=self.credentials)
 
+    @property
+    def _property_resource(self) -> str:
+        """Retorna o resource name no formato properties/XXXXXXXX."""
+        value = str(self.property_id or "").strip()
+        if value.startswith("properties/"):
+            return value
+        return f"properties/{value}"
+
     def _build_campaign_filter(self, campaign_filter: str) -> FilterExpression:
         """
         Cria filtro por campanha (utm_campaign) para as queries GA4
@@ -127,7 +135,7 @@ class GA4Integration:
 
             # Criar requisição
             request = RunReportRequest(
-                property=f"properties/{self.property_id}",
+                property=self._property_resource,
                 date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
                 dimensions=[
                     Dimension(name="date"),
@@ -187,7 +195,7 @@ class GA4Integration:
 
             # Criar requisição com métricas detalhadas
             request_params = {
-                "property": f"properties/{self.property_id}",
+                "property": self._property_resource,
                 "date_ranges": [DateRange(start_date=start_date_str, end_date=end_date_str)],
                 "dimensions": [
                     Dimension(name="eventName"),
@@ -245,7 +253,7 @@ class GA4Integration:
         try:
             start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
             request = RunReportRequest(
-                property=f"properties/{self.property_id}",
+                property=self._property_resource,
                 date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
                 dimensions=[Dimension(name="eventName")],
                 metrics=[Metric(name="eventCount")],
@@ -288,7 +296,7 @@ class GA4Integration:
 
             # Criar requisição para métricas agregadas
             request_params = {
-                "property": f"properties/{self.property_id}",
+                "property": self._property_resource,
                 "date_ranges": [DateRange(start_date=start_date_str, end_date=end_date_str)],
                 "metrics": [
                     Metric(name="sessions"),
@@ -346,7 +354,7 @@ class GA4Integration:
 
             # Criar requisição
             request_params = {
-                "property": f"properties/{self.property_id}",
+                "property": self._property_resource,
                 "date_ranges": [DateRange(start_date=start_date_str, end_date=end_date_str)],
                 "dimensions": [
                     Dimension(name="sessionSourceMedium"),
@@ -410,7 +418,7 @@ class GA4Integration:
 
             # Criar requisição para listar campanhas
             request = RunReportRequest(
-                property=f"properties/{self.property_id}",
+                property=self._property_resource,
                 date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
                 dimensions=[
                     Dimension(name="sessionCampaignName"),
@@ -463,7 +471,7 @@ class GA4Integration:
 
             # 1. Verificar conexão básica (total de sessões)
             basic_request = RunReportRequest(
-                property=f"properties/{self.property_id}",
+                property=self._property_resource,
                 date_ranges=[DateRange(start_date=start_date_str, end_date=end_date_str)],
                 metrics=[
                     Metric(name="sessions"),
@@ -512,6 +520,88 @@ class GA4Integration:
                 'error': str(e),
                 'status': 'error'
             }
+
+    def get_landing_events_summary(
+        self,
+        date_range: str = "last_7d",
+        custom_start: str = None,
+        custom_end: str = None,
+        landing_host_filter: str = None,
+        limit: int = 8,
+    ) -> Dict[str, Any]:
+        """Obtém resumo de eventos da landing page para o card dedicado."""
+        start_date_str, end_date_str = self._get_date_range(date_range, custom_start, custom_end)
+
+        request_params = {
+            "property": self._property_resource,
+            "date_ranges": [DateRange(start_date=start_date_str, end_date=end_date_str)],
+            "dimensions": [
+                Dimension(name="date"),
+                Dimension(name="eventName"),
+            ],
+            "metrics": [
+                Metric(name="eventCount"),
+                Metric(name="totalUsers"),
+                Metric(name="conversions"),
+            ],
+            "order_bys": [
+                {"metric": {"metric_name": "eventCount"}, "desc": True},
+            ],
+            "limit": max(1, int(limit)),
+        }
+
+        if landing_host_filter:
+            request_params["dimension_filter"] = FilterExpression(
+                filter=Filter(
+                    field_name="pageLocation",
+                    string_filter=Filter.StringFilter(
+                        match_type=Filter.StringFilter.MatchType.CONTAINS,
+                        value=landing_host_filter,
+                        case_sensitive=False,
+                    ),
+                )
+            )
+
+        response = self.client.run_report(RunReportRequest(**request_params))
+
+        rows = []
+        total_events = 0
+        total_users = 0
+        total_conversions = 0.0
+        events_by_name: Dict[str, int] = {}
+
+        for row in response.rows:
+            event_name = row.dimension_values[1].value
+            event_count = int(float(row.metric_values[0].value or 0))
+            users = int(float(row.metric_values[1].value or 0))
+            conversions = float(row.metric_values[2].value or 0)
+
+            rows.append({
+                "Data": row.dimension_values[0].value,
+                "Evento": event_name,
+                "Contagem": event_count,
+                "Usuários": users,
+                "Conversões": round(conversions, 2),
+            })
+
+            total_events += event_count
+            total_users += users
+            total_conversions += conversions
+            events_by_name[event_name] = events_by_name.get(event_name, 0) + event_count
+
+        key_events = ["generate_lead", "form_submit", "whatsapp_click", "page_view"]
+        key_event_totals = {name: events_by_name.get(name, 0) for name in key_events if events_by_name.get(name, 0) > 0}
+
+        return {
+            "rows": rows,
+            "total_events": total_events,
+            "total_users": total_users,
+            "total_conversions": round(total_conversions, 2),
+            "has_conversions": total_conversions > 0,
+            "key_event_totals": key_event_totals,
+            "has_key_events": bool(key_event_totals),
+            "date_range": f"{start_date_str} a {end_date_str}",
+        }
 
     def _empty_metrics(self) -> Dict[str, Any]:
         """Retorna métricas vazias em caso de erro"""

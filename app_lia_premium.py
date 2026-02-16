@@ -9,6 +9,7 @@ import logging
 import textwrap
 from dashboard_kpis import build_meta_kpi_cards_payload
 from build_info import get_build_stamp
+from landing_events_service import build_landing_events_card_data
 
 # Importar integrações
 from config import Config
@@ -524,6 +525,20 @@ class DataProvider:
                 logger.error(f"Erro ao obter eventos reais: {e}")
 
         return self._get_mock_events_data()
+
+    def get_landing_events_card_data(self, period="7d", custom_start=None, custom_end=None):
+        """Retorna dados do card de Eventos da Landing (GA4) com fallback seguro."""
+        events_mode = Config.get_events_mode()
+        api_period = self._period_to_api_format(period)
+        landing_host_filter = Config.get_landing_host_filter()
+        return build_landing_events_card_data(
+            self.ga4_client,
+            events_mode=events_mode,
+            period_api=api_period,
+            custom_start=custom_start,
+            custom_end=custom_end,
+            landing_host_filter=landing_host_filter,
+        )
 
     def get_creative_data(self, period="7d", custom_start=None, custom_end=None, campaign_filter=None):
         if self.meta_client and self.mode != "mock":
@@ -1747,6 +1762,8 @@ try:
         creative_data = _fetch_creative_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
         trends_data = _fetch_trends_cached(selected_period, meta_campaign_filter, custom_start_str, custom_end_str)
         cycle_status = data_provider.get_cycle_status(selected_period, meta_data, creative_data)
+        events_mode = Config.get_events_mode()
+        landing_events_card_data = data_provider.get_landing_events_card_data(selected_period, custom_start_str, custom_end_str)
 except Exception as e:
     logger.error(f"Erro ao carregar dados do módulo Premium: {e}")
     meta_data = {
@@ -1762,6 +1779,8 @@ except Exception as e:
     }
     creative_data = {}
     trends_data = []
+    events_mode = Config.get_events_mode()
+    landing_events_card_data = {"status": "error", "title": "Eventos (em desenvolvimento)", "message": "Integração GA4/Meta em configuração. Este bloco será ativado quando GA4_PROPERTY_ID e credenciais estiverem válidos.", "checklist": ["Adicionar a service account como Viewer na propriedade GA4", "Setar GA4_PROPERTY_ID", "Validar eventos da landing page"], "error": "Falha no carregamento de dados."}
 
 # -----------------------------------------------------------------------------
 # REFRESH BUTTON + LAST UPDATED TIMESTAMP
@@ -2392,7 +2411,8 @@ ga4_section = textwrap.dedent(f"""
 st.markdown(ga4_section, unsafe_allow_html=True)
 
 # Tabelas lado a lado: Origem/Midia e Eventos
-table_cols = st.columns(2)
+show_events_card = events_mode != "off"
+table_cols = st.columns(2) if show_events_card else st.columns(1)
 
 with table_cols[0]:
     # Tabela Origem/Midia
